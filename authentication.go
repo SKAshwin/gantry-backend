@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -16,6 +17,8 @@ var allowedCorsOrigins = []string{"http://localhost:8080"}
 var loginURL = "/api/auth/login"
 var signingKey = []byte("theSecretPassword")
 var loginTokenUsername, loginTokenExpiryTime = "username", "exp"
+var admins = "app_admin"
+var users = "app_user"
 
 type loginDetails struct {
 	Username string `json:"username"`
@@ -31,12 +34,10 @@ var loginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request)
 	decoder := json.NewDecoder(r.Body)
 	var ld loginDetails
 	err := decoder.Decode(&ld)
-	if err != nil {
-		panic(err)
-	}
+	panicIf(err)
 	fmt.Println(ld.Username)
 
-	if authenticate(ld) {
+	if authenticate(ld, admins) {
 		jwtToken := createToken(ld)
 		reply, _ := json.Marshal(map[string]string{"accessToken": jwtToken})
 		w.Write(reply)
@@ -56,20 +57,24 @@ func createToken(user loginDetails) string {
 	claims[loginTokenExpiryTime] = time.Now().Add(time.Hour).Unix()
 
 	tokenSigned, err := token.SignedString(signingKey)
-	if err != nil {
-		panic(err)
-	}
+	panicIf(err)
 
 	return tokenSigned
 }
 
-func authenticate(user loginDetails) bool {
-	//still in testing
-	if user.Username == "admin567" {
-		return bcrypt.CompareHashAndPassword([]byte("$2a$05$Is.BydwHRaXnXTB5rVFDQerDElDYS6Qbl4KH.T5fVyTvdQHXWNZTS"), []byte(user.Password)) == nil //method returns nil if there is a match between password and hash
-		//current password is password
+func authenticate(user loginDetails, tableName string) bool {
+	if tableName == "app_admin" {
+		//TODO implement logic to handle both user and admin authentication
 	}
-	return false
+	stmt, err := db.Prepare("SELECT passwordHash FROM app_admin where username = $2")
+	panicIf(err)
+	var passwordHash string
+	err = stmt.QueryRow(user.Username).Scan(&passwordHash)
+	if err == sql.ErrNoRows {
+		return false //no such username exists
+	}
+	panicIf(err)                                                                             //any other error should be panicked on
+	return bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(user.Password)) == nil //method returns nil if there is a match between password and hash
 }
 
 func hashAndSalt(pwd []byte) string {

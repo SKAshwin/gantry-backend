@@ -132,3 +132,9 @@ func recoverWrap(h http.Handler) http.Handler {
 		h.ServeHTTP(w, r)
 	})
 }
+
+func panicIf(err error) {
+	if err != nil {
+		panic(err)
+	}
+}
