@@ -7,13 +7,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"github.com/rs/cors"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var HASH_COST = 5 //cost must be above 4
+var HASH_COST = 5 //cost must be above 4, the larger you make it the slower the hash function will run
 var ALLOWED_CORS_ORIGINS = []string{"http://localhost:8080"}
 var LOGIN_URL = "/api/auth/login"
 var signingKey = []byte("theSecretPassword")
@@ -24,18 +24,22 @@ func main() {
 	r.Handle(LOGIN_URL, loginHandler).Methods("POST")
 	handler := cors.New(cors.Options{
 		AllowedOrigins: ALLOWED_CORS_ORIGINS,
-	}).Handler(r) //only allow GETs POSTs from that address; the bare minimum needed
+	}).Handler(r) //only allow GETs POSTs from that address (LOGIN_URL, the client-side address); the bare minimum needed
 	http.ListenAndServe(":3000", handler) //PostGres listens on 5432
 }
 
-type LoginDetails struct {
+type loginDetails struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
+type response struct {
+	Message string `json:"message"`
+}
+
 var loginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
-	var ld LoginDetails
+	var ld loginDetails
 	err := decoder.Decode(&ld)
 	if err != nil {
 		fmt.Println(err)
@@ -45,14 +49,23 @@ var loginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request)
 
 	if authenticate(ld) {
 		jwtToken := createToken(ld)
-		w.Write([]byte(jwtToken))
+		if reply, err := json.Marshal(map[string]string{"accessToken": jwtToken}); err != nil {
+			panic(err) //TODO deal with json marshalling error
+		} else {
+			w.Write(reply)
+		}
 	} else {
-		fmt.Println("FAILED AUTHENTICATE")
+		w.WriteHeader(http.StatusUnauthorized)
+		if reply, err := json.Marshal(response{Message: "Incorrect Username or Password"}); err != nil {
+			panic(err) //TODO deal with json marshalling error
+		} else {
+			w.Write(reply)
+		}
 	}
 
 })
 
-func createToken(user LoginDetails) string {
+func createToken(user loginDetails) string {
 	token := jwt.New(jwt.SigningMethodHS256)
 	claims := token.Claims.(jwt.MapClaims)
 
@@ -64,10 +77,11 @@ func createToken(user LoginDetails) string {
 	return tokenSigned
 }
 
-func authenticate(user LoginDetails) bool {
+func authenticate(user loginDetails) bool {
 	//still in testing
 	if user.Username == "admin567" {
-		return bcrypt.CompareHashAndPassword([]byte("$2a$05$eFNkk5Pdou0I6tzHErvo3ug6VXnercYCMDWdAssVPT0l.BVxLhOXK"), []byte(user.Password)) == nil //method returns nil if there is a match between password and hash
+		return bcrypt.CompareHashAndPassword([]byte("$2a$05$Is.BydwHRaXnXTB5rVFDQerDElDYS6Qbl4KH.T5fVyTvdQHXWNZTS"), []byte(user.Password)) == nil //method returns nil if there is a match between password and hash
+		//current password is password
 	}
 	return false
 }
