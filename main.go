@@ -37,11 +37,7 @@ var db *sql.DB
 
 func main() {
 	//redirectLogger()
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-		panic(err)
-	}
+	loadEnvironmentalVariables()
 	initDB()
 	r := mux.NewRouter()
 	r.Handle(loginURL, recoverWrap(loginHandler)).Methods("POST")
@@ -51,7 +47,17 @@ func main() {
 	http.ListenAndServe(":3000", handler) //PostGres listens on 5432
 }
 
+func loadEnvironmentalVariables() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Print("Error loading environmental variables: ")
+		log.Fatal(err.Error())
+	}
+}
+
 func redirectLogger() {
+	//redirects logger output to a logger file
+	//for use in production
 	file, err := os.OpenFile("info.log", os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		log.Fatal(err)
@@ -62,6 +68,8 @@ func redirectLogger() {
 }
 
 func initDB() {
+	//initializes the db variable
+	//forms a connection to the database
 	config := dbConfig()
 	var err error
 	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s "+
@@ -81,22 +89,23 @@ func initDB() {
 }
 
 func dbConfig() map[string]string {
+	//reads from environmental variables to work out details of the database
 	conf := make(map[string]string)
 	host, ok := os.LookupEnv(dbhost)
 	if !ok {
-		panic("DBHOST environment variable required but not set")
+		log.Fatal("DBHOST environment variable required but not set")
 	}
 	port, ok := os.LookupEnv(dbport)
 	if !ok {
-		panic("DBPORT environment variable required but not set")
+		log.Fatal("DBPORT environment variable required but not set")
 	}
 	user, ok := os.LookupEnv(dbuser)
 	if !ok {
-		panic("DBUSER environment variable required but not set")
+		log.Fatal("DBUSER environment variable required but not set")
 	}
 	password, ok := os.LookupEnv(dbpass)
 	if !ok {
-		panic("DBPASS environment variable required but not set")
+		log.Fatal("DBPASS environment variable required but not set")
 	}
 	name, ok := os.LookupEnv(dbname)
 	if !ok {
@@ -111,6 +120,8 @@ func dbConfig() map[string]string {
 }
 
 func recoverWrap(h http.Handler) http.Handler {
+	//Middleware which handles any error in the api by logging it and reporting an internal server error to
+	//the front end
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var err error
 		defer func() {
