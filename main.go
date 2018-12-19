@@ -39,9 +39,10 @@ func main() {
 	loadEnvironmentalVariables()
 	initDB()
 
-	jwtMiddleware := jwtmiddleware.New(jwtmiddleware.Options{ //to check if the token sent with the request has expired or not
+	jwtMiddleware := jwtmiddleware.New(jwtmiddleware.Options{ //check if jwt is sent, extracts information
 		ValidationKeyGetter: func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				log.Printf("Unexpected signing method: %v \n", token.Header["alg"])
 				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 			}
 			return signingKey, nil
@@ -51,7 +52,7 @@ func main() {
 
 	r := mux.NewRouter()
 	r.Handle(loginEndPoint, adminLoginHandler).Methods("POST")
-	r.Handle(usersEndPoint, jwtMiddleware.Handler(listUsersHandler)).Methods("POST")
+	r.Handle(usersEndPoint, jwtMiddleware.Handler(listUsersHandler)).Methods("GET")
 	handler := cors.New(cors.Options{
 		AllowedOrigins: allowedCorsOrigins,
 	}).Handler(r) //only allow GETs POSTs from that address (LOGIN_URL, the client-side address); the bare minimum needed
@@ -146,7 +147,7 @@ func recoverWrap(h http.Handler) http.Handler {
 				default:
 					err = errors.New("Unknown error")
 				}
-				log.Println(err.Error())
+				log.Println("Internal Server Error: ", err.Error())
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 			}
 		}()
@@ -154,9 +155,11 @@ func recoverWrap(h http.Handler) http.Handler {
 	})
 }
 
-//panicIf Panics if the error passed to it is not nil
-func panicIf(err error) {
+//panicIf If error passed to it is not nil, panics with the error, and logs the desired log message
+//The log message should ideally identify the source of the problem
+func panicIf(err error, logMessage string) {
 	if err != nil {
+		log.Println(logMessage)
 		panic(err)
 	}
 }

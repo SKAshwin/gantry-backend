@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"time"
 
@@ -31,7 +30,7 @@ var adminLoginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 	decoder := json.NewDecoder(r.Body)
 	var ld loginDetails
 	err := decoder.Decode(&ld)
-	panicIf(err)
+	panicIf(err, "JSON Decoding in Authentication Failed")
 	fmt.Println(ld.Username)
 
 	if authenticate(ld, adminTable) {
@@ -55,7 +54,7 @@ func createToken(user loginDetails, isAdmin bool) string {
 	claims[jwtAdminStatus] = isAdmin
 
 	tokenSigned, err := token.SignedString(signingKey)
-	panicIf(err)
+	panicIf(err, "Token signing failed")
 
 	return tokenSigned
 }
@@ -68,13 +67,13 @@ func authenticate(user loginDetails, tableName string) bool {
 	} else if tableName == userTable {
 		stmt, err = db.Prepare("SELECT passwordHash FROM app_user where username = $1")
 	}
-	panicIf(err)
+	panicIf(err, "Statement Preparation in Authentication Failed")
 	var passwordHash string
 	err = stmt.QueryRow(user.Username).Scan(&passwordHash)
 	if err == sql.ErrNoRows {
 		return false //no such username exists
 	}
-	panicIf(err)                                                                             //any other error should be panicked on
+	panicIf(err, "Databse Querying in Authentication Failed")                                //any other error should be panicked on
 	return bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(user.Password)) == nil //method returns nil if there is a match between password and hash
 }
 
@@ -82,10 +81,7 @@ func hashAndSalt(pwd []byte) string {
 	// Use GenerateFromPassword to hash & salt pwd.
 	//cost must be above 4
 	hash, err := bcrypt.GenerateFromPassword(pwd, hashCost)
-	if err != nil {
-		log.Println(err)
-		panic(err)
-	}
+	panicIf(err, "Hashing Failed")
 	// GenerateFromPassword returns a byte slice so we need to
 	// convert the bytes to a string and return it
 	return string(hash)
