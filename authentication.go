@@ -4,41 +4,38 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	//jwtRequest "github.com/dgrijalva/jwt-go/request"
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
 
-var hashCost = 5 //cost must be above 4, the larger you make it the slower the hash function will run
-var allowedCorsOrigins = []string{"http://localhost:8080"}
-var loginURL = "/api/auth/login"
+const hashCost = 5 //cost must be above 4, the larger you make it the slower the hash function will run
 var signingKey = []byte("theSecretPassword")
-var loginTokenUsername, loginTokenExpiryTime = "username", "exp"
-var admins = "app_admin"
-var users = "app_user"
+
+const jwtUsername, jwtExpiryTime, jwtAdminStatus = "username", "exp", "admin"
+const adminTable = "app_admin"
+const userTable = "app_user"
 
 type loginDetails struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
-type response struct {
-	Message string `json:"message"`
-}
-
-//loginHandler Handles authentication and generation of web tokens in response to the user attempting to login, via /api/auth/login
-var loginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+//adminLoginHandler Handles authentication and generation of web tokens in response to the user attempting to login, via /api/auth/login
+var adminLoginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var ld loginDetails
 	err := decoder.Decode(&ld)
 	panicIf(err)
 	fmt.Println(ld.Username)
 
-	if authenticate(ld, admins) {
-		jwtToken := createToken(ld)
+	if authenticate(ld, adminTable) {
+		jwtToken := createToken(ld, true)
 		reply, _ := json.Marshal(map[string]string{"accessToken": jwtToken})
 		w.Write(reply)
 	} else {
@@ -49,12 +46,13 @@ var loginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request)
 
 })
 
-func createToken(user loginDetails) string {
+func createToken(user loginDetails, isAdmin bool) string {
 	token := jwt.New(jwt.SigningMethodHS256)
 	claims := token.Claims.(jwt.MapClaims)
 
-	claims[loginTokenUsername] = user.Username
-	claims[loginTokenExpiryTime] = time.Now().Add(time.Hour).Unix()
+	claims[jwtUsername] = user.Username
+	claims[jwtExpiryTime] = time.Now().Add(time.Hour).Unix()
+	claims[jwtAdminStatus] = isAdmin
 
 	tokenSigned, err := token.SignedString(signingKey)
 	panicIf(err)
@@ -63,10 +61,13 @@ func createToken(user loginDetails) string {
 }
 
 func authenticate(user loginDetails, tableName string) bool {
-	if tableName == "app_admin" {
-		//TODO implement logic to handle both user and admin authentication
+	var stmt *sql.Stmt
+	var err error
+	if tableName == adminTable {
+		stmt, err = db.Prepare("SELECT passwordHash FROM app_admin where username = $1")
+	} else if tableName == userTable {
+		stmt, err = db.Prepare("SELECT passwordHash FROM app_user where username = $1")
 	}
-	stmt, err := db.Prepare("SELECT passwordHash FROM app_admin where username = $2")
 	panicIf(err)
 	var passwordHash string
 	err = stmt.QueryRow(user.Username).Scan(&passwordHash)
@@ -82,7 +83,7 @@ func hashAndSalt(pwd []byte) string {
 	//cost must be above 4
 	hash, err := bcrypt.GenerateFromPassword(pwd, hashCost)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		panic(err)
 	}
 	// GenerateFromPassword returns a byte slice so we need to

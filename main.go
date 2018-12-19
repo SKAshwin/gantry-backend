@@ -9,11 +9,17 @@ import (
 	"net/http"
 	"os"
 
+	jwtmiddleware "github.com/auth0/go-jwt-middleware"
+	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/rs/cors"
 )
+
+type response struct {
+	Message string `json:"message"`
+}
 
 const (
 	dbhost = "DBHOST"
@@ -24,17 +30,32 @@ const (
 )
 
 var db *sql.DB
+var allowedCorsOrigins = []string{"http://localhost:8080"}
+var loginEndPoint = "/api/auth/login"
+var usersEndPoint = "/api/app/users"
 
 func main() {
 	//redirectLogger()
 	loadEnvironmentalVariables()
 	initDB()
+
+	jwtMiddleware := jwtmiddleware.New(jwtmiddleware.Options{ //to check if the token sent with the request has expired or not
+		ValidationKeyGetter: func(token *jwt.Token) (interface{}, error) {
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+			}
+			return signingKey, nil
+		},
+		SigningMethod: jwt.SigningMethodHS256,
+	})
+
 	r := mux.NewRouter()
-	r.Handle(loginURL, recoverWrap(loginHandler)).Methods("POST")
+	r.Handle(loginEndPoint, adminLoginHandler).Methods("POST")
+	r.Handle(usersEndPoint, jwtMiddleware.Handler(listUsersHandler)).Methods("POST")
 	handler := cors.New(cors.Options{
 		AllowedOrigins: allowedCorsOrigins,
 	}).Handler(r) //only allow GETs POSTs from that address (LOGIN_URL, the client-side address); the bare minimum needed
-	http.ListenAndServe(":3000", handler) //PostGres listens on 5432
+	http.ListenAndServe(":3000", recoverWrap(handler)) //PostGres listens on 5432
 }
 
 func loadEnvironmentalVariables() {
@@ -133,6 +154,7 @@ func recoverWrap(h http.Handler) http.Handler {
 	})
 }
 
+//panicIf Panics if the error passed to it is not nil
 func panicIf(err error) {
 	if err != nil {
 		panic(err)
