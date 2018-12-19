@@ -10,6 +10,20 @@ create table app_admin(
 	name text NOT NULL
 );
 
+create table event(
+	eventID SERIAL PRIMARY KEY NOT NULL,
+	title text NOT NULL,
+	startDate DATE NOT NULL,
+	endDate DATE NOT NULL,
+	geofence CIRCLE NOT NULL
+);
+
+create table hosts(
+	username text NOT NULL REFERENCES app_user(username),
+	eventID SERIAL NOT NULL REFERENCES event(eventID),
+	PRIMARY KEY(username, eventID)
+)
+
 INSERT INTO app_user (username, passwordHash, name) VALUES
 	('ME5Bob', '$2a$05$xuLyzrAaW7Y4mXGAXzPjOOIdTim2BVGzePV73H.Vsy8gKCUxXqRB2', 'Robert Lim'), --DarkHorseBigCat
 	('ME6Alice', '$2a$05$KlEAswrxBhrgXr1Fh7Io0ecBHB182FeJAuP8BppK8BVRujEPlavkK', 'Alice Ng'), --abcdef12345!@#$%
