@@ -1,3 +1,6 @@
+create DATABASE registrationapp;
+\connect registrationapp
+
 create table app_user(
 	username text PRIMARY KEY NOT NULL,
 	passwordHash text NOT NULL,
@@ -22,7 +25,7 @@ create table hosts(
 	username text NOT NULL REFERENCES app_user(username),
 	eventID SERIAL NOT NULL REFERENCES event(eventID),
 	PRIMARY KEY(username, eventID)
-)
+);
 
 INSERT INTO app_user (username, passwordHash, name) VALUES
 	('ME5Bob', '$2a$05$xuLyzrAaW7Y4mXGAXzPjOOIdTim2BVGzePV73H.Vsy8gKCUxXqRB2', 'Robert Lim'), --DarkHorseBigCat
@@ -32,4 +35,9 @@ INSERT INTO app_user (username, passwordHash, name) VALUES
 	('TestUser', '$2a$05$D/nbFy9utEDFgg.Jfsl39epqO2Yx2nIRClYFGVMw9fnLZlXFFnP5u', 'User McUserson'); --WhatAreDictionaryAttacks
 
 INSERT into app_admin(username, passwordHash, name) VALUES 
-	('Hackerman','$2a$05$YNWHk.7Su/St644J1BAX7.G8KP3t5ts16bcAPApXSw.yc4hHrgwNi','Drop Table')
+	('Hackerman','$2a$05$YNWHk.7Su/St644J1BAX7.G8KP3t5ts16bcAPApXSw.yc4hHrgwNi','Drop Table');
+
+create USER server_access with password 'LongNightShortDay';
+grant CONNECT on DATABASE registrationapp to server_access;
+grant SELECT, INSERT, UPDATE, DELETE on app_user to server_access;
+grant SELECT, INSERT, UPDATE on app_admin to server_access;
