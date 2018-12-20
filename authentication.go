@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -30,13 +31,28 @@ var adminLoginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 	decoder := json.NewDecoder(r.Body)
 	var ld loginDetails
 	err := decoder.Decode(&ld)
-	panicIf(err, "JSON Decoding in Authentication Failed")
+	if err != nil {
+		log.Println(err.Error())
+		writeError(http.StatusBadRequest, "Authentication JSON malformed", w)
+		return
+	}
 	fmt.Println(ld.Username)
 
-	if authenticate(ld, adminTable) {
-		jwtToken := createToken(ld, true)
-		reply, _ := json.Marshal(map[string]string{"accessToken": jwtToken})
-		w.Write(reply)
+	isAuthenticated, err := authenticate(ld, adminTable)
+
+	if err != nil {
+		writeError(http.StatusInternalServerError, "Authentication failed due to server error", w)
+		return
+	}
+
+	if isAuthenticated {
+		jwtToken, err := createToken(ld, true)
+		if err != nil {
+			writeError(http.StatusInternalServerError, "Token creation failed", w)
+		} else {
+			reply, _ := json.Marshal(map[string]string{"accessToken": jwtToken})
+			w.Write(reply)
+		}
 	} else {
 		w.WriteHeader(http.StatusUnauthorized)
 		reply, _ := json.Marshal(response{Message: "Incorrect Username or Password"})
@@ -45,7 +61,7 @@ var adminLoginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 
 })
 
-func createToken(user loginDetails, isAdmin bool) string {
+func createToken(user loginDetails, isAdmin bool) (string, error) {
 	token := jwt.New(jwt.SigningMethodHS256)
 	claims := token.Claims.(jwt.MapClaims)
 
@@ -54,12 +70,15 @@ func createToken(user loginDetails, isAdmin bool) string {
 	claims[jwtAdminStatus] = isAdmin
 
 	tokenSigned, err := token.SignedString(signingKey)
-	panicIf(err, "Token signing failed")
+	if err != nil {
+		log.Println(err.Error())
+		return "", err
+	}
 
-	return tokenSigned
+	return tokenSigned, nil
 }
 
-func authenticate(user loginDetails, tableName string) bool {
+func authenticate(user loginDetails, tableName string) (bool, error) {
 	var stmt *sql.Stmt
 	var err error
 	if tableName == adminTable {
@@ -67,22 +86,30 @@ func authenticate(user loginDetails, tableName string) bool {
 	} else if tableName == userTable {
 		stmt, err = db.Prepare("SELECT passwordHash FROM app_user where username = $1")
 	}
-	panicIf(err, "Statement Preparation in Authentication Failed")
+	if err != nil {
+		log.Println("Statement preparation in authentication failed: ", err.Error())
+		return false, err
+	}
 	var passwordHash string
 	err = stmt.QueryRow(user.Username).Scan(&passwordHash)
 	if err == sql.ErrNoRows {
-		return false //no such username exists
+		return false, nil //no such username exists
+	} else if err != nil {
+		//any other error represents a failure
+		log.Println("Database Querying in Authentication Failed: ", err.Error())
+		return false, err
 	}
-	panicIf(err, "Databse Querying in Authentication Failed")                                //any other error should be panicked on
-	return bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(user.Password)) == nil //method returns nil if there is a match between password and hash
+	return bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(user.Password)) == nil, nil //method returns nil if there is a match between password and hash
 }
 
-func hashAndSalt(pwd []byte) string {
+func hashAndSalt(pwd []byte) (string, error) {
 	// Use GenerateFromPassword to hash & salt pwd.
 	//cost must be above 4
 	hash, err := bcrypt.GenerateFromPassword(pwd, hashCost)
-	panicIf(err, "Hashing Failed")
+	if err != nil {
+		return "", err
+	}
 	// GenerateFromPassword returns a byte slice so we need to
 	// convert the bytes to a string and return it
-	return string(hash)
+	return string(hash), nil
 }

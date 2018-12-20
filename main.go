@@ -3,6 +3,7 @@ package main
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -132,8 +133,9 @@ func dbConfig() map[string]string {
 }
 
 func recoverWrap(h http.Handler) http.Handler {
-	//Middleware which handles any error in the api by logging it and reporting an internal server error to
-	//the front end
+	//Middleware which handles any panic in the handlers by logging it and reporting an internal
+	//server error to the front end
+	//intended for unexpected errors (expected, handled errors should not cause a panic)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var err error
 		defer func() {
@@ -162,4 +164,11 @@ func panicIf(err error, logMessage string) {
 		log.Println(logMessage)
 		panic(err)
 	}
+}
+
+func writeError(statusCode int, message string, w http.ResponseWriter) {
+	log.Println(message)
+	w.WriteHeader(statusCode)
+	reply, _ := json.Marshal(response{Message: message})
+	w.Write(reply)
 }
