@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	jwtmiddleware "github.com/auth0/go-jwt-middleware"
 	jwt "github.com/dgrijalva/jwt-go"
@@ -40,7 +41,9 @@ func main() {
 	loadEnvironmentalVariables()
 	initDB()
 
-	jwtMiddleware := jwtmiddleware.New(jwtmiddleware.Options{ //check if jwt is sent, extracts information
+	jwtMiddleware := jwtmiddleware.New(jwtmiddleware.Options{
+		//check if jwt is sent, extracts information
+		//also checks if token is expired; returns 401 if not
 		ValidationKeyGetter: func(token *jwt.Token) (interface{}, error) {
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				log.Printf("Unexpected signing method: %v \n", token.Header["alg"])
@@ -53,11 +56,11 @@ func main() {
 
 	r := mux.NewRouter()
 	r.Handle(loginEndPoint, adminLoginHandler).Methods("POST")
-	r.Handle(usersEndPoint, jwtMiddleware.Handler(listUsersHandler)).Methods("GET")
+	r.Handle(usersEndPoint, isAdmin(jwtMiddleware.Handler(listUsersHandler))).Methods("GET")
 	handler := cors.New(cors.Options{
 		AllowedOrigins: allowedCorsOrigins,
 	}).Handler(r) //only allow GETs POSTs from that address (LOGIN_URL, the client-side address); the bare minimum needed
-	http.ListenAndServe(":3000", recoverWrap(handler)) //PostGres listens on 5432
+	http.ListenAndServe(":3000", recoverWrap(handler))
 }
 
 func loadEnvironmentalVariables() {
@@ -130,6 +133,53 @@ func dbConfig() map[string]string {
 	conf[dbpass] = password
 	conf[dbname] = name
 	return conf
+}
+
+func getJWTClaims(r *http.Request) (map[string]interface{}, bool) {
+	reqToken := r.Header.Get("Authorization")
+	splitToken := strings.Split(reqToken, "Bearer ")
+	reqToken = splitToken[1]
+	claims, ok := extractClaimsFromTokenString(reqToken)
+	return claims, ok
+
+}
+
+func extractClaimsFromTokenString(tokenStr string) (jwt.MapClaims, bool) {
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			log.Printf("Unexpected signing method: %v \n", token.Header["alg"])
+			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+		}
+		return signingKey, nil
+	})
+
+	if err != nil {
+		log.Println("Token parsing failed: ", err.Error())
+		return nil, false
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		return claims, true
+	} else {
+		log.Println("Invalid (expired) JWT Token")
+		return nil, false
+	}
+}
+
+func isAdmin(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		claims, ok := getJWTClaims(r)
+		if !ok {
+			writeError(http.StatusUnauthorized, "Invalid JWT Token", w)
+		} else {
+			if claims[jwtAdminStatus] == true {
+				h.ServeHTTP(w, r)
+			} else {
+				writeError(http.StatusUnauthorized, "Accessing this page requires admin privileges",
+					w)
+			}
+		}
+	})
 }
 
 func recoverWrap(h http.Handler) http.Handler {
