@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	//jwtRequest "github.com/dgrijalva/jwt-go/request"
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -54,9 +54,7 @@ var adminLoginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 			w.Write(reply)
 		}
 	} else {
-		w.WriteHeader(http.StatusUnauthorized)
-		reply, _ := json.Marshal(response{Message: "Incorrect Username or Password"})
-		w.Write(reply)
+		writeError(http.StatusUnauthorized, "Incorrect Username or Password", w)
 	}
 
 })
@@ -112,4 +110,36 @@ func hashAndSalt(pwd []byte) (string, error) {
 	// GenerateFromPassword returns a byte slice so we need to
 	// convert the bytes to a string and return it
 	return string(hash), nil
+}
+
+func keyGetter(token *jwt.Token) (interface{}, error) {
+	if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+		log.Printf("Unexpected signing method: %v \n", token.Header["alg"])
+		return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
+	}
+	return signingKey, nil
+}
+
+func getJWTClaims(r *http.Request) (map[string]interface{}, bool) {
+	reqToken := r.Header.Get("Authorization")
+	splitToken := strings.Split(reqToken, "Bearer ")
+	reqToken = splitToken[1]
+	claims, ok := extractClaimsFromTokenString(reqToken)
+	return claims, ok
+
+}
+
+func extractClaimsFromTokenString(tokenStr string) (jwt.MapClaims, bool) {
+	token, err := jwt.Parse(tokenStr, keyGetter)
+
+	if err != nil {
+		log.Println("Token parsing failed: ", err.Error())
+		return nil, false
+	}
+
+	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
+		return claims, true
+	}
+	log.Println("Expired JWT Token")
+	return nil, false
 }

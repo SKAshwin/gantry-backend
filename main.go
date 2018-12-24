@@ -9,7 +9,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
 
 	jwtmiddleware "github.com/auth0/go-jwt-middleware"
 	jwt "github.com/dgrijalva/jwt-go"
@@ -44,12 +43,9 @@ func main() {
 	jwtMiddleware := jwtmiddleware.New(jwtmiddleware.Options{
 		//check if jwt is sent, extracts information
 		//also checks if token is expired; returns 401 if not
-		ValidationKeyGetter: func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				log.Printf("Unexpected signing method: %v \n", token.Header["alg"])
-				return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
-			}
-			return signingKey, nil
+		ValidationKeyGetter: keyGetter,
+		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err string) {
+			writeError(http.StatusUnauthorized, err, w)
 		},
 		SigningMethod: jwt.SigningMethodHS256,
 	})
@@ -135,42 +131,11 @@ func dbConfig() map[string]string {
 	return conf
 }
 
-func getJWTClaims(r *http.Request) (map[string]interface{}, bool) {
-	reqToken := r.Header.Get("Authorization")
-	splitToken := strings.Split(reqToken, "Bearer ")
-	reqToken = splitToken[1]
-	claims, ok := extractClaimsFromTokenString(reqToken)
-	return claims, ok
-
-}
-
-func extractClaimsFromTokenString(tokenStr string) (jwt.MapClaims, bool) {
-	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			log.Printf("Unexpected signing method: %v \n", token.Header["alg"])
-			return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
-		}
-		return signingKey, nil
-	})
-
-	if err != nil {
-		log.Println("Token parsing failed: ", err.Error())
-		return nil, false
-	}
-
-	if claims, ok := token.Claims.(jwt.MapClaims); ok && token.Valid {
-		return claims, true
-	} else {
-		log.Println("Invalid (expired) JWT Token")
-		return nil, false
-	}
-}
-
 func isAdmin(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		claims, ok := getJWTClaims(r)
 		if !ok {
-			writeError(http.StatusUnauthorized, "Invalid JWT Token", w)
+			writeError(http.StatusUnauthorized, "Expired Token", w)
 		} else {
 			if claims[jwtAdminStatus] == true {
 				h.ServeHTTP(w, r)
@@ -217,8 +182,14 @@ func panicIf(err error, logMessage string) {
 }
 
 func writeError(statusCode int, message string, w http.ResponseWriter) {
-	log.Println(message)
+	if statusCode != http.StatusOK {
+		log.Println("writeError:", message)
+	}
 	w.WriteHeader(statusCode)
 	reply, _ := json.Marshal(response{Message: message})
 	w.Write(reply)
+}
+
+func writeMessage(message string, w http.ResponseWriter) {
+	writeError(http.StatusOK, message, w)
 }
