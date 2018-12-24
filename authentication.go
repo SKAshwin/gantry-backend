@@ -59,23 +59,6 @@ var adminLoginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 
 })
 
-func createToken(user loginDetails, isAdmin bool) (string, error) {
-	token := jwt.New(jwt.SigningMethodHS256)
-	claims := token.Claims.(jwt.MapClaims)
-
-	claims[jwtUsername] = user.Username
-	claims[jwtExpiryTime] = time.Now().Add(time.Hour).Unix()
-	claims[jwtAdminStatus] = isAdmin
-
-	tokenSigned, err := token.SignedString(signingKey)
-	if err != nil {
-		log.Println(err.Error())
-		return "", err
-	}
-
-	return tokenSigned, nil
-}
-
 func authenticate(user loginDetails, tableName string) (bool, error) {
 	var stmt *sql.Stmt
 	var err error
@@ -110,6 +93,23 @@ func hashAndSalt(pwd []byte) (string, error) {
 	// GenerateFromPassword returns a byte slice so we need to
 	// convert the bytes to a string and return it
 	return string(hash), nil
+}
+
+func createToken(user loginDetails, isAdmin bool) (string, error) {
+	token := jwt.New(jwt.SigningMethodHS256)
+	claims := token.Claims.(jwt.MapClaims)
+
+	claims[jwtUsername] = user.Username
+	claims[jwtExpiryTime] = time.Now().Add(time.Hour).Unix()
+	claims[jwtAdminStatus] = isAdmin
+
+	tokenSigned, err := token.SignedString(signingKey)
+	if err != nil {
+		log.Println(err.Error())
+		return "", err
+	}
+
+	return tokenSigned, nil
 }
 
 func keyGetter(token *jwt.Token) (interface{}, error) {
