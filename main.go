@@ -164,8 +164,8 @@ func recoverWrap(h http.Handler) http.Handler {
 				default:
 					err = errors.New("Unknown error")
 				}
-				log.Println("Internal Server Error: ", err.Error())
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				log.Println("Entered Panic with ", err.Error())
+				writeError(http.StatusInternalServerError, err.Error(), w)
 			}
 		}()
 		h.ServeHTTP(w, r)
