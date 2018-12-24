@@ -6,6 +6,8 @@ import (
 	"log"
 	"net/http"
 	"time"
+
+	"github.com/guregu/null"
 )
 
 type userPublicDetail struct {
@@ -13,7 +15,7 @@ type userPublicDetail struct {
 	Name         string
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
-	LastLoggedIn time.Time
+	LastLoggedIn null.Time
 }
 
 type userPublicDetails []userPublicDetail
@@ -50,7 +52,7 @@ func fetchUserDetails() ([]userPublicDetail, error) {
 	for thereAreMore := rows.Next(); thereAreMore; thereAreMore = rows.Next() {
 		var username, name string
 		var createdAt, updatedAt time.Time
-		var lastLoggedIn time.Time
+		var lastLoggedIn null.Time
 		err = rows.Scan(&username, &name, &createdAt, &updatedAt, &lastLoggedIn)
 		if err != nil {
 			return nil, errors.New("Could not extract user details: " + err.Error())
