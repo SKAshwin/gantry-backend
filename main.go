@@ -133,8 +133,9 @@ func dbConfig() map[string]string {
 
 func isAdmin(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		claims, ok := getJWTClaims(r)
-		if !ok {
+		claims, err := getJWTClaims(r)
+		if err != nil {
+			log.Println("isAdmin faced an error: " + err.Error())
 			writeError(http.StatusUnauthorized, "Expired Token", w)
 		} else {
 			if claims[jwtAdminStatus] == true {
