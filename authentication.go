@@ -34,7 +34,7 @@ var adminLoginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 	err := decoder.Decode(&ld)
 	if err != nil {
 		log.Println("adminLoginHandler faced an error: " + err.Error())
-		writeError(http.StatusBadRequest, "Authentication JSON malformed", w)
+		writeMessage(http.StatusBadRequest, "Authentication JSON malformed", w)
 		return
 	}
 	fmt.Println(ld.Username)
@@ -43,7 +43,7 @@ var adminLoginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 
 	if err != nil {
 		log.Println("adminLoginHandler faced an error: " + err.Error())
-		writeError(http.StatusInternalServerError, "Authentication failed due to server error", w)
+		writeMessage(http.StatusInternalServerError, "Authentication failed due to server error", w)
 		return
 	}
 
@@ -51,13 +51,13 @@ var adminLoginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 		jwtToken, err := createToken(ld, true)
 		if err != nil {
 			log.Println("adminLoginHandler faced an error: " + err.Error())
-			writeError(http.StatusInternalServerError, "Token creation failed", w)
+			writeMessage(http.StatusInternalServerError, "Token creation failed", w)
 		} else {
 			reply, _ := json.Marshal(map[string]string{"accessToken": jwtToken})
 			w.Write(reply)
 		}
 	} else {
-		writeError(http.StatusUnauthorized, "Incorrect Username or Password", w)
+		writeMessage(http.StatusUnauthorized, "Incorrect Username or Password", w)
 	}
 
 })

@@ -19,6 +19,12 @@ type userPublicDetail struct {
 	LastLoggedIn null.Time `json:"lastLoggedIn"`
 }
 
+type userCreateData struct {
+	Name     string `json:"name"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
 type userPublicDetails []userPublicDetail
 
 var listUsersHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -26,12 +32,39 @@ var listUsersHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Requ
 	userDetails, err := fetchUserDetails()
 	if err != nil {
 		log.Println(err.Error())
-		writeError(http.StatusInternalServerError, "Could not get user data", w)
+		writeMessage(http.StatusInternalServerError, "Could not get user data", w)
 		return
 	}
 	reply, _ := json.Marshal(map[string]userPublicDetails{"message": userDetails})
 	w.Write(reply)
 })
+
+var createUserHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	var userData userCreateData
+	err := json.NewDecoder(r.Body).Decode(&userData)
+	if err != nil {
+		log.Println("Error when decoding name: " + err.Error())
+		writeMessage(http.StatusBadRequest, "Incorrect fields for creating user", w)
+	}
+
+	err = createUser(userData)
+	if err != nil {
+		log.Println("Error creating user: " + err.Error())
+		writeMessage(http.StatusInternalServerError, "User creation failed", w)
+	} else {
+		writeMessage(http.StatusCreated, "Registration successful", w)
+	}
+})
+
+func createUser(userData userCreateData) error {
+	passwordHash, err := hashAndSalt([]byte(userData.Password))
+	if err != nil {
+		return errors.New("createUser: " + err.Error())
+	}
+	_, err = db.Exec("INSERT into app_user (username,passwordHash,name,createdAt,updatedAt,lastLoggedIn) VALUES ($1, $2, $3, NOW(), NOW(), NULL)",
+		userData.Username, passwordHash, userData.Name)
+	return err
+}
 
 func fetchUserDetails() ([]userPublicDetail, error) {
 	rows, err := db.Query("SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user")

@@ -45,7 +45,7 @@ func main() {
 		//also checks if token is expired; returns 401 if not
 		ValidationKeyGetter: keyGetter,
 		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err string) {
-			writeError(http.StatusUnauthorized, err, w)
+			writeMessage(http.StatusUnauthorized, err, w)
 		},
 		SigningMethod: jwt.SigningMethodHS256,
 	})
@@ -53,6 +53,7 @@ func main() {
 	r := mux.NewRouter()
 	r.Handle(loginEndPoint, adminLoginHandler).Methods("POST")
 	r.Handle(usersEndPoint, isAdmin(jwtMiddleware.Handler(listUsersHandler))).Methods("GET")
+	r.Handle(usersEndPoint, isAdmin(jwtMiddleware.Handler(createUserHandler))).Methods("POST")
 	handler := cors.New(cors.Options{
 		AllowedOrigins: allowedCorsOrigins,
 	}).Handler(r) //only allow GETs POSTs from that address (LOGIN_URL, the client-side address); the bare minimum needed
@@ -136,12 +137,12 @@ func isAdmin(h http.Handler) http.Handler {
 		claims, err := getJWTClaims(r)
 		if err != nil {
 			log.Println("isAdmin faced an error: " + err.Error())
-			writeError(http.StatusUnauthorized, "Expired Token", w)
+			writeMessage(http.StatusUnauthorized, "Expired Token", w)
 		} else {
 			if claims[jwtAdminStatus] == true {
 				h.ServeHTTP(w, r)
 			} else {
-				writeError(http.StatusUnauthorized, "Accessing this page requires admin privileges",
+				writeMessage(http.StatusUnauthorized, "Accessing this page requires admin privileges",
 					w)
 			}
 		}
@@ -166,7 +167,7 @@ func recoverWrap(h http.Handler) http.Handler {
 					err = errors.New("Unknown error")
 				}
 				log.Println("Entered Panic with ", err.Error())
-				writeError(http.StatusInternalServerError, err.Error(), w)
+				writeMessage(http.StatusInternalServerError, err.Error(), w)
 			}
 		}()
 		h.ServeHTTP(w, r)
@@ -182,8 +183,8 @@ func panicIf(err error, logMessage string) {
 	}
 }
 
-func writeError(statusCode int, message string, w http.ResponseWriter) {
-	if statusCode != http.StatusOK {
+func writeMessage(statusCode int, message string, w http.ResponseWriter) {
+	if statusCode >= 400 { //if the message is an error message
 		log.Println("writeError:", message)
 	}
 	w.WriteHeader(statusCode)
@@ -191,6 +192,6 @@ func writeError(statusCode int, message string, w http.ResponseWriter) {
 	w.Write(reply)
 }
 
-func writeMessage(message string, w http.ResponseWriter) {
-	writeError(http.StatusOK, message, w)
+func writeOKMessage(message string, w http.ResponseWriter) {
+	writeMessage(http.StatusOK, message, w)
 }
