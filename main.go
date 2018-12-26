@@ -2,7 +2,6 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -13,6 +12,7 @@ import (
 	jwtmiddleware "github.com/auth0/go-jwt-middleware"
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
+	"github.com/jmoiron/sqlx"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/rs/cors"
@@ -30,10 +30,8 @@ const (
 	dbname = "DBNAME"
 )
 
-var db *sql.DB
+var db *sqlx.DB
 var allowedCorsOrigins = []string{"http://localhost:8080"}
-var loginEndPoint = "/api/auth/login"
-var usersEndPoint = "/api/app/users"
 
 func main() {
 	//redirectLogger()
@@ -51,9 +49,11 @@ func main() {
 	})
 
 	r := mux.NewRouter()
-	r.Handle(loginEndPoint, adminLoginHandler).Methods("POST")
-	r.Handle(usersEndPoint, isAdmin(jwtMiddleware.Handler(listUsersHandler))).Methods("GET")
-	r.Handle(usersEndPoint, isAdmin(jwtMiddleware.Handler(createUserHandler))).Methods("POST")
+	r.Handle("/api/auth/login", adminLoginHandler).Methods("POST")
+	r.Handle("/api/users", isAdmin(jwtMiddleware.Handler(listUsersHandler))).Methods("GET")
+	r.Handle("/api/users", isAdmin(jwtMiddleware.Handler(createUserHandler))).Methods("POST")
+	//r.Handle("/api/users/{username}", isAdmin(jwtMiddleware.Handler(getUserDetailsHandler))).Methods("GET")
+	// /users/profile
 	handler := cors.New(cors.Options{
 		AllowedOrigins: allowedCorsOrigins,
 	}).Handler(r) //only allow GETs POSTs from that address (LOGIN_URL, the client-side address); the bare minimum needed
@@ -90,7 +90,7 @@ func initDB() {
 		config[dbhost], config[dbport],
 		config[dbuser], config[dbpass], config[dbname])
 
-	db, err = sql.Open("postgres", psqlInfo)
+	db, err = sqlx.Open("postgres", psqlInfo)
 	if err != nil {
 		log.Fatal("Could not open databse")
 	}

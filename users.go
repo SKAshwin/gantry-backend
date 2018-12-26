@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/guregu/null"
+	"github.com/jmoiron/sqlx"
 )
 
 type userPublicDetail struct {
@@ -27,9 +28,11 @@ type userCreateData struct {
 
 type userPublicDetails []userPublicDetail
 
+var userDoesNotExistErr = errors.New("User does not exist")
+
 var listUsersHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	//writeMessage("Hey you made it here", w)
-	userDetails, err := fetchUserDetails()
+	userDetails, err := getAllUsers()
 	if err != nil {
 		log.Println(err.Error())
 		writeMessage(http.StatusInternalServerError, "Could not get user data", w)
@@ -66,6 +69,10 @@ var createUserHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 	}
 })
 
+//var getUserDetailsHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+//
+//})
+
 func createUser(userData userCreateData) error {
 	//TODO check if username already exists
 	passwordHash, err := hashAndSalt([]byte(userData.Password))
@@ -77,6 +84,15 @@ func createUser(userData userCreateData) error {
 	return err
 }
 
+//func getUserData(username string) (userPublicDetail, error) {
+//	row, err := db.Query("SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user where username = $1", username)
+//	if err == sql.ErrNoRows {
+//		return userPublicDetail{}, userDoesNotExistErr
+//	} else if err != nil {
+//		return userPublicDetail{}, errors.New("Could not fetch user details: " + err.Error())
+//	}
+//
+//}
 func checkIfUserExists(username string) (bool, error) {
 	_, err := db.Query("SELECT username from app_user where username = $1", username)
 	if err == sql.ErrNoRows {
@@ -87,8 +103,8 @@ func checkIfUserExists(username string) (bool, error) {
 	return true, nil
 }
 
-func fetchUserDetails() ([]userPublicDetail, error) {
-	rows, err := db.Query("SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user")
+func getAllUsers() ([]userPublicDetail, error) {
+	rows, err := db.Queryx("SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user")
 	if err != nil {
 		return nil, errors.New("Cannot fetch user details: " + err.Error())
 	}
@@ -113,19 +129,17 @@ func getNumberOfUsers() (int, error) {
 	return numUsers, nil
 }
 
-func scanRowsIntoUserDetails(rows *sql.Rows, rowCount int) ([]userPublicDetail, error) {
+func scanRowsIntoUserDetails(rows *sqlx.Rows, rowCount int) ([]userPublicDetail, error) {
 	users := make([]userPublicDetail, rowCount)
 
 	index := 0
 	for thereAreMore := rows.Next(); thereAreMore; thereAreMore = rows.Next() {
-		var username, name string
-		var createdAt, updatedAt time.Time
-		var lastLoggedIn null.Time
-		err := rows.Scan(&username, &name, &createdAt, &updatedAt, &lastLoggedIn)
+		var userDetail userPublicDetail
+		err := rows.StructScan(&userDetail)
 		if err != nil {
 			return nil, errors.New("Could not extract user details: " + err.Error())
 		}
-		users[index] = userPublicDetail{username, name, createdAt, updatedAt, lastLoggedIn}
+		users[index] = userDetail
 		index++
 	}
 
