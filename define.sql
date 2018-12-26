@@ -18,7 +18,7 @@ create table app_admin(
 
 create table event(
 	eventID SERIAL PRIMARY KEY NOT NULL,
-	title text NOT NULL,
+	name text NOT NULL,
 	startDate DATE NOT NULL,
 	endDate DATE NOT NULL,
 	geofence CIRCLE NOT NULL
