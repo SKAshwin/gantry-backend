@@ -47,6 +47,16 @@ var createUserHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 		writeMessage(http.StatusBadRequest, "Incorrect fields for creating user", w)
 	}
 
+	//check if the user already exists first before attempting to create one
+	if userExists, err := checkIfUserExists(userData.Username); err == nil && !userExists {
+		writeMessage(http.StatusConflict, "Username already taken", w)
+		return
+	} else if err != nil {
+		log.Println("Error checking if user exists: " + err.Error())
+		writeMessage(http.StatusInternalServerError, "Error checking if user exists", w)
+		return
+	}
+
 	err = createUser(userData)
 	if err != nil {
 		log.Println("Error creating user: " + err.Error())
@@ -57,6 +67,7 @@ var createUserHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 })
 
 func createUser(userData userCreateData) error {
+	//TODO check if username already exists
 	passwordHash, err := hashAndSalt([]byte(userData.Password))
 	if err != nil {
 		return errors.New("createUser: " + err.Error())
@@ -64,6 +75,16 @@ func createUser(userData userCreateData) error {
 	_, err = db.Exec("INSERT into app_user (username,passwordHash,name,createdAt,updatedAt,lastLoggedIn) VALUES ($1, $2, $3, NOW(), NOW(), NULL)",
 		userData.Username, passwordHash, userData.Name)
 	return err
+}
+
+func checkIfUserExists(username string) (bool, error) {
+	_, err := db.Query("SELECT username from app_user where username = $1", username)
+	if err == sql.ErrNoRows {
+		return false, nil
+	} else if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func fetchUserDetails() ([]userPublicDetail, error) {
