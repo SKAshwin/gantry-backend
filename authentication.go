@@ -113,7 +113,7 @@ func createToken(user loginDetails, isAdmin bool) (string, error) {
 
 	tokenSigned, err := token.SignedString(signingKey)
 	if err != nil {
-		return "", error.New("Token signing failed during creation: " + err.Error())
+		return "", errors.New("Token signing failed during creation: " + err.Error())
 	}
 
 	return tokenSigned, nil
