@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gorilla/mux"
+
 	"github.com/guregu/null"
 	"github.com/jmoiron/sqlx"
 )
@@ -28,7 +30,7 @@ type userCreateData struct {
 
 type userPublicDetails []userPublicDetail
 
-var userDoesNotExistErr = errors.New("User does not exist")
+var errUserDoesNotExist = errors.New("User does not exist")
 
 var listUsersHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	//writeMessage("Hey you made it here", w)
@@ -51,7 +53,7 @@ var createUserHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 	}
 
 	//check if the user already exists first before attempting to create one
-	if userExists, err := checkIfUserExists(userData.Username); err == nil && !userExists {
+	if userExists, err := checkIfUserExists(userData.Username); err == nil && userExists {
 		writeMessage(http.StatusConflict, "Username already taken", w)
 		return
 	} else if err != nil {
@@ -69,9 +71,49 @@ var createUserHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 	}
 })
 
-//var getUserDetailsHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-//
-//})
+var getUserDetailsHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	username := mux.Vars(r)["username"]
+	userData, err := getUserData(username)
+	if err != nil {
+		if err == errUserDoesNotExist {
+			log.Println("User not found")
+			writeMessage(http.StatusNotFound, "User does not exist with that username", w)
+		} else {
+			log.Println("Error fetching user data: " + err.Error())
+			writeMessage(http.StatusInternalServerError, "Could not get user data", w)
+		}
+	} else {
+		reply, _ := json.Marshal(userData)
+		w.Write(reply)
+	}
+})
+
+var updateUserDetailsHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+})
+
+var deleteUserHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	username := mux.Vars(r)["username"]
+
+	//confirm the user exists in the first place before deleting it
+	if userExists, err := checkIfUserExists(username); err == nil && !userExists {
+		writeMessage(http.StatusNotFound, "User does not exist", w)
+		return
+	} else if err != nil {
+		log.Println("Error checking if user exists: " + err.Error())
+		writeMessage(http.StatusInternalServerError, "Error checking if user exists", w)
+		return
+	}
+
+	err := deleteUser(username)
+
+	if err != nil {
+		log.Println("Error deleting user: " + err.Error())
+		writeMessage(http.StatusInternalServerError, "Error deleting user", w)
+	} else {
+		writeOKMessage("Successfully deleted user", w)
+	}
+})
 
 func createUser(userData userCreateData) error {
 	//TODO check if username already exists
@@ -84,23 +126,31 @@ func createUser(userData userCreateData) error {
 	return err
 }
 
-//func getUserData(username string) (userPublicDetail, error) {
-//	row, err := db.Query("SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user where username = $1", username)
-//	if err == sql.ErrNoRows {
-//		return userPublicDetail{}, userDoesNotExistErr
-//	} else if err != nil {
-//		return userPublicDetail{}, errors.New("Could not fetch user details: " + err.Error())
-//	}
-//
-//}
-func checkIfUserExists(username string) (bool, error) {
-	_, err := db.Query("SELECT username from app_user where username = $1", username)
+func deleteUser(username string) error {
+	_, err := db.Exec("DELETE from app_user where username = $1", username)
+	return err
+}
+
+func getUserData(username string) (userPublicDetail, error) {
+	var userDetail userPublicDetail
+	err := db.QueryRowx("SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user where username = $1", username).StructScan(&userDetail)
+
 	if err == sql.ErrNoRows {
-		return false, nil
+		return userPublicDetail{}, errUserDoesNotExist
 	} else if err != nil {
+		return userPublicDetail{}, errors.New("Could not fetch user details: " + err.Error())
+	}
+
+	return userDetail, nil
+}
+
+func checkIfUserExists(username string) (bool, error) {
+	var numUsers int
+	err := db.QueryRow("SELECT COUNT(*) from app_user where username = $1", username).Scan(&numUsers)
+	if err != nil {
 		return false, err
 	}
-	return true, nil
+	return numUsers != 0, nil
 }
 
 func getAllUsers() ([]userPublicDetail, error) {
@@ -109,7 +159,6 @@ func getAllUsers() ([]userPublicDetail, error) {
 		return nil, errors.New("Cannot fetch user details: " + err.Error())
 	}
 	defer rows.Close() //make sure this is after checking for an error, or this will be a nil pointer dereference
-
 	numUsers, err := getNumberOfUsers()
 	if err != nil {
 		return nil, errors.New("fetchUserDetails: " + err.Error())
