@@ -15,7 +15,8 @@ import (
 
 func SetUpRouting() *mux.Router {
 	r := mux.NewRouter()
-	r.Handle("/api/auth/login", handlers.AdminLogin).Methods("POST")
+	r.Handle("/api/admins/auth/login", handlers.AdminLogin).Methods("POST")
+	r.Handle("/api/users/auth/login", handlers.UserLogin).Methods("POST")
 	r.Handle("/api/users", auth.AccessControl(auth.IsAdmin, handlers.ListUsers)).Methods("GET")
 	r.Handle("/api/users", auth.AccessControl(auth.IsAdmin, handlers.CreateUser)).Methods("POST")
 	r.Handle("/api/users/{username}", users.UserExists(auth.AccessControl(auth.SpecificUserOrAdmin, handlers.GetUser))).Methods("GET")

@@ -9,37 +9,43 @@ import (
 	"registration-app/response"
 )
 
-//AdminLoginHandler Handles authentication and generation of web tokens in response to the user attempting to login, via /api/auth/login
-var AdminLogin = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
-	var ld auth.LoginDetails
-	err := decoder.Decode(&ld)
-	if err != nil {
-		log.Println("adminLoginHandler faced an error: " + err.Error())
-		response.WriteMessage(http.StatusBadRequest, "Authentication JSON malformed", w)
-		return
-	}
-	fmt.Println(ld.Username)
+//AdminLogin Handles administrator log in
+var AdminLogin = login(auth.Admin)
 
-	isAuthenticated, err := ld.Authenticate(auth.Admin)
+//UserLogin Handles user log in
+var UserLogin = login(auth.User)
 
-	if err != nil {
-		log.Println("adminLoginHandler faced an error: " + err.Error())
-		response.WriteMessage(http.StatusInternalServerError, "Authentication failed due to server error", w)
-		return
-	}
-
-	if isAuthenticated {
-		jwtToken, err := ld.CreateToken(auth.Admin)
+func login(status auth.AdminStatus) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		decoder := json.NewDecoder(r.Body)
+		var ld auth.LoginDetails
+		err := decoder.Decode(&ld)
 		if err != nil {
-			log.Println("AdminLoginHandler faced an error: " + err.Error())
-			response.WriteMessage(http.StatusInternalServerError, "Token creation failed", w)
-		} else {
-			reply, _ := json.Marshal(map[string]string{"accessToken": jwtToken})
-			w.Write(reply)
+			log.Println("Login faced an error decoding JSON: " + err.Error())
+			response.WriteMessage(http.StatusBadRequest, "Authentication JSON malformed", w)
+			return
 		}
-	} else {
-		response.WriteMessage(http.StatusUnauthorized, "Incorrect Username or Password", w)
-	}
+		fmt.Println(ld.Username)
 
-})
+		isAuthenticated, err := ld.Authenticate(status)
+
+		if err != nil {
+			log.Println("Login faced an error in authentication: " + err.Error())
+			response.WriteMessage(http.StatusInternalServerError, "Authentication failed due to server error", w)
+			return
+		}
+
+		if isAuthenticated {
+			jwtToken, err := ld.CreateToken(status)
+			if err != nil {
+				log.Println("Login faced an error in token creation: " + err.Error())
+				response.WriteMessage(http.StatusInternalServerError, "Token creation failed", w)
+			} else {
+				reply, _ := json.Marshal(map[string]string{"accessToken": jwtToken})
+				w.Write(reply)
+			}
+		} else {
+			response.WriteMessage(http.StatusUnauthorized, "Incorrect Username or Password", w)
+		}
+	})
+}
