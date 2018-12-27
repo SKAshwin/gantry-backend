@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"log"
@@ -30,7 +29,16 @@ type userCreateData struct {
 
 type userPublicDetails []userPublicDetail
 
-var errUserDoesNotExist = errors.New("User does not exist")
+const (
+	dbUsername = "username"
+	dbPassword = "passwordHash"
+	dbName     = "name"
+)
+
+var (
+	errUserDoesNotExist    = errors.New("User does not exist")
+	updateSchemaTranslator = map[string]string{"username": dbUsername, "password": dbPassword, "name": dbName}
+)
 
 var listUsersHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	//writeMessage("Hey you made it here", w)
@@ -50,6 +58,7 @@ var createUserHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 	if err != nil {
 		log.Println("Error when decoding name: " + err.Error())
 		writeMessage(http.StatusBadRequest, "Incorrect fields for creating user", w)
+		return
 	}
 
 	//check if the user already exists first before attempting to create one
@@ -75,13 +84,8 @@ var getUserDetailsHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http
 	username := mux.Vars(r)["username"]
 	userData, err := getUserData(username)
 	if err != nil {
-		if err == errUserDoesNotExist {
-			log.Println("User not found")
-			writeMessage(http.StatusNotFound, "User does not exist with that username", w)
-		} else {
-			log.Println("Error fetching user data: " + err.Error())
-			writeMessage(http.StatusInternalServerError, "Could not get user data", w)
-		}
+		log.Println("Error fetching user data: " + err.Error())
+		writeMessage(http.StatusInternalServerError, "Could not get user data", w)
 	} else {
 		reply, _ := json.Marshal(userData)
 		w.Write(reply)
@@ -89,22 +93,30 @@ var getUserDetailsHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http
 })
 
 var updateUserDetailsHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	var updatedFields map[string]string
+	err := json.NewDecoder(r.Body).Decode(&updatedFields)
+	if err != nil {
+		log.Println("Error when decoding update fields: " + err.Error())
+		writeMessage(http.StatusBadRequest, "JSON could not be decoded", w)
+		return
+	}
+
+	username := mux.Vars(r)["username"] //middleware already confirms user exists
+	validRequest, err := updateUser(username, updatedFields)
+
+	if err != nil {
+		log.Println("Error updating user: " + err.Error())
+		writeMessage(http.StatusInternalServerError, "Error updating user", w)
+	} else if !validRequest {
+		writeMessage(http.StatusBadRequest, "Incorrect fields for user update", w)
+	} else {
+		writeOKMessage("User updated", w)
+	}
 
 })
 
 var deleteUserHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	username := mux.Vars(r)["username"]
-
-	//confirm the user exists in the first place before deleting it
-	if userExists, err := checkIfUserExists(username); err == nil && !userExists {
-		writeMessage(http.StatusNotFound, "User does not exist", w)
-		return
-	} else if err != nil {
-		log.Println("Error checking if user exists: " + err.Error())
-		writeMessage(http.StatusInternalServerError, "Error checking if user exists", w)
-		return
-	}
-
+	username := mux.Vars(r)["username"] //user already confirmed to exist through middleware
 	err := deleteUser(username)
 
 	if err != nil {
@@ -115,8 +127,21 @@ var deleteUserHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 	}
 })
 
+func userExists(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		username := mux.Vars(r)["username"]
+		if exists, err := checkIfUserExists(username); err != nil {
+			log.Println("Error checking if user exists" + err.Error())
+			writeMessage(http.StatusInternalServerError, "Error checking if user exists", w)
+		} else if !exists {
+			writeMessage(http.StatusNotFound, "User does not exist", w)
+		} else {
+			h.ServeHTTP(w, r)
+		}
+	})
+}
+
 func createUser(userData userCreateData) error {
-	//TODO check if username already exists
 	passwordHash, err := hashAndSalt([]byte(userData.Password))
 	if err != nil {
 		return errors.New("createUser: " + err.Error())
@@ -131,13 +156,65 @@ func deleteUser(username string) error {
 	return err
 }
 
+func updateUser(username string, updateFields map[string]string) (bool, error) {
+	//check if the update fields are valid
+	//this sanitizes the input for later
+	if !isUpdateRequestValid(updateFields) {
+		return false, nil
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return false, errors.New("Error opening transaction:" + err.Error())
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("updateUser entered panic, recovered to rollback, with error: ", r)
+			if rollBackErr := tx.Rollback(); rollBackErr != nil {
+				log.Println("Could not rollback: " + err.Error())
+			}
+		}
+	}()
+
+	for attribute, newValue := range updateFields {
+		//primary key literally can't be updated in this syntax anyway
+		_, err := tx.Exec("UPDATE app_user SET "+updateSchemaTranslator[attribute]+" = $1 where username = $2", newValue, username)
+		if err != nil {
+			tx.Rollback()
+			return false, errors.New("Error while updating database: " + err.Error())
+		}
+	}
+
+	_, err = tx.Exec("UPDATE app_user SET updatedAt = NOW() where username = $1", username)
+	if err != nil {
+		tx.Rollback()
+		return false, errors.New("Error when updating updated field in app_user: " + err.Error())
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return false, errors.New("Error committing changes to database: " + err.Error())
+	}
+
+	return true, nil
+}
+
+func isUpdateRequestValid(updateFields map[string]string) bool {
+	for attribute := range updateFields {
+		if _, exist := updateSchemaTranslator[attribute]; !exist {
+			return false
+		}
+	}
+	return true
+
+}
+
 func getUserData(username string) (userPublicDetail, error) {
 	var userDetail userPublicDetail
 	err := db.QueryRowx("SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user where username = $1", username).StructScan(&userDetail)
 
-	if err == sql.ErrNoRows {
-		return userPublicDetail{}, errUserDoesNotExist
-	} else if err != nil {
+	if err != nil {
 		return userPublicDetail{}, errors.New("Could not fetch user details: " + err.Error())
 	}
 

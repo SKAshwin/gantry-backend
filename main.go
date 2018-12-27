@@ -52,9 +52,9 @@ func main() {
 	r.Handle("/api/auth/login", adminLoginHandler).Methods("POST")
 	r.Handle("/api/users", isAdmin(jwtMiddleware.Handler(listUsersHandler))).Methods("GET")
 	r.Handle("/api/users", isAdmin(jwtMiddleware.Handler(createUserHandler))).Methods("POST")
-	r.Handle("/api/users/{username}", isAdmin(jwtMiddleware.Handler(getUserDetailsHandler))).Methods("GET")
-	r.Handle("/api/users/{username}", isAdmin(jwtMiddleware.Handler(updateUserDetailsHandler))).Methods("PUT")
-	r.Handle("/api/users/{username}", isAdmin(jwtMiddleware.Handler(deleteUserHandler))).Methods("DELETE")
+	r.Handle("/api/users/{username}", userExists(isAdmin(jwtMiddleware.Handler(getUserDetailsHandler)))).Methods("GET")
+	r.Handle("/api/users/{username}", userExists(isAdmin(jwtMiddleware.Handler(updateUserDetailsHandler)))).Methods("PUT")
+	r.Handle("/api/users/{username}", userExists(isAdmin(jwtMiddleware.Handler(deleteUserHandler)))).Methods("DELETE")
 	// /users/profile
 	handler := cors.New(cors.Options{
 		AllowedOrigins: allowedCorsOrigins,
