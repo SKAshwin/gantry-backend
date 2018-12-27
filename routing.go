@@ -15,12 +15,12 @@ import (
 
 func SetUpRouting() *mux.Router {
 	r := mux.NewRouter()
-	r.Handle("/api/auth/login", handlers.AdminLoginHandler).Methods("POST")
-	r.Handle("/api/users", auth.AccessControl(auth.IsAdmin, handlers.ListUsersHandler)).Methods("GET")
-	r.Handle("/api/users", auth.AccessControl(auth.IsAdmin, handlers.CreateUserHandler)).Methods("POST")
-	r.Handle("/api/users/{username}", users.UserExists(auth.AccessControl(auth.SpecificUserOrAdmin, handlers.GetUserHandler))).Methods("GET")
-	r.Handle("/api/users/{username}", users.UserExists(auth.AccessControl(auth.SpecificUserOrAdmin, handlers.UpdateUserDetailsHandler))).Methods("PUT")
-	r.Handle("/api/users/{username}", users.UserExists(auth.AccessControl(auth.SpecificUserOrAdmin, handlers.DeleteUserHandler))).Methods("DELETE")
+	r.Handle("/api/auth/login", handlers.AdminLogin).Methods("POST")
+	r.Handle("/api/users", auth.AccessControl(auth.IsAdmin, handlers.ListUsers)).Methods("GET")
+	r.Handle("/api/users", auth.AccessControl(auth.IsAdmin, handlers.CreateUser)).Methods("POST")
+	r.Handle("/api/users/{username}", users.UserExists(auth.AccessControl(auth.SpecificUserOrAdmin, handlers.GetUser))).Methods("GET")
+	r.Handle("/api/users/{username}", users.UserExists(auth.AccessControl(auth.SpecificUserOrAdmin, handlers.UpdateUserDetails))).Methods("PUT")
+	r.Handle("/api/users/{username}", users.UserExists(auth.AccessControl(auth.SpecificUserOrAdmin, handlers.DeleteUser))).Methods("DELETE")
 	// /users/profile
 
 	return r

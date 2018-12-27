@@ -10,7 +10,7 @@ import (
 )
 
 //AdminLoginHandler Handles authentication and generation of web tokens in response to the user attempting to login, via /api/auth/login
-var AdminLoginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+var AdminLogin = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var ld auth.LoginDetails
 	err := decoder.Decode(&ld)

@@ -10,7 +10,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-var ListUsersHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+var ListUsers = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	//writeMessage("Hey you made it here", w)
 	userDetails, err := users.GetAllUsers()
 	if err != nil {
@@ -23,7 +23,7 @@ var ListUsersHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Requ
 	w.Write(reply)
 })
 
-var CreateUserHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+var CreateUser = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	var userData users.UserCreateData
 	err := json.NewDecoder(r.Body).Decode(&userData)
 	if err != nil {
@@ -51,7 +51,7 @@ var CreateUserHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 	}
 })
 
-var GetUserHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+var GetUser = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	username := mux.Vars(r)["username"]
 	userData, err := users.GetUserData(username)
 	if err != nil {
@@ -63,7 +63,7 @@ var GetUserHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Reques
 	}
 })
 
-var UpdateUserDetailsHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+var UpdateUserDetails = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	var updatedFields map[string]string
 	err := json.NewDecoder(r.Body).Decode(&updatedFields)
 	if err != nil {
@@ -86,7 +86,7 @@ var UpdateUserDetailsHandler = http.HandlerFunc(func(w http.ResponseWriter, r *h
 
 })
 
-var DeleteUserHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+var DeleteUser = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	username := mux.Vars(r)["username"] //user already confirmed to exist through middleware
 	err := users.DeleteUser(username)
 
