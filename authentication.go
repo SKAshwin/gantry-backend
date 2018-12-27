@@ -27,14 +27,14 @@ type loginDetails struct {
 	Password string `json:"password"`
 }
 
-//adminLoginHandler Handles authentication and generation of web tokens in response to the user attempting to login, via /api/auth/login
-var adminLoginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+//AdminLoginHandler Handles authentication and generation of web tokens in response to the user attempting to login, via /api/auth/login
+var AdminLoginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var ld loginDetails
 	err := decoder.Decode(&ld)
 	if err != nil {
 		log.Println("adminLoginHandler faced an error: " + err.Error())
-		writeMessage(http.StatusBadRequest, "Authentication JSON malformed", w)
+		WriteMessage(http.StatusBadRequest, "Authentication JSON malformed", w)
 		return
 	}
 	fmt.Println(ld.Username)
@@ -43,21 +43,21 @@ var adminLoginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 
 	if err != nil {
 		log.Println("adminLoginHandler faced an error: " + err.Error())
-		writeMessage(http.StatusInternalServerError, "Authentication failed due to server error", w)
+		WriteMessage(http.StatusInternalServerError, "Authentication failed due to server error", w)
 		return
 	}
 
 	if isAuthenticated {
-		jwtToken, err := createToken(ld, true)
+		jwtToken, err := CreateToken(ld, true)
 		if err != nil {
-			log.Println("adminLoginHandler faced an error: " + err.Error())
-			writeMessage(http.StatusInternalServerError, "Token creation failed", w)
+			log.Println("AdminLoginHandler faced an error: " + err.Error())
+			WriteMessage(http.StatusInternalServerError, "Token creation failed", w)
 		} else {
 			reply, _ := json.Marshal(map[string]string{"accessToken": jwtToken})
 			w.Write(reply)
 		}
 	} else {
-		writeMessage(http.StatusUnauthorized, "Incorrect Username or Password", w)
+		WriteMessage(http.StatusUnauthorized, "Incorrect Username or Password", w)
 	}
 
 })
@@ -69,9 +69,9 @@ func authenticate(user loginDetails, tableName string) (bool, error) {
 	var stmt *sql.Stmt
 	var err error
 	if tableName == adminTable {
-		stmt, err = db.Prepare("SELECT passwordHash FROM app_admin where username = $1")
+		stmt, err = DB.Prepare("SELECT passwordHash FROM app_admin where username = $1")
 	} else if tableName == userTable {
-		stmt, err = db.Prepare("SELECT passwordHash FROM app_user where username = $1")
+		stmt, err = DB.Prepare("SELECT passwordHash FROM app_user where username = $1")
 	}
 	if err != nil {
 		return false, errors.New("Statement preparation in authentication failed: " + err.Error())
@@ -87,9 +87,9 @@ func authenticate(user loginDetails, tableName string) (bool, error) {
 	return bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(user.Password)) == nil, nil //method returns nil if there is a match between password and hash
 }
 
-//hashAndSalt given a password (as []byte), uses the bcrypt method to hash a password
+//HashAndSalt given a password (as []byte), uses the bcrypt method to hash a password
 //Returns a string containing both the salt and the hash (use bcrypt library to work with it)
-func hashAndSalt(pwd []byte) (string, error) {
+func HashAndSalt(pwd []byte) (string, error) {
 	//Use GenerateFromPassword to hash & salt pwd.
 	//cost must be above 4
 	hash, err := bcrypt.GenerateFromPassword(pwd, hashCost)
@@ -101,9 +101,9 @@ func hashAndSalt(pwd []byte) (string, error) {
 	return string(hash), nil
 }
 
-//createToken Given a user (or admin's) login details, returns an encrypted web token
+//CreateToken Given a user (or admin's) login details, returns an encrypted web token
 //Uses signing method HS256
-func createToken(user loginDetails, isAdmin bool) (string, error) {
+func CreateToken(user loginDetails, isAdmin bool) (string, error) {
 	token := jwt.New(jwt.SigningMethodHS256)
 	claims := token.Claims.(jwt.MapClaims)
 
@@ -119,10 +119,10 @@ func createToken(user loginDetails, isAdmin bool) (string, error) {
 	return tokenSigned, nil
 }
 
-//keyGetter checks if the provided token follows the appropriate signing method
+//KeyGetter checks if the provided token follows the appropriate signing method
 //Returns an error if not
 //Returns the signing key if it does follow the appropriate method
-func keyGetter(token *jwt.Token) (interface{}, error) {
+func KeyGetter(token *jwt.Token) (interface{}, error) {
 	if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 		log.Printf("Unexpected signing method: %v \n", token.Header["alg"])
 		return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
@@ -130,23 +130,23 @@ func keyGetter(token *jwt.Token) (interface{}, error) {
 	return signingKey, nil
 }
 
-//getJWTClaims Given a http request, extracts the encrypted JWT string from the authorization header
+//GetJWTClaims Given a http request, extracts the encrypted JWT string from the authorization header
 //Returns a map between the JWT claims and their values
 //Returns an error if either token parsing failed (possibly incorrect signing method etc) or if the token is expired
-func getJWTClaims(r *http.Request) (map[string]interface{}, error) {
+func GetJWTClaims(r *http.Request) (map[string]interface{}, error) {
 	reqToken := r.Header.Get("Authorization")
 	splitToken := strings.Split(reqToken, "Bearer ")
 	reqToken = splitToken[1]
-	claims, err := extractClaimsFromTokenString(reqToken)
+	claims, err := ExtractClaimsFromTokenString(reqToken)
 	return claims, err
 
 }
 
-//extractClaimsFromTokenString given the encrypted JWT string (usually taken from the authorization header)
+//ExtractClaimsFromTokenString given the encrypted JWT string (usually taken from the authorization header)
 //Returns a jwt.MapClaims object representing the claims in the token
 //Returns a non-nil error if either token parsing failed, or the token was expired
-func extractClaimsFromTokenString(tokenStr string) (jwt.MapClaims, error) {
-	token, err := jwt.Parse(tokenStr, keyGetter)
+func ExtractClaimsFromTokenString(tokenStr string) (jwt.MapClaims, error) {
+	token, err := jwt.Parse(tokenStr, KeyGetter)
 
 	if err != nil {
 		return nil, errors.New("Token parsing failed during extraction of claims: " + err.Error())
