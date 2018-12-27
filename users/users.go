@@ -44,7 +44,7 @@ var (
 func UserExists(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		username := mux.Vars(r)["username"]
-		if exists, err := CheckIfUserExists(username); err != nil {
+		if exists, err := CheckIfExists(username); err != nil {
 			log.Println("Error checking if user exists" + err.Error())
 			response.WriteMessage(http.StatusInternalServerError, "Error checking if user exists", w)
 		} else if !exists {
@@ -65,7 +65,7 @@ func (userData UserCreateData) CreateUser() error {
 	return err
 }
 
-func DeleteUser(username string) error {
+func Delete(username string) error {
 	_, err := config.DB.Exec("DELETE from app_user where username = $1", username)
 	return err
 }
@@ -124,7 +124,7 @@ func IsUpdateRequestValid(updateFields map[string]string) bool {
 
 }
 
-func GetUserData(username string) (UserPublicDetail, error) {
+func GetData(username string) (UserPublicDetail, error) {
 	var userDetail UserPublicDetail
 	err := config.DB.QueryRowx("SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user where username = $1", username).StructScan(&userDetail)
 
@@ -135,7 +135,7 @@ func GetUserData(username string) (UserPublicDetail, error) {
 	return userDetail, nil
 }
 
-func CheckIfUserExists(username string) (bool, error) {
+func CheckIfExists(username string) (bool, error) {
 	var numUsers int
 	err := config.DB.QueryRow("SELECT COUNT(*) from app_user where username = $1", username).Scan(&numUsers)
 	if err != nil {
@@ -144,7 +144,7 @@ func CheckIfUserExists(username string) (bool, error) {
 	return numUsers != 0, nil
 }
 
-func GetAllUsers() ([]UserPublicDetail, error) {
+func GetAll() ([]UserPublicDetail, error) {
 	rows, err := config.DB.Queryx("SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user")
 	if err != nil {
 		return nil, errors.New("Cannot fetch user details: " + err.Error())

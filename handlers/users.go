@@ -12,7 +12,7 @@ import (
 
 var ListUsers = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	//writeMessage("Hey you made it here", w)
-	userDetails, err := users.GetAllUsers()
+	userDetails, err := users.GetAll()
 	if err != nil {
 		log.Println(err.Error())
 		response.WriteMessage(http.StatusInternalServerError, "Could not get user data", w)
@@ -33,7 +33,7 @@ var CreateUser = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}
 
 	//check if the user already exists first before attempting to create one
-	if userExists, err := users.CheckIfUserExists(userData.Username); err == nil && userExists {
+	if userExists, err := users.CheckIfExists(userData.Username); err == nil && userExists {
 		response.WriteMessage(http.StatusConflict, "Username already taken", w)
 		return
 	} else if err != nil {
@@ -53,7 +53,7 @@ var CreateUser = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 var GetUser = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	username := mux.Vars(r)["username"]
-	userData, err := users.GetUserData(username)
+	userData, err := users.GetData(username)
 	if err != nil {
 		log.Println("Error fetching user data: " + err.Error())
 		response.WriteMessage(http.StatusInternalServerError, "Could not get user data", w)
@@ -88,7 +88,7 @@ var UpdateUserDetails = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 
 var DeleteUser = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	username := mux.Vars(r)["username"] //user already confirmed to exist through middleware
-	err := users.DeleteUser(username)
+	err := users.Delete(username)
 
 	if err != nil {
 		log.Println("Error deleting user: " + err.Error())
