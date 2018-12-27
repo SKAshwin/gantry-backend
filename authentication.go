@@ -134,12 +134,19 @@ func KeyGetter(token *jwt.Token) (interface{}, error) {
 //Returns a map between the JWT claims and their values
 //Returns an error if either token parsing failed (possibly incorrect signing method etc) or if the token is expired
 func GetJWTClaims(r *http.Request) (map[string]interface{}, error) {
-	reqToken := r.Header.Get("Authorization")
-	splitToken := strings.Split(reqToken, "Bearer ")
-	reqToken = splitToken[1]
-	claims, err := ExtractClaimsFromTokenString(reqToken)
+	claims, err := ExtractClaimsFromTokenString(GetJWTString(r))
 	return claims, err
 
+}
+
+func GetJWTString(r *http.Request) string {
+	reqToken := r.Header.Get("Authorization")
+	if reqToken == "" {
+		return ""
+	}
+	splitToken := strings.Split(reqToken, "Bearer ")
+	reqToken = splitToken[1]
+	return reqToken
 }
 
 //ExtractClaimsFromTokenString given the encrypted JWT string (usually taken from the authorization header)
@@ -156,4 +163,27 @@ func ExtractClaimsFromTokenString(tokenStr string) (jwt.MapClaims, error) {
 		return claims, nil
 	}
 	return nil, errors.New("Expired token")
+}
+
+func AccessControl(adminLock bool, h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		token, err := jwt.Parse(GetJWTString(r), KeyGetter)
+
+		if err != nil {
+			log.Println("Failed to extract token: " + err.Error())
+			WriteMessage(http.StatusBadRequest, "Could not decipher authorization token", w)
+			return
+		}
+		if !token.Valid {
+			WriteMessage(http.StatusUnauthorized, "Token has expired", w)
+			return
+		}
+
+		claims, _ := token.Claims.(jwt.MapClaims)
+		if claims[jwtAdminStatus] == true || !adminLock {
+			h.ServeHTTP(w, r)
+		} else {
+			WriteMessage(http.StatusUnauthorized, "Accessing this page requires admin privileges", w)
+		}
+	})
 }

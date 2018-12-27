@@ -5,29 +5,17 @@ import (
 	"log"
 	"net/http"
 
-	jwtmiddleware "github.com/auth0/go-jwt-middleware"
-	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"
 )
 
 func SetUpRouting() *mux.Router {
-	jwtMiddleware := jwtmiddleware.New(jwtmiddleware.Options{
-		//check if jwt is sent, extracts information
-		//also checks if token is expired; returns 401 if not
-		ValidationKeyGetter: KeyGetter,
-		ErrorHandler: func(w http.ResponseWriter, r *http.Request, err string) {
-			WriteMessage(http.StatusUnauthorized, err, w)
-		},
-		SigningMethod: jwt.SigningMethodHS256,
-	})
-
 	r := mux.NewRouter()
 	r.Handle("/api/auth/login", AdminLoginHandler).Methods("POST")
-	r.Handle("/api/users", IsAdmin(jwtMiddleware.Handler(ListUsersHandler))).Methods("GET")
-	r.Handle("/api/users", IsAdmin(jwtMiddleware.Handler(CreateUserHandler))).Methods("POST")
-	r.Handle("/api/users/{username}", UserExists(IsAdmin(jwtMiddleware.Handler(GetUserHandler)))).Methods("GET")
-	r.Handle("/api/users/{username}", UserExists(IsAdmin(jwtMiddleware.Handler(UpdateUserDetailsHandler)))).Methods("PUT")
-	r.Handle("/api/users/{username}", UserExists(IsAdmin(jwtMiddleware.Handler(DeleteUserHandler)))).Methods("DELETE")
+	r.Handle("/api/users", AccessControl(true, ListUsersHandler)).Methods("GET")
+	r.Handle("/api/users", AccessControl(true, CreateUserHandler)).Methods("POST")
+	r.Handle("/api/users/{username}", UserExists(AccessControl(true, GetUserHandler))).Methods("GET")
+	r.Handle("/api/users/{username}", UserExists(AccessControl(true, UpdateUserDetailsHandler))).Methods("PUT")
+	r.Handle("/api/users/{username}", UserExists(AccessControl(true, DeleteUserHandler))).Methods("DELETE")
 	// /users/profile
 
 	return r

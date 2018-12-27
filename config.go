@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"net/http"
 	"os"
 
 	"github.com/jmoiron/sqlx"
@@ -90,21 +89,4 @@ func dbConfig() map[string]string {
 	conf[dbpass] = password
 	conf[dbname] = name
 	return conf
-}
-
-func IsAdmin(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		claims, err := GetJWTClaims(r)
-		if err != nil {
-			log.Println("isAdmin faced an error: " + err.Error())
-			WriteMessage(http.StatusUnauthorized, "Expired Token", w)
-		} else {
-			if claims[jwtAdminStatus] == true {
-				h.ServeHTTP(w, r)
-			} else {
-				WriteMessage(http.StatusUnauthorized, "Accessing this page requires admin privileges",
-					w)
-			}
-		}
-	})
 }
