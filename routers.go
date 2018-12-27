@@ -11,11 +11,11 @@ import (
 func SetUpRouting() *mux.Router {
 	r := mux.NewRouter()
 	r.Handle("/api/auth/login", AdminLoginHandler).Methods("POST")
-	r.Handle("/api/users", AccessControl(true, ListUsersHandler)).Methods("GET")
-	r.Handle("/api/users", AccessControl(true, CreateUserHandler)).Methods("POST")
-	r.Handle("/api/users/{username}", UserExists(AccessControl(true, GetUserHandler))).Methods("GET")
-	r.Handle("/api/users/{username}", UserExists(AccessControl(true, UpdateUserDetailsHandler))).Methods("PUT")
-	r.Handle("/api/users/{username}", UserExists(AccessControl(true, DeleteUserHandler))).Methods("DELETE")
+	r.Handle("/api/users", AccessControl(IsAdmin, ListUsersHandler)).Methods("GET")
+	r.Handle("/api/users", AccessControl(IsAdmin, CreateUserHandler)).Methods("POST")
+	r.Handle("/api/users/{username}", UserExists(AccessControl(SpecificUserOrAdmin, GetUserHandler))).Methods("GET")
+	r.Handle("/api/users/{username}", UserExists(AccessControl(SpecificUserOrAdmin, UpdateUserDetailsHandler))).Methods("PUT")
+	r.Handle("/api/users/{username}", UserExists(AccessControl(SpecificUserOrAdmin, DeleteUserHandler))).Methods("DELETE")
 	// /users/profile
 
 	return r

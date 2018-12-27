@@ -11,6 +11,7 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/gorilla/mux"
 	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -165,7 +166,9 @@ func ExtractClaimsFromTokenString(tokenStr string) (jwt.MapClaims, error) {
 	return nil, errors.New("Expired token")
 }
 
-func AccessControl(adminLock bool, h http.Handler) http.Handler {
+type AccessRestriction func(jwt.MapClaims, *http.Request) bool
+
+func AccessControl(canAccess AccessRestriction, h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		token, err := jwt.Parse(GetJWTString(r), KeyGetter)
 
@@ -180,10 +183,22 @@ func AccessControl(adminLock bool, h http.Handler) http.Handler {
 		}
 
 		claims, _ := token.Claims.(jwt.MapClaims)
-		if claims[jwtAdminStatus] == true || !adminLock {
+		if canAccess(claims, r) {
 			h.ServeHTTP(w, r)
 		} else {
-			WriteMessage(http.StatusUnauthorized, "Accessing this page requires admin privileges", w)
+			WriteMessage(http.StatusUnauthorized, "Access Unauthorized", w)
 		}
 	})
+}
+
+func NoRestriction(claims jwt.MapClaims, r *http.Request) bool {
+	return true
+}
+
+func IsAdmin(claims jwt.MapClaims, r *http.Request) bool {
+	return claims[jwtAdminStatus] == true
+}
+
+func SpecificUserOrAdmin(claims jwt.MapClaims, r *http.Request) bool {
+	return claims[jwtAdminStatus] == true || claims[jwtUsername] == mux.Vars(r)["username"]
 }
