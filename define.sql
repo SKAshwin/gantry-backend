@@ -25,8 +25,8 @@ create table event(
 );
 
 create table hosts(
-	username text NOT NULL REFERENCES app_user(username),
-	eventID SERIAL NOT NULL REFERENCES event(eventID),
+	username text NOT NULL REFERENCES app_user(username) ON UPDATE CASCADE ON DELETE CASCADE,
+	eventID SERIAL NOT NULL REFERENCES event(eventID) ON UPDATE CASCADE ON DELETE CASCADE,
 	PRIMARY KEY(username, eventID)
 );
 
