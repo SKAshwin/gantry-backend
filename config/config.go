@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"fmt"
@@ -6,7 +6,6 @@ import (
 	"os"
 
 	"github.com/jmoiron/sqlx"
-	"github.com/joho/godotenv"
 )
 
 const (
@@ -18,14 +17,6 @@ const (
 )
 
 var DB *sqlx.DB
-
-func LoadEnvironmentalVariables() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Print("Error loading environmental variables: ")
-		log.Fatal(err.Error())
-	}
-}
 
 func RedirectLogger() {
 	//redirects logger output to a logger file

@@ -1,4 +1,4 @@
-package main
+package users
 
 import (
 	"errors"
@@ -10,6 +10,10 @@ import (
 
 	"github.com/guregu/null"
 	"github.com/jmoiron/sqlx"
+
+	"registration-app/auth"
+	"registration-app/config"
+	"registration-app/response"
 )
 
 type UserPublicDetail struct {
@@ -26,8 +30,6 @@ type UserCreateData struct {
 	Password string `json:"password"`
 }
 
-type userPublicDetails []UserPublicDetail
-
 const (
 	dbUsername = "username"
 	dbPassword = "passwordHash"
@@ -42,40 +44,40 @@ var (
 func UserExists(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		username := mux.Vars(r)["username"]
-		if exists, err := checkIfUserExists(username); err != nil {
+		if exists, err := CheckIfUserExists(username); err != nil {
 			log.Println("Error checking if user exists" + err.Error())
-			WriteMessage(http.StatusInternalServerError, "Error checking if user exists", w)
+			response.WriteMessage(http.StatusInternalServerError, "Error checking if user exists", w)
 		} else if !exists {
-			WriteMessage(http.StatusNotFound, "User does not exist", w)
+			response.WriteMessage(http.StatusNotFound, "User does not exist", w)
 		} else {
 			h.ServeHTTP(w, r)
 		}
 	})
 }
 
-func createUser(userData UserCreateData) error {
-	passwordHash, err := HashAndSalt([]byte(userData.Password))
+func (userData UserCreateData) CreateUser() error {
+	passwordHash, err := auth.HashAndSalt([]byte(userData.Password))
 	if err != nil {
 		return errors.New("createUser: " + err.Error())
 	}
-	_, err = DB.Exec("INSERT into app_user (username,passwordHash,name,createdAt,updatedAt,lastLoggedIn) VALUES ($1, $2, $3, NOW(), NOW(), NULL)",
+	_, err = config.DB.Exec("INSERT into app_user (username,passwordHash,name,createdAt,updatedAt,lastLoggedIn) VALUES ($1, $2, $3, NOW(), NOW(), NULL)",
 		userData.Username, passwordHash, userData.Name)
 	return err
 }
 
-func deleteUser(username string) error {
-	_, err := DB.Exec("DELETE from app_user where username = $1", username)
+func DeleteUser(username string) error {
+	_, err := config.DB.Exec("DELETE from app_user where username = $1", username)
 	return err
 }
 
-func updateUser(username string, updateFields map[string]string) (bool, error) {
+func UpdateUser(username string, updateFields map[string]string) (bool, error) {
 	//check if the update fields are valid
 	//this sanitizes the input for later
 	if !IsUpdateRequestValid(updateFields) {
 		return false, nil
 	}
 
-	tx, err := DB.Begin()
+	tx, err := config.DB.Begin()
 	if err != nil {
 		return false, errors.New("Error opening transaction:" + err.Error())
 	}
@@ -122,9 +124,9 @@ func IsUpdateRequestValid(updateFields map[string]string) bool {
 
 }
 
-func getUserData(username string) (UserPublicDetail, error) {
+func GetUserData(username string) (UserPublicDetail, error) {
 	var userDetail UserPublicDetail
-	err := DB.QueryRowx("SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user where username = $1", username).StructScan(&userDetail)
+	err := config.DB.QueryRowx("SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user where username = $1", username).StructScan(&userDetail)
 
 	if err != nil {
 		return UserPublicDetail{}, errors.New("Could not fetch user details: " + err.Error())
@@ -133,17 +135,17 @@ func getUserData(username string) (UserPublicDetail, error) {
 	return userDetail, nil
 }
 
-func checkIfUserExists(username string) (bool, error) {
+func CheckIfUserExists(username string) (bool, error) {
 	var numUsers int
-	err := DB.QueryRow("SELECT COUNT(*) from app_user where username = $1", username).Scan(&numUsers)
+	err := config.DB.QueryRow("SELECT COUNT(*) from app_user where username = $1", username).Scan(&numUsers)
 	if err != nil {
 		return false, err
 	}
 	return numUsers != 0, nil
 }
 
-func getAllUsers() ([]UserPublicDetail, error) {
-	rows, err := DB.Queryx("SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user")
+func GetAllUsers() ([]UserPublicDetail, error) {
+	rows, err := config.DB.Queryx("SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user")
 	if err != nil {
 		return nil, errors.New("Cannot fetch user details: " + err.Error())
 	}
@@ -158,7 +160,7 @@ func getAllUsers() ([]UserPublicDetail, error) {
 
 func getNumberOfUsers() (int, error) {
 	var numUsers int
-	err := DB.QueryRow("SELECT count(*) from app_user").Scan(&numUsers)
+	err := config.DB.QueryRow("SELECT count(*) from app_user").Scan(&numUsers)
 
 	if err != nil {
 		return 0, errors.New("Cannot fetch user count: " + err.Error())

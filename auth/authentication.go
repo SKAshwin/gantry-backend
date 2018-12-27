@@ -1,8 +1,7 @@
-package main
+package auth
 
 import (
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -10,9 +9,9 @@ import (
 	"strings"
 	"time"
 
+	"registration-app/config"
+
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/gorilla/mux"
-	_ "github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -20,59 +19,29 @@ const hashCost = 5 //cost must be above 4, the larger you make it the slower the
 var signingKey = []byte("theSecretPassword")
 
 const jwtUsername, jwtExpiryTime, jwtAdminStatus = "username", "exp", "admin"
-const adminTable = "app_admin"
-const userTable = "app_user"
 
-type loginDetails struct {
+type AdminStatus int
+
+const (
+	Admin = iota
+	User
+)
+
+type LoginDetails struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
-//AdminLoginHandler Handles authentication and generation of web tokens in response to the user attempting to login, via /api/auth/login
-var AdminLoginHandler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	decoder := json.NewDecoder(r.Body)
-	var ld loginDetails
-	err := decoder.Decode(&ld)
-	if err != nil {
-		log.Println("adminLoginHandler faced an error: " + err.Error())
-		WriteMessage(http.StatusBadRequest, "Authentication JSON malformed", w)
-		return
-	}
-	fmt.Println(ld.Username)
-
-	isAuthenticated, err := authenticate(ld, adminTable)
-
-	if err != nil {
-		log.Println("adminLoginHandler faced an error: " + err.Error())
-		WriteMessage(http.StatusInternalServerError, "Authentication failed due to server error", w)
-		return
-	}
-
-	if isAuthenticated {
-		jwtToken, err := CreateToken(ld, true)
-		if err != nil {
-			log.Println("AdminLoginHandler faced an error: " + err.Error())
-			WriteMessage(http.StatusInternalServerError, "Token creation failed", w)
-		} else {
-			reply, _ := json.Marshal(map[string]string{"accessToken": jwtToken})
-			w.Write(reply)
-		}
-	} else {
-		WriteMessage(http.StatusUnauthorized, "Incorrect Username or Password", w)
-	}
-
-})
-
-//authenticate Given a user's login details and a table name (indicating whether they are admin or users)
+//Authenticate Given a user's login details and a table name (indicating whether they are admin or users)
 //Returns true if the password matches that username, false otherwise
 //Returns error if there is a database querying issue
-func authenticate(user loginDetails, tableName string) (bool, error) {
+func (user LoginDetails) Authenticate(as AdminStatus) (bool, error) {
 	var stmt *sql.Stmt
 	var err error
-	if tableName == adminTable {
-		stmt, err = DB.Prepare("SELECT passwordHash FROM app_admin where username = $1")
-	} else if tableName == userTable {
-		stmt, err = DB.Prepare("SELECT passwordHash FROM app_user where username = $1")
+	if as == Admin {
+		stmt, err = config.DB.Prepare("SELECT passwordHash FROM app_admin where username = $1")
+	} else if as == User {
+		stmt, err = config.DB.Prepare("SELECT passwordHash FROM app_user where username = $1")
 	}
 	if err != nil {
 		return false, errors.New("Statement preparation in authentication failed: " + err.Error())
@@ -104,13 +73,13 @@ func HashAndSalt(pwd []byte) (string, error) {
 
 //CreateToken Given a user (or admin's) login details, returns an encrypted web token
 //Uses signing method HS256
-func CreateToken(user loginDetails, isAdmin bool) (string, error) {
+func (user LoginDetails) CreateToken(as AdminStatus) (string, error) {
 	token := jwt.New(jwt.SigningMethodHS256)
 	claims := token.Claims.(jwt.MapClaims)
 
 	claims[jwtUsername] = user.Username
 	claims[jwtExpiryTime] = time.Now().Add(time.Hour).Unix()
-	claims[jwtAdminStatus] = isAdmin //token claim to be given out if user is logging in as admin (through internal console)
+	claims[jwtAdminStatus] = (as == Admin) //token claim to be given out if user is logging in as admin (through internal console)
 
 	tokenSigned, err := token.SignedString(signingKey)
 	if err != nil {
@@ -164,41 +133,4 @@ func ExtractClaimsFromTokenString(tokenStr string) (jwt.MapClaims, error) {
 		return claims, nil
 	}
 	return nil, errors.New("Expired token")
-}
-
-type AccessRestriction func(jwt.MapClaims, *http.Request) bool
-
-func AccessControl(canAccess AccessRestriction, h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token, err := jwt.Parse(GetJWTString(r), KeyGetter)
-
-		if err != nil {
-			log.Println("Failed to extract token: " + err.Error())
-			WriteMessage(http.StatusBadRequest, "Could not decipher authorization token", w)
-			return
-		}
-		if !token.Valid {
-			WriteMessage(http.StatusUnauthorized, "Token has expired", w)
-			return
-		}
-
-		claims, _ := token.Claims.(jwt.MapClaims)
-		if canAccess(claims, r) {
-			h.ServeHTTP(w, r)
-		} else {
-			WriteMessage(http.StatusUnauthorized, "Access Unauthorized", w)
-		}
-	})
-}
-
-func NoRestriction(claims jwt.MapClaims, r *http.Request) bool {
-	return true
-}
-
-func IsAdmin(claims jwt.MapClaims, r *http.Request) bool {
-	return claims[jwtAdminStatus] == true
-}
-
-func SpecificUserOrAdmin(claims jwt.MapClaims, r *http.Request) bool {
-	return claims[jwtAdminStatus] == true || claims[jwtUsername] == mux.Vars(r)["username"]
 }
