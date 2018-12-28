@@ -70,6 +70,9 @@ func Delete(username string) error {
 	return err
 }
 
+//Update updates a particular user given their username, and a map of attributes to new values
+//Returns a boolean flag indicating if the arguments were valid
+//Returns a non-nil error if there was an error updating the user
 func Update(username string, updateFields map[string]string) (bool, error) {
 	//check if the update fields are valid
 	//this sanitizes the input for later
@@ -92,7 +95,12 @@ func Update(username string, updateFields map[string]string) (bool, error) {
 	}()
 
 	for attribute, newValue := range updateFields {
-		//primary key literally can't be updated in this syntax anyway
+		if attribute == "password" {
+			newValue, err = auth.HashAndSalt([]byte(newValue))
+			if err != nil {
+				return false, errors.New("Could not hash new password: " + err.Error())
+			}
+		}
 		_, err := tx.Exec("UPDATE app_user SET "+updateSchemaTranslator[attribute]+" = $1 where username = $2", newValue, username)
 		if err != nil {
 			tx.Rollback()
