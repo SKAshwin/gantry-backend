@@ -17,7 +17,7 @@ create table app_admin(
 );
 
 create table event(
-	eventID SERIAL PRIMARY KEY NOT NULL,
+	eventID UUID PRIMARY KEY NOT NULL,
 	name text NOT NULL,
 	startDate DATE NOT NULL,
 	endDate DATE NOT NULL,
@@ -26,7 +26,7 @@ create table event(
 
 create table hosts(
 	username text NOT NULL REFERENCES app_user(username) ON UPDATE CASCADE ON DELETE CASCADE,
-	eventID SERIAL NOT NULL REFERENCES event(eventID) ON UPDATE CASCADE ON DELETE CASCADE,
+	eventID UUID NOT NULL REFERENCES event(eventID) ON UPDATE CASCADE ON DELETE CASCADE,
 	PRIMARY KEY(username, eventID)
 );
 
