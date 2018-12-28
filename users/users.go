@@ -95,7 +95,7 @@ func Update(username string, updateFields map[string]string) (bool, error) {
 	}()
 
 	for attribute, newValue := range updateFields {
-		if attribute == "password" {
+		if attribute == "password" { //password needs to be hashed for update
 			newValue, err = auth.HashAndSalt([]byte(newValue))
 			if err != nil {
 				return false, errors.New("Could not hash new password: " + err.Error())
@@ -105,6 +105,9 @@ func Update(username string, updateFields map[string]string) (bool, error) {
 		if err != nil {
 			tx.Rollback()
 			return false, errors.New("Error while updating database: " + err.Error())
+		}
+		if attribute == "username" { //if primary key, username, was changed
+			username = newValue //need to know for all future changes
 		}
 	}
 
