@@ -73,7 +73,7 @@ var UpdateUserDetails = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 	}
 
 	username := mux.Vars(r)["username"] //middleware already confirms user exists
-	validRequest, err := users.UpdateUser(username, updatedFields)
+	validRequest, err := users.Update(username, updatedFields)
 
 	if err != nil {
 		log.Println("Error updating user: " + err.Error())

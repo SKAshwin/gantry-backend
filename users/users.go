@@ -70,7 +70,7 @@ func Delete(username string) error {
 	return err
 }
 
-func UpdateUser(username string, updateFields map[string]string) (bool, error) {
+func Update(username string, updateFields map[string]string) (bool, error) {
 	//check if the update fields are valid
 	//this sanitizes the input for later
 	if !IsUpdateRequestValid(updateFields) {
@@ -156,6 +156,12 @@ func GetAll() ([]UserPublicDetail, error) {
 	}
 
 	return scanRowsIntoUserDetails(rows, numUsers)
+}
+
+//UpdateLastLoggedIn Sets the lastLoggedIn attribute of this user to the current time
+func UpdateLastLoggedIn(username string) error {
+	_, err := config.DB.Exec("UPDATE app_user SET lastLoggedIn = NOW() where username = $1", username)
+	return err
 }
 
 func getNumberOfUsers() (int, error) {

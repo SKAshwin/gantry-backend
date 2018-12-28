@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"registration-app/auth"
 	"registration-app/response"
+	"registration-app/users"
 )
 
 //AdminLogin Handles administrator log in
@@ -41,6 +42,13 @@ func login(status auth.AdminStatus) http.HandlerFunc {
 				log.Println("Login faced an error in token creation: " + err.Error())
 				response.WriteMessage(http.StatusInternalServerError, "Token creation failed", w)
 			} else {
+				if status == auth.User {
+					if err := users.UpdateLastLoggedIn(ld.Username); err != nil {
+						log.Println("Login faced an error in updated last logged in: " + err.Error())
+						response.WriteMessage(http.StatusInternalServerError, "Error updating last logged in", w)
+						return
+					}
+				}
 				reply, _ := json.Marshal(map[string]string{"accessToken": jwtToken})
 				w.Write(reply)
 			}
