@@ -1,8 +1,10 @@
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; --allows the use of uuid_generate_v4() to create UUID
 create DATABASE registrationapp;
 \connect registrationapp
 
 create table app_user(
-	username text PRIMARY KEY NOT NULL,
+	ID UUID PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
+	username text UNIQUE NOT NULL,
 	passwordHash text NOT NULL,
 	name text NOT NULL,
 	createdAt TIMESTAMP NOT NULL,
@@ -11,7 +13,8 @@ create table app_user(
 );
 
 create table app_admin(
-	username text PRIMARY KEY NOT NULL,
+	ID UUID PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
+	username text UNIQUE NOT NULL,
 	passwordHash text NOT NULL,
 	name text NOT NULL
 );
@@ -25,9 +28,9 @@ create table event(
 );
 
 create table hosts(
-	username text NOT NULL REFERENCES app_user(username) ON UPDATE CASCADE ON DELETE CASCADE,
+	userID UUID NOT NULL REFERENCES app_user(ID) ON UPDATE CASCADE ON DELETE CASCADE,
 	eventID UUID NOT NULL REFERENCES event(eventID) ON UPDATE CASCADE ON DELETE CASCADE,
-	PRIMARY KEY(username, eventID)
+	PRIMARY KEY(userID, eventID)
 );
 
 INSERT INTO app_user (username, passwordHash, name, createdAt, updatedAt, lastLoggedIn) VALUES

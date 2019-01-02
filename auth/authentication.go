@@ -18,7 +18,7 @@ import (
 const hashCost = 5 //cost must be above 4, the larger you make it the slower the hash function will run
 var signingKey = []byte("theSecretPassword")
 
-const jwtUsername, jwtExpiryTime, jwtAdminStatus = "username", "exp", "admin"
+const jwtUsername, jwtExpiryTime, jwtAdminStatus, jwtID = "username", "exp", "admin", "userID"
 
 type AdminStatus int
 
@@ -71,12 +71,31 @@ func HashAndSalt(pwd []byte) (string, error) {
 	return string(hash), nil
 }
 
+//GetID For a given username (used in the log in process)
+//Returns the userID/adminID, the primary key used internally
+func (user LoginDetails) GetID(as AdminStatus) (string, error) {
+	var uuid string
+	var err error
+	if as == Admin {
+		err = config.DB.QueryRow("SELECT ID from app_admin where username = $1", user.Username).Scan(&uuid)
+	} else {
+		err = config.DB.QueryRow("SELECT ID from app_user where username = $1", user.Username).Scan(&uuid)
+	}
+
+	if err != nil {
+		return "", errors.New("Could not fetch user ID: " + err.Error())
+	}
+
+	return uuid, nil
+}
+
 //CreateToken Given a user (or admin's) login details, returns an encrypted web token
 //Uses signing method HS256
-func (user LoginDetails) CreateToken(as AdminStatus) (string, error) {
+func (user LoginDetails) CreateToken(as AdminStatus, ID string) (string, error) {
 	token := jwt.New(jwt.SigningMethodHS256)
 	claims := token.Claims.(jwt.MapClaims)
 
+	claims[jwtID] = ID
 	claims[jwtUsername] = user.Username
 	claims[jwtExpiryTime] = time.Now().Add(time.Hour).Unix()
 	claims[jwtAdminStatus] = (as == Admin) //token claim to be given out if user is logging in as admin (through internal console)
