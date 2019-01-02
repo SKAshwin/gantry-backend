@@ -38,7 +38,7 @@ INSERT INTO app_user (username, passwordHash, name, createdAt, updatedAt, lastLo
 	('TestUser', '$2a$05$D/nbFy9utEDFgg.Jfsl39epqO2Yx2nIRClYFGVMw9fnLZlXFFnP5u', 'User McUserson', NOW(), NOW(), NULL); --WhatAreDictionaryAttacks
 
 INSERT into app_admin(username, passwordHash, name) VALUES 
-	('Hackerman','$2a$05$YNWHk.7Su/St644J1BAX7.G8KP3t5ts16bcAPApXSw.yc4hHrgwNi','Drop Table');
+	('Hackerman','$2a$05$YNWHk.7Su/St644J1BAX7.G8KP3t5ts16bcAPApXSw.yc4hHrgwNi','Drop Table'); --BlackFireFoodHorse
 
 create USER server_access with password 'LongNightShortDay';
 grant CONNECT on DATABASE registrationapp to server_access;
