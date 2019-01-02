@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"registration-app/auth"
@@ -26,7 +25,6 @@ func login(status auth.AdminStatus) http.HandlerFunc {
 			response.WriteMessage(http.StatusBadRequest, "Authentication JSON malformed", w)
 			return
 		}
-		fmt.Println(ld.Username)
 
 		isAuthenticated, err := ld.Authenticate(status)
 
