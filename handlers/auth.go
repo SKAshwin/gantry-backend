@@ -36,16 +36,8 @@ func login(status auth.AdminStatus) http.HandlerFunc {
 			return
 		}
 
-		ID, err := ld.GetID(status)
-
-		if err != nil {
-			log.Println("Login faced an error in fetching the UUID: " + err.Error())
-			response.WriteMessage(http.StatusInternalServerError, "Authentication failed due to server error", w)
-			return
-		}
-
 		if isAuthenticated {
-			jwtToken, err := ld.CreateToken(status, ID)
+			jwtToken, err := ld.CreateToken(status)
 			if err != nil {
 				log.Println("Login faced an error in token creation: " + err.Error())
 				response.WriteMessage(http.StatusInternalServerError, "Token creation failed", w)
