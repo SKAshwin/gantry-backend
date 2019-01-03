@@ -23,6 +23,7 @@ func SetUpRouting() *mux.Router {
 	r.Handle("/api/users/{username}", users.UserExists(auth.AccessControl(auth.SpecificUserOrAdmin, handlers.UpdateUserDetails))).Methods("PUT")
 	r.Handle("/api/users/{username}", users.UserExists(auth.AccessControl(auth.SpecificUserOrAdmin, handlers.DeleteUser))).Methods("DELETE")
 	r.Handle("/api/events", auth.AccessControl(auth.NoRestriction, handlers.ListEvents)).Methods("GET")
+	r.Handle("/api/events/{eventID}", auth.AccessControl(auth.NoRestriction, handlers.GetEvent)).Methods("GET")
 	// /users/profile
 
 	return r

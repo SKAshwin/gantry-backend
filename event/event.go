@@ -13,13 +13,13 @@ import (
 
 //Event represents an event which will have an associated website
 type Event struct {
-	ID     string
-	Name   string
-	Start  null.Time
-	End    null.Time
-	Lat    null.Float
-	Long   null.Float
-	Radius null.Float //in km
+	ID     string     `json:"id"`
+	Name   string     `json:"name"`
+	Start  null.Time  `json:"start"`
+	End    null.Time  `json:"end"`
+	Lat    null.Float `json:"lat"`
+	Long   null.Float `json:"long"`
+	Radius null.Float `json:"radius"` //in km
 }
 
 //GetAll Given a username as an argument
@@ -44,6 +44,26 @@ func GetAll(username string) ([]Event, error) {
 	}
 
 	return events, nil
+}
+
+//Get returns an Event object corresponding to the given eventID
+func Get(eventID string) (Event, error) {
+	var event Event
+	err := config.DB.QueryRowx("SELECT ID, name, \"start\", \"end\", lat, long, radius from event where ID = $1", eventID).StructScan(&event)
+	if err != nil {
+		return Event{}, errors.New("Error fetching event details " + err.Error())
+	}
+	return event, nil
+}
+
+//CheckHost returns true if that user is a host of the given event
+func CheckHost(username string, eventID string) (bool, error) {
+	var numHosts int
+	err := config.DB.QueryRow("SELECT count(*) from hosts where hosts.eventID = $1 and hosts.username = $2", eventID, username).Scan(&numHosts)
+	if err != nil {
+		return false, errors.New("Error checking if host relationship exists: " + err.Error())
+	}
+	return numHosts == 1, nil
 }
 
 func getNumberOfEvents(username string) (int, error) {

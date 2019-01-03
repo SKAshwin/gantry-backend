@@ -47,9 +47,14 @@ INSERT into event(name) VALUES
 	('Data Science CoP'),
 	('SDB Cohesion');
 
+INSERT into event(name, start, "end", lat, long, radius) VALUES
+	('Data Science Department Talk', '2019-01-10 15:00:00', '2019-01-10 18:00:00', 1.335932, 103.744708, 0.5);
+
 INSERT into hosts(username, eventID) VALUES
 	('ME5Bob', '6a148e7d-54d6-4b93-b008-64bb9abb624a'),
-	('TestUser', '3a09e470-50c8-467f-a2d8-98ac9a1d6f46');
+	('TestUser', '3a09e470-50c8-467f-a2d8-98ac9a1d6f46'),
+	('TestUser', 'b0b60860-31e9-4395-bf7b-f0316f2cb86d'),
+	('ME5Bob', 'b0b60860-31e9-4395-bf7b-f0316f2cb86d');
 
 create USER server_access with password 'LongNightShortDay';
 grant CONNECT on DATABASE registrationapp to server_access;
