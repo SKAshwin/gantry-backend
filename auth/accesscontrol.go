@@ -27,6 +27,7 @@ func AccessControl(canAccess AccessRestriction, h http.Handler) http.Handler {
 		}
 
 		claims, _ := token.Claims.(jwt.MapClaims)
+		r.Header.Set(jwtUsername, claims[jwtUsername].(string))
 		if canAccess(claims, r) {
 			h.ServeHTTP(w, r)
 		} else {
