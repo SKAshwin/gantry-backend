@@ -22,7 +22,7 @@ var ListEvents = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type Events []event.Event
-	reply, _ := json.Marshal(map[string]Events{"message": events})
+	reply, _ := json.Marshal(map[string]Events{"events": events})
 	w.Write(reply)
 })
 
@@ -44,7 +44,7 @@ var GetEvent = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			log.Println("Error fetching event: " + err.Error())
 			response.WriteMessage(http.StatusInternalServerError, "Error fetching event", w)
 		} else {
-			reply, _ := json.Marshal(map[string]event.Event{"message": ev})
+			reply, _ := json.Marshal(map[string]event.Event{"event": ev})
 			w.Write(reply)
 		}
 	}

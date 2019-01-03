@@ -19,7 +19,7 @@ var ListUsers = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type userPublicDetails []users.UserPublicDetail
-	reply, _ := json.Marshal(map[string]userPublicDetails{"message": userDetails})
+	reply, _ := json.Marshal(map[string]userPublicDetails{"users": userDetails})
 	w.Write(reply)
 })
 
@@ -58,7 +58,7 @@ var GetUser = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error fetching user data: " + err.Error())
 		response.WriteMessage(http.StatusInternalServerError, "Could not get user data", w)
 	} else {
-		reply, _ := json.Marshal(userData)
+		reply, _ := json.Marshal(map[string]users.UserPublicDetail{"user": userData})
 		w.Write(reply)
 	}
 })
