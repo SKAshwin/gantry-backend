@@ -1,4 +1,5 @@
 create DATABASE registrationapp;
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 \connect registrationapp
 
 create table app_user(
@@ -17,16 +18,18 @@ create table app_admin(
 );
 
 create table event(
-	eventID UUID PRIMARY KEY NOT NULL,
+	ID UUID PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
 	name text NOT NULL,
-	startDate DATE NOT NULL,
-	endDate DATE NOT NULL,
-	geofence CIRCLE NOT NULL
+	start TIMESTAMP,
+	end TIMESTAMP,
+	lat float8,
+	long float8,
+	radius float8 --in km
 );
 
 create table hosts(
 	username text NOT NULL REFERENCES app_user(username) ON UPDATE CASCADE ON DELETE CASCADE,
-	eventID UUID NOT NULL REFERENCES event(eventID) ON UPDATE CASCADE ON DELETE CASCADE,
+	eventID UUID NOT NULL REFERENCES event(ID) ON UPDATE CASCADE ON DELETE CASCADE,
 	PRIMARY KEY(username, eventID)
 );
 
@@ -40,7 +43,17 @@ INSERT INTO app_user (username, passwordHash, name, createdAt, updatedAt, lastLo
 INSERT into app_admin(username, passwordHash, name) VALUES 
 	('Hackerman','$2a$05$YNWHk.7Su/St644J1BAX7.G8KP3t5ts16bcAPApXSw.yc4hHrgwNi','Drop Table'); --BlackFireFoodHorse
 
+INSERT into event(name) VALUES
+	('Data Science CoP'),
+	('SDB Cohesion');
+
+INSERT into hosts(username, eventID) VALUES
+	('ME5Bob', '6a148e7d-54d6-4b93-b008-64bb9abb624a'),
+	('TestUser', '3a09e470-50c8-467f-a2d8-98ac9a1d6f46');
+
 create USER server_access with password 'LongNightShortDay';
 grant CONNECT on DATABASE registrationapp to server_access;
 grant SELECT, INSERT, UPDATE, DELETE on app_user to server_access;
 grant SELECT, INSERT, UPDATE on app_admin to server_access;
+grant SELECT, INSERT, UPDATE, DELETE on event to server_access;
+grant SELECT, INSERT, UPDATE, DELETE on hosts to server_access;
