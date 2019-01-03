@@ -89,8 +89,9 @@ func Update(username string, updateFields map[string]string) (bool, error) {
 		if r := recover(); r != nil {
 			log.Println("updateUser entered panic, recovered to rollback, with error: ", r)
 			if rollBackErr := tx.Rollback(); rollBackErr != nil {
-				log.Println("Could not rollback: " + err.Error())
+				log.Println("Could not rollback: " + rollBackErr.Error())
 			}
+			panic("Event.Create panicked")
 		}
 	}()
 
