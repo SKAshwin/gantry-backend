@@ -18,7 +18,7 @@ import (
 const hashCost = 5 //cost must be above 4, the larger you make it the slower the hash function will run
 var signingKey = []byte("theSecretPassword")
 
-const jwtUsername, jwtExpiryTime, jwtAdminStatus = "username", "exp", "admin"
+const JWTUsername, JWTExpiryTime, JWTAdminStatus = "username", "exp", "admin"
 
 type AdminStatus int
 
@@ -77,9 +77,9 @@ func (user LoginDetails) CreateToken(as AdminStatus) (string, error) {
 	token := jwt.New(jwt.SigningMethodHS256)
 	claims := token.Claims.(jwt.MapClaims)
 
-	claims[jwtUsername] = user.Username
-	claims[jwtExpiryTime] = time.Now().Add(time.Hour).Unix()
-	claims[jwtAdminStatus] = (as == Admin) //token claim to be given out if user is logging in as admin (through internal console)
+	claims[JWTUsername] = user.Username
+	claims[JWTExpiryTime] = time.Now().Add(time.Hour).Unix()
+	claims[JWTAdminStatus] = (as == Admin) //token claim to be given out if user is logging in as admin (through internal console)
 
 	tokenSigned, err := token.SignedString(signingKey)
 	if err != nil {

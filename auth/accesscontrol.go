@@ -27,7 +27,7 @@ func AccessControl(canAccess AccessRestriction, h http.Handler) http.Handler {
 		}
 
 		claims, _ := token.Claims.(jwt.MapClaims)
-		r.Header.Set(jwtUsername, claims[jwtUsername].(string))
+		r.Header.Set(JWTUsername, claims[JWTUsername].(string))
 		if canAccess(claims, r) {
 			h.ServeHTTP(w, r)
 		} else {
@@ -41,9 +41,9 @@ func NoRestriction(claims jwt.MapClaims, r *http.Request) bool {
 }
 
 func IsAdmin(claims jwt.MapClaims, r *http.Request) bool {
-	return claims[jwtAdminStatus] == true
+	return claims[JWTAdminStatus] == true
 }
 
 func SpecificUserOrAdmin(claims jwt.MapClaims, r *http.Request) bool {
-	return claims[jwtAdminStatus] == true || claims[jwtUsername] == mux.Vars(r)["username"]
+	return claims[JWTAdminStatus] == true || claims[JWTUsername] == mux.Vars(r)["username"]
 }
