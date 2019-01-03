@@ -14,13 +14,13 @@ import (
 //Event represents an event which will have an associated website
 type Event struct {
 	ID     string     `json:"id"`
-	Name   string     `json:"name"`
-	Start  null.Time  `json:"start"`
-	End    null.Time  `json:"end"`
-	Lat    null.Float `json:"lat"`
-	Long   null.Float `json:"long"`
-	Radius null.Float `json:"radius"` //in km
-	URL    string     `json:"url"`
+	Name   string     `json:"name" db:"name"`
+	Start  null.Time  `json:"start" db:"start"`
+	End    null.Time  `json:"end" db:"end"`
+	Lat    null.Float `json:"lat" db:"lat"`
+	Long   null.Float `json:"long" db:"long"`
+	Radius null.Float `json:"radius" db:"radius"` //in km
+	URL    string     `json:"url" db:"url"`
 }
 
 //GetAll Given a username as an argument
@@ -56,6 +56,49 @@ func Get(eventID string) (Event, error) {
 		return Event{}, errors.New("Error fetching event details " + err.Error())
 	}
 	return event, nil
+}
+
+//Create creates a new event in the database given its contents
+func (eventData Event) Create(hostUsername string) error {
+	tx, err := config.DB.Beginx()
+	if err != nil {
+		return errors.New("Error opening transaction:" + err.Error())
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("event.Create entered panic, recovered to rollback, with error: ", r)
+			if rollBackErr := tx.Rollback(); rollBackErr != nil {
+				log.Println("Could not rollback: " + err.Error())
+			}
+		}
+	}()
+
+	_, err = tx.NamedExec("INSERT INTO event(id, name, url,start, \"end\", lat, long, radius) VALUES (:id, :name, :url, :start, :end, :lat, :long, :radius)", eventData)
+	if err != nil {
+		tx.Rollback()
+		return errors.New("Error inserting event data: " + err.Error())
+	}
+
+	_, err = tx.Exec("INSERT into hosts(eventID, username) VALUES ($1, $2)", eventData.ID, hostUsername)
+	if err != nil {
+		tx.Rollback()
+		return errors.New("Error creating host relationship: " + err.Error())
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		return errors.New("Error committing changes to database: " + err.Error())
+	}
+
+	return nil
+}
+
+//AddHost creates a new host relationship between a user and an event
+func (eventData Event) AddHost(username string) error {
+	_, err := config.DB.Exec("INSERT INTO hosts(eventID, username) VALUES ($1, $2)", eventData.ID, username)
+	return err
 }
 
 //CheckHost returns true if that user is a host of the given event

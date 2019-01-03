@@ -3,6 +3,7 @@ module registration-app
 require (
 	github.com/auth0/go-jwt-middleware v0.0.0-20170425171159-5493cabe49f7
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
+	github.com/google/uuid v1.1.0
 	github.com/gorilla/mux v1.6.2
 	github.com/guregu/null v3.4.0+incompatible
 	github.com/jmoiron/sqlx v1.2.0

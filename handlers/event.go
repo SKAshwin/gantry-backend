@@ -8,6 +8,7 @@ import (
 	"registration-app/event"
 	"registration-app/response"
 
+	"github.com/google/uuid"
 	"github.com/gorilla/mux"
 )
 
@@ -47,5 +48,24 @@ var GetEvent = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			reply, _ := json.Marshal(map[string]event.Event{"event": ev})
 			w.Write(reply)
 		}
+	}
+})
+
+//CreateEvent creates an event
+var CreateEvent = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	var eventData event.Event
+	err := json.NewDecoder(r.Body).Decode(&eventData)
+	eventData.ID = uuid.New().String()
+	if err != nil {
+		log.Println("Error decoding event JSON: " + err.Error())
+		response.WriteMessage(http.StatusBadRequest, "Invalid arguments to create event", w)
+		return
+	}
+	err = eventData.Create(r.Header.Get(auth.JWTUsername))
+	if err != nil {
+		log.Println("Error in creating event: " + err.Error())
+		response.WriteMessage(http.StatusInternalServerError, "Error in creating event", w)
+	} else {
+		response.WriteOKMessage("Event created", w)
 	}
 })
