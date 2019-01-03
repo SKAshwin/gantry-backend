@@ -20,13 +20,15 @@ type Event struct {
 	Lat    null.Float `json:"lat"`
 	Long   null.Float `json:"long"`
 	Radius null.Float `json:"radius"` //in km
+	URL    string     `json:"url"`
 }
 
 //GetAll Given a username as an argument
 //Returns an array of all the events hosted by that user
 //Will return an empty array (with no error) if that user hosts no events
 func GetAll(username string) ([]Event, error) {
-	rows, err := config.DB.Queryx("SELECT ID, name, \"start\", \"end\", lat, long, radius from event, hosts where hosts.username = $1 and hosts.eventID = event.ID", username)
+	rows, err := config.DB.Queryx("SELECT ID, name, \"start\", \"end\", lat, long, radius, url from event, hosts where hosts.username = $1 and hosts.eventID = event.ID",
+		username)
 	if err != nil {
 		return nil, errors.New("Error fetching all events for user: " + err.Error())
 	}
@@ -49,7 +51,7 @@ func GetAll(username string) ([]Event, error) {
 //Get returns an Event object corresponding to the given eventID
 func Get(eventID string) (Event, error) {
 	var event Event
-	err := config.DB.QueryRowx("SELECT ID, name, \"start\", \"end\", lat, long, radius from event where ID = $1", eventID).StructScan(&event)
+	err := config.DB.QueryRowx("SELECT ID, name, \"start\", \"end\", lat, long, radius, url from event where ID = $1", eventID).StructScan(&event)
 	if err != nil {
 		return Event{}, errors.New("Error fetching event details " + err.Error())
 	}
