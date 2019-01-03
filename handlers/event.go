@@ -29,25 +29,15 @@ var ListEvents = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 //GetEvent is a handler, which given a username in the http request and a eventID in the URL
 var GetEvent = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	//TODO handle authorization in an accesscontrol fashion
-	username := r.Header.Get(auth.JWTUsername)
 	eventID := mux.Vars(r)["eventID"]
-	if ok, err := event.CheckHost(username, eventID); err != nil {
-		log.Println("Error checking if request is authorized: " + err.Error())
-		response.WriteMessage(http.StatusInternalServerError, "Error checking if request is authorized", w)
-		return
-	} else if !ok {
-		response.WriteMessage(http.StatusForbidden, "User is not host of the stated event (or event does not exist)", w)
-		return
+
+	ev, err := event.Get(eventID)
+	if err != nil {
+		log.Println("Error fetching event: " + err.Error())
+		response.WriteMessage(http.StatusInternalServerError, "Error fetching event", w)
 	} else {
-		ev, err := event.Get(eventID)
-		if err != nil {
-			log.Println("Error fetching event: " + err.Error())
-			response.WriteMessage(http.StatusInternalServerError, "Error fetching event", w)
-		} else {
-			reply, _ := json.Marshal(map[string]event.Event{"event": ev})
-			w.Write(reply)
-		}
+		reply, _ := json.Marshal(map[string]event.Event{"event": ev})
+		w.Write(reply)
 	}
 })
 
