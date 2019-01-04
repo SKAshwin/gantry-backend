@@ -29,6 +29,7 @@ func SetUpRouting() *mux.Router {
 	r.Handle("/api/events", auth.AccessControl(handlers.ListEvents)).Methods("GET")
 	r.Handle("/api/events/{eventID}", auth.AccessControl(handlers.GetEvent, event.IsHost, auth.IsAdmin)).Methods("GET")
 	r.Handle("/api/events", auth.AccessControl(handlers.CreateEvent)).Methods("POST")
+	r.Handle("/api/events/{eventURL}", auth.AccessControl(handlers.EventURLAvailable)).Methods("HEAD")
 
 	return r
 }

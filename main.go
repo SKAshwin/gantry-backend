@@ -24,7 +24,7 @@ func main() {
 
 	handler := cors.New(cors.Options{
 		AllowedOrigins: allowedCorsOrigins,
-	}).Handler(r) //only allow GETs POSTs from that address (LOGIN_URL, the client-side address); the bare minimum needed
+	}).Handler(r)
 
 	http.ListenAndServe(":3000", RecoverWrap(handler))
 }

@@ -70,3 +70,17 @@ var CreateEvent = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) 
 		response.WriteOKMessage("Event created", w)
 	}
 })
+
+//EventURLAvailable Checks if the eventURL provided in the endpoint is already used
+var EventURLAvailable = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	url := mux.Vars(r)["eventURL"]
+	if exists, err := event.URLExists(url); err != nil {
+		log.Println("Error checking if URL already taken: " + err.Error())
+		response.WriteMessage(http.StatusInternalServerError, "Error checking if URL exists", w)
+		return
+	} else if !exists {
+		response.WriteMessage(http.StatusNotFound, "", w)
+		return
+	}
+	response.WriteOKMessage("", w)
+})
