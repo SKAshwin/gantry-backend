@@ -28,7 +28,13 @@ type AccessOption func(jwt.MapClaims, *http.Request) (bool, error)
 //If an error occurs before any AccessOption returns true, error will be logged and handler will not execute
 func AccessControl(h http.Handler, requirements ...AccessOption) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		token, err := jwt.Parse(GetJWTString(r), KeyGetter)
+		tokenString, err := GetJWTString(r)
+		if err != nil {
+			log.Println("Failed to extract token string: " + err.Error())
+			response.WriteMessage(http.StatusBadRequest, "Authorization token in invalid format", w)
+			return
+		}
+		token, err := jwt.Parse(tokenString, KeyGetter)
 
 		if err != nil {
 			log.Println("Failed to extract token: " + err.Error())

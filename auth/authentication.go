@@ -104,19 +104,26 @@ func KeyGetter(token *jwt.Token) (interface{}, error) {
 //Returns a map between the JWT claims and their values
 //Returns an error if either token parsing failed (possibly incorrect signing method etc) or if the token is expired
 func GetJWTClaims(r *http.Request) (map[string]interface{}, error) {
-	claims, err := ExtractClaimsFromTokenString(GetJWTString(r))
-	return claims, err
-
+	tokenString, err := GetJWTString(r)
+	if err != nil {
+		return nil, err
+	}
+	return ExtractClaimsFromTokenString(tokenString)
 }
 
-func GetJWTString(r *http.Request) string {
+//GetJWTString extracts the JWT string from the Authorization header, in a Bearer {{token}} format
+//Returns an error If there is no JWT string, or the header's value is in an invalid format
+func GetJWTString(r *http.Request) (string, error) {
 	reqToken := r.Header.Get("Authorization")
 	if reqToken == "" {
-		return ""
+		return "", errors.New("No string in authorization header")
 	}
 	splitToken := strings.Split(reqToken, "Bearer ")
+	if len(splitToken) != 2 {
+		return "", errors.New("Authorization header value not in Bearer {{token}} format")
+	}
 	reqToken = splitToken[1]
-	return reqToken
+	return reqToken, nil
 }
 
 //ExtractClaimsFromTokenString given the encrypted JWT string (usually taken from the authorization header)
