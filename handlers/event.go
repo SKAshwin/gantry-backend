@@ -77,10 +77,9 @@ var EventURLAvailable = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 	if exists, err := event.URLExists(url); err != nil {
 		log.Println("Error checking if URL already taken: " + err.Error())
 		response.WriteMessage(http.StatusInternalServerError, "Error checking if URL exists", w)
-		return
-	} else if !exists {
-		response.WriteMessage(http.StatusNotFound, "", w)
-		return
+	} else {
+		reply, _ := json.Marshal(map[string]bool{"available": !exists})
+		w.Write(reply)
 	}
-	response.WriteOKMessage("", w)
+
 })
