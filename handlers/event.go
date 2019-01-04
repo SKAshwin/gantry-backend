@@ -12,9 +12,9 @@ import (
 	"github.com/gorilla/mux"
 )
 
-//ListEvents is a handler which, given a username in the http request
+//GetUsersEvents is a handler which, given a username in the http request
 //Returns all the information regarding the events belonging to that user
-var ListEvents = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+var GetUsersEvents = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	username := r.Header.Get(auth.JWTUsername)
 	events, err := event.GetAll(username)
 	if err != nil {
@@ -43,7 +43,6 @@ var GetEvent = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 //CreateEvent creates an event
 var CreateEvent = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	//TODO: check if url already used (create an endpoint for this as well)
 	var eventData event.Event
 	err := json.NewDecoder(r.Body).Decode(&eventData)
 	if err != nil {
@@ -69,6 +68,25 @@ var CreateEvent = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) 
 	} else {
 		response.WriteOKMessage("Event created", w)
 	}
+})
+
+//DeleteEvent deletes the event given by the eventID provided in the endpoint
+var DeleteEvent = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	eventID := mux.Vars(r)["eventID"]
+	err := event.Delete(eventID)
+	if err != nil {
+		log.Println("Error deleting event: " + err.Error())
+		response.WriteMessage(http.StatusInternalServerError, "Error deleting user", w)
+	} else {
+		response.WriteOKMessage("Successfully deleted event", w)
+	}
+})
+
+//UpdateEvent updates the event given by the eventID provided in the endpoint
+//using the fields provided in the body of the request
+//Only need to supply the fields that need updating
+var UpdateEvent = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
 })
 
 //EventURLAvailable Checks if the eventURL provided in the endpoint is already used

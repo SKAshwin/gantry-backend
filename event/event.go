@@ -58,6 +58,12 @@ func Get(eventID string) (Event, error) {
 	return event, nil
 }
 
+//Delete removes an event (if it exists) from the database
+func Delete(eventID string) error {
+	_, err := config.DB.Exec("DELETE FROM event where ID = $1", eventID)
+	return err
+}
+
 //Create creates a new event in the database given its contents
 //Also creates a host relationship, given the host's username
 func (eventData Event) Create(hostUsername string) error {

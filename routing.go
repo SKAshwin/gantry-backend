@@ -26,10 +26,12 @@ func SetUpRouting() *mux.Router {
 	r.Handle("/api/users/{username}", users.UserExists(auth.AccessControl(handlers.UpdateUserDetails, auth.IsSpecifiedUser, auth.IsAdmin))).Methods("PUT")
 	r.Handle("/api/users/{username}", users.UserExists(auth.AccessControl(handlers.DeleteUser, auth.IsSpecifiedUser, auth.IsAdmin))).Methods("DELETE")
 
-	r.Handle("/api/events", auth.AccessControl(handlers.ListEvents)).Methods("GET")
-	r.Handle("/api/events/{eventID}", auth.AccessControl(handlers.GetEvent, event.IsHost, auth.IsAdmin)).Methods("GET")
+	r.Handle("/api/events", auth.AccessControl(handlers.GetUsersEvents)).Methods("GET")
 	r.Handle("/api/events", auth.AccessControl(handlers.CreateEvent)).Methods("POST")
 	r.Handle("/api/events/exists/{eventURL}", auth.AccessControl(handlers.EventURLAvailable)).Methods("GET")
+	r.Handle("/api/events/{eventID}", auth.AccessControl(handlers.GetEvent, event.IsHost, auth.IsAdmin)).Methods("GET")
+	r.Handle("/api/events/{eventID}", auth.AccessControl(handlers.UpdateEvent, event.IsHost, auth.IsAdmin)).Methods("PUT")
+	r.Handle("/api/events/{eventID}", auth.AccessControl(handlers.DeleteEvent, event.IsHost, auth.IsAdmin)).Methods("DELETE")
 
 	return r
 }
