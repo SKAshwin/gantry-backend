@@ -43,14 +43,25 @@ var GetEvent = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
 //CreateEvent creates an event
 var CreateEvent = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	//TODO: check if url already used (create an endpoint for this as well)
 	var eventData event.Event
 	err := json.NewDecoder(r.Body).Decode(&eventData)
-	eventData.ID = uuid.New().String()
 	if err != nil {
 		log.Println("Error decoding event JSON: " + err.Error())
 		response.WriteMessage(http.StatusBadRequest, "Invalid arguments to create event", w)
 		return
 	}
+
+	if exists, err := event.URLExists(eventData.URL); err != nil { //check if the URL provided is available
+		log.Println("Error checking if URL already taken: " + err.Error())
+		response.WriteMessage(http.StatusInternalServerError, "Error checking if URL is available", w)
+		return
+	} else if exists {
+		response.WriteMessage(http.StatusConflict, "URL already used by another event", w)
+		return
+	}
+
+	eventData.ID = uuid.New().String()
 	err = eventData.Create(r.Header.Get(auth.JWTUsername))
 	if err != nil {
 		log.Println("Error in creating event: " + err.Error())

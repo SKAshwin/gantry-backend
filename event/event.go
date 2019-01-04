@@ -59,6 +59,7 @@ func Get(eventID string) (Event, error) {
 }
 
 //Create creates a new event in the database given its contents
+//Also creates a host relationship, given the host's username
 func (eventData Event) Create(hostUsername string) error {
 	tx, err := config.DB.Beginx()
 	if err != nil {
@@ -94,6 +95,15 @@ func (eventData Event) Create(hostUsername string) error {
 	}
 
 	return nil
+}
+
+//URLExists checks if the given URL is already used
+//Returns true if it is already used
+//Returns false otherwise
+func URLExists(url string) (bool, error) {
+	var numURL int
+	err := config.DB.QueryRow("SELECT count(*) from event where url = $1", url).Scan(&numURL)
+	return numURL == 1, err
 }
 
 //AddHost creates a new host relationship between a user and an event
