@@ -23,7 +23,7 @@ func SetUpRouting() *mux.Router {
 	r.Handle("/api/users", auth.AccessControl(handlers.ListUsers, auth.IsAdmin)).Methods("GET")
 	r.Handle("/api/users", auth.AccessControl(handlers.CreateUser, auth.IsAdmin)).Methods("POST")
 	r.Handle("/api/users/{username}", users.UserExists(auth.AccessControl(handlers.GetUser, auth.IsSpecifiedUser, auth.IsAdmin))).Methods("GET")
-	r.Handle("/api/users/{username}", users.UserExists(auth.AccessControl(handlers.UpdateUserDetails, auth.IsSpecifiedUser, auth.IsAdmin))).Methods("PUT")
+	r.Handle("/api/users/{username}", users.UserExists(auth.AccessControl(handlers.UpdateUser, auth.IsSpecifiedUser, auth.IsAdmin))).Methods("PUT")
 	r.Handle("/api/users/{username}", users.UserExists(auth.AccessControl(handlers.DeleteUser, auth.IsSpecifiedUser, auth.IsAdmin))).Methods("DELETE")
 
 	r.Handle("/api/events", auth.AccessControl(handlers.GetUsersEvents)).Methods("GET")

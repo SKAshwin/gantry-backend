@@ -63,7 +63,7 @@ var GetUser = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	}
 })
 
-var UpdateUserDetails = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+var UpdateUser = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	var updatedFields map[string]string
 	err := json.NewDecoder(r.Body).Decode(&updatedFields)
 	if err != nil {
