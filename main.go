@@ -2,12 +2,10 @@
 package main
 
 import (
-	"log"
 	"net/http"
 
-	"github.com/joho/godotenv"
-
 	"registration-app/config"
+	"registration-app/routing"
 
 	_ "github.com/lib/pq"
 	"github.com/rs/cors"
@@ -16,11 +14,11 @@ import (
 var allowedCorsOrigins = []string{"http://localhost:8080"}
 
 func main() {
-	//redirectLogger()
-	LoadEnvironmentalVariables()
+	//config.RedirectLogger()
+	config.LoadEnvironmentalVariables()
 	config.InitDB()
 
-	r := SetUpRouting()
+	r := routing.SetUp()
 
 	handler := cors.New(cors.Options{
 		AllowedOrigins: allowedCorsOrigins,
@@ -28,13 +26,5 @@ func main() {
 		AllowedHeaders: []string{"*"},
 	}).Handler(r)
 
-	http.ListenAndServe(":3000", RecoverWrap(handler))
-}
-
-func LoadEnvironmentalVariables() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Print("Error loading environmental variables: ")
-		log.Fatal(err.Error())
-	}
+	http.ListenAndServe(":3000", routing.RecoverWrap(handler))
 }

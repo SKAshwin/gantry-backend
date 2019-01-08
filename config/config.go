@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/joho/godotenv"
 )
 
 const (
@@ -16,8 +17,20 @@ const (
 	dbname = "DBNAME"
 )
 
+//DB the connection to the database used by the entire program
 var DB *sqlx.DB
 
+//LoadEnvironmentalVariables Loads variables from the .env
+func LoadEnvironmentalVariables() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Print("Error loading environmental variables: ")
+		log.Fatal(err.Error())
+	}
+}
+
+//RedirectLogger redirects logging output to a file instead of the console
+//for use in production
 func RedirectLogger() {
 	//redirects logger output to a logger file
 	//for use in production
@@ -30,6 +43,7 @@ func RedirectLogger() {
 	log.SetOutput(file)
 }
 
+//InitDB initializes the Db based on the environmental variables
 func InitDB() {
 	//initializes the db variable
 	//forms a connection to the database
