@@ -25,7 +25,9 @@ create table event(
 	end TIMESTAMP,
 	lat float8,
 	long float8,
-	radius float8 --in km
+	radius float8, --in km
+	createdAt TIMESTAMP NOT NULL DEFAULT NOW(),
+	updatedAt TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
 create table hosts(
