@@ -14,10 +14,10 @@ import (
 
 //Event represents an event which will have an associated website
 type Event struct {
-	ID        string     `json:"id" db:"id"`
+	ID        string     `json:"eventId" db:"id"`
 	Name      string     `json:"name" db:"name"`
-	Start     null.Time  `json:"start" db:"start"`
-	End       null.Time  `json:"end" db:"end"`
+	Start     null.Time  `json:"startDateTime" db:"start"`
+	End       null.Time  `json:"endDateTime" db:"end"`
 	Lat       null.Float `json:"lat" db:"lat"`
 	Long      null.Float `json:"long" db:"long"`
 	Radius    null.Float `json:"radius" db:"radius"` //in km
@@ -26,7 +26,8 @@ type Event struct {
 	CreatedAt time.Time  `json:"createdAt" db:"createdat"`
 }
 
-var updateSchemaTranslator = map[string]string{"name": "name", "start": "start", "end": "end", "lat": "lat", "long": "long", "radius": "radius", "url": "url"}
+//maps from json:db
+var updateSchemaTranslator = map[string]string{"name": "name", "startDateTime": "start", "endDateTime": "end", "lat": "lat", "long": "long", "radius": "radius", "url": "url"}
 
 //GetAll Re
 func GetAll() ([]Event, error) {
