@@ -28,6 +28,28 @@ type Event struct {
 
 var updateSchemaTranslator = map[string]string{"name": "name", "start": "start", "end": "end", "lat": "lat", "long": "long", "radius": "radius", "url": "url"}
 
+//GetAll Re
+func GetAll() ([]Event, error) {
+	rows, err := config.DB.Queryx("SELECT ID, name, \"start\", \"end\", lat, long, radius, url, createdAt, updatedAt from event")
+	if err != nil {
+		return nil, errors.New("Error fetching all events: " + err.Error())
+	}
+	numEvents, err := getNumberOfEvents()
+	if err != nil {
+		return nil, errors.New("Error fetching number of events:" + err.Error())
+	}
+
+	events, err := scanRowsIntoEvents(rows, numEvents)
+	if err == sql.ErrNoRows {
+		log.Println("No rows, returned empty event")
+		return make([]Event, 0), nil
+	} else if err != nil {
+		return nil, errors.New("Error scanning rows into events:" + err.Error())
+	}
+
+	return events, nil
+}
+
 //GetAllBy Given a username as an argument
 //Returns an array of all the events hosted by that user
 //Will return an empty array (with no error) if that user hosts no events
@@ -37,7 +59,7 @@ func GetAllBy(username string) ([]Event, error) {
 	if err != nil {
 		return nil, errors.New("Error fetching all events for user: " + err.Error())
 	}
-	numEvents, err := getNumberOfEvents(username)
+	numEvents, err := getNumberOfEventsBy(username)
 	if err != nil {
 		return nil, errors.New("Error fetching number of events for user:" + err.Error())
 	}
@@ -200,7 +222,18 @@ func IsUpdateRequestValid(updateFields map[string]string) bool {
 	return true
 }
 
-func getNumberOfEvents(username string) (int, error) {
+func getNumberOfEvents() (int, error) {
+	var numEvents int
+	err := config.DB.QueryRow("SELECT count(*) from event").Scan(&numEvents)
+
+	if err != nil {
+		return 0, errors.New("Cannot fetch event count: " + err.Error())
+	}
+
+	return numEvents, nil
+}
+
+func getNumberOfEventsBy(username string) (int, error) {
 	var numEvents int
 	err := config.DB.QueryRow("SELECT count(*) from event, hosts where hosts.username = $1 and hosts.eventID = event.ID", username).Scan(&numEvents)
 

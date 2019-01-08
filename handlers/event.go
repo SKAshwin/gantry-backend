@@ -12,13 +12,26 @@ import (
 	"github.com/gorilla/mux"
 )
 
+//GetAllEvents is a handler which returns all information pertaining to all events
+var GetAllEvents = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	events, err := event.GetAll()
+	if err != nil {
+		log.Println("Error in GetAllEvents: " + err.Error())
+		response.WriteMessage(http.StatusInternalServerError, "Error fetching all events", w)
+		return
+	}
+	type Events []event.Event
+	reply, _ := json.Marshal(map[string]Events{"events": events})
+	w.Write(reply)
+})
+
 //GetUsersEvents is a handler which, given a username in the http request
 //Returns all the information regarding the events belonging to that user
 var GetUsersEvents = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	username := r.Header.Get(auth.JWTUsername)
 	events, err := event.GetAllBy(username)
 	if err != nil {
-		log.Println("Error in ListEvents: " + err.Error())
+		log.Println("Error in GetUsersEvents: " + err.Error())
 		response.WriteMessage(http.StatusInternalServerError, "Error fetching user's events", w)
 		return
 	}
