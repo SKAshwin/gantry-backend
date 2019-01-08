@@ -28,10 +28,10 @@ type Event struct {
 
 var updateSchemaTranslator = map[string]string{"name": "name", "start": "start", "end": "end", "lat": "lat", "long": "long", "radius": "radius", "url": "url"}
 
-//GetAll Given a username as an argument
+//GetAllBy Given a username as an argument
 //Returns an array of all the events hosted by that user
 //Will return an empty array (with no error) if that user hosts no events
-func GetAll(username string) ([]Event, error) {
+func GetAllBy(username string) ([]Event, error) {
 	rows, err := config.DB.Queryx("SELECT ID, name, \"start\", \"end\", lat, long, radius, url, createdAt, updatedAt from event, hosts where hosts.username = $1 and hosts.eventID = event.ID",
 		username)
 	if err != nil {
@@ -162,6 +162,15 @@ func URLExists(url string) (bool, error) {
 	var numURL int
 	err := config.DB.QueryRow("SELECT count(*) from event where url = $1", url).Scan(&numURL)
 	return numURL == 1, err
+}
+
+//CheckIfExists checks if an event exists with that eventID
+//Returns a boolean flag indicating if the event exists
+//Return a non-nil error if there is an error in querying the database
+func CheckIfExists(id string) (bool, error) {
+	var num int
+	err := config.DB.QueryRow("SELECT count(*) from event where id = $1", id).Scan(&num)
+	return num == 1, err
 }
 
 //AddHost creates a new host relationship between a user and an event

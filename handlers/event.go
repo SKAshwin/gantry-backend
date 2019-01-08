@@ -16,7 +16,7 @@ import (
 //Returns all the information regarding the events belonging to that user
 var GetUsersEvents = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	username := r.Header.Get(auth.JWTUsername)
-	events, err := event.GetAll(username)
+	events, err := event.GetAllBy(username)
 	if err != nil {
 		log.Println("Error in ListEvents: " + err.Error())
 		response.WriteMessage(http.StatusInternalServerError, "Error fetching user's events", w)
@@ -119,3 +119,20 @@ var EventURLAvailable = http.HandlerFunc(func(w http.ResponseWriter, r *http.Req
 	}
 
 })
+
+//EventExists middleware which checks if the eventID in the
+//URL points to an event which actually exists
+//Outputs a 404 if the event does not exist
+func EventExists(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		eventID := mux.Vars(r)["eventID"]
+		if exists, err := event.CheckIfExists(eventID); err != nil {
+			log.Println("Error checking if event exists" + err.Error())
+			response.WriteMessage(http.StatusInternalServerError, "Error checking if event exists", w)
+		} else if !exists {
+			response.WriteMessage(http.StatusNotFound, "Event does not exist", w)
+		} else {
+			h.ServeHTTP(w, r)
+		}
+	})
+}
