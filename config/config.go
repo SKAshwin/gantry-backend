@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 
@@ -17,8 +19,34 @@ const (
 	dbname = "DBNAME"
 )
 
+//CORSConfig Contains the configuration information for CORS
+type CORSConfig struct {
+	AllowedOrigins []string `json:"allowedOrigins"`
+	AllowedMethods []string `json:"allowedMethods"`
+	AllowedHeaders []string `json:"allowedHeaders"`
+}
+
 //DB the connection to the database used by the entire program
 var DB *sqlx.DB
+
+//GetCorsConfig returns the CORSConfig information in cors.json
+func GetCorsConfig() CORSConfig {
+	corsFile, err := os.Open("config/cors.json")
+	if err != nil {
+		log.Fatal("Error opening cors.json: " + err.Error())
+	}
+	defer corsFile.Close()
+	byteValue, err := ioutil.ReadAll(corsFile)
+	if err != nil {
+		log.Fatal("Error reading cors.json: " + err.Error())
+	}
+	var config CORSConfig
+	err = json.Unmarshal([]byte(byteValue), &config)
+	if err != nil {
+		log.Fatal("cors.json formatted wrongly, error when parsing: " + err.Error())
+	}
+	return config
+}
 
 //LoadEnvironmentalVariables Loads variables from the .env
 func LoadEnvironmentalVariables() {

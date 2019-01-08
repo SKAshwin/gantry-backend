@@ -11,8 +11,6 @@ import (
 	"github.com/rs/cors"
 )
 
-var allowedCorsOrigins = []string{"http://localhost:8080"}
-
 func init() {
 	config.LoadEnvironmentalVariables()
 	config.InitDB()
@@ -22,11 +20,11 @@ func main() {
 	//config.RedirectLogger()
 
 	r := routing.SetUp()
-
+	corsConfig := config.GetCorsConfig()
 	handler := cors.New(cors.Options{
-		AllowedOrigins: allowedCorsOrigins,
-		AllowedMethods: []string{"GET", "POST", "DELETE", "PUT"},
-		AllowedHeaders: []string{"*"},
+		AllowedOrigins: corsConfig.AllowedOrigins,
+		AllowedMethods: corsConfig.AllowedMethods,
+		AllowedHeaders: corsConfig.AllowedHeaders,
 	}).Handler(r)
 
 	http.ListenAndServe(":3000", routing.RecoverWrap(handler))
