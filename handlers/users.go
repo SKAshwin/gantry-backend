@@ -97,3 +97,17 @@ var DeleteUser = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		response.WriteOKMessage("Successfully deleted user", w)
 	}
 })
+
+func UserExists(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		username := mux.Vars(r)["username"]
+		if exists, err := users.CheckIfExists(username); err != nil {
+			log.Println("Error checking if user exists" + err.Error())
+			response.WriteMessage(http.StatusInternalServerError, "Error checking if user exists", w)
+		} else if !exists {
+			response.WriteMessage(http.StatusNotFound, "User does not exist", w)
+		} else {
+			h.ServeHTTP(w, r)
+		}
+	})
+}

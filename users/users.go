@@ -3,17 +3,13 @@ package users
 import (
 	"errors"
 	"log"
-	"net/http"
 	"time"
-
-	"github.com/gorilla/mux"
 
 	"github.com/guregu/null"
 	"github.com/jmoiron/sqlx"
 
 	"registration-app/auth"
 	"registration-app/config"
-	"registration-app/response"
 )
 
 type UserPublicDetail struct {
@@ -40,20 +36,6 @@ var (
 	errUserDoesNotExist    = errors.New("User does not exist")
 	updateSchemaTranslator = map[string]string{"username": dbUsername, "password": dbPassword, "name": dbName}
 )
-
-func UserExists(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		username := mux.Vars(r)["username"]
-		if exists, err := CheckIfExists(username); err != nil {
-			log.Println("Error checking if user exists" + err.Error())
-			response.WriteMessage(http.StatusInternalServerError, "Error checking if user exists", w)
-		} else if !exists {
-			response.WriteMessage(http.StatusNotFound, "User does not exist", w)
-		} else {
-			h.ServeHTTP(w, r)
-		}
-	})
-}
 
 func (userData UserCreateData) CreateUser() error {
 	passwordHash, err := auth.HashAndSalt([]byte(userData.Password))
