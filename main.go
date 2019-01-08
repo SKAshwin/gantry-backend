@@ -13,10 +13,13 @@ import (
 
 var allowedCorsOrigins = []string{"http://localhost:8080"}
 
-func main() {
-	//config.RedirectLogger()
+func init() {
 	config.LoadEnvironmentalVariables()
 	config.InitDB()
+}
+
+func main() {
+	//config.RedirectLogger()
 
 	r := routing.SetUp()
 

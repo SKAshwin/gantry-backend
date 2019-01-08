@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,21 +17,50 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-const hashCost = 5 //cost must be above 4, the larger you make it the slower the hash function will run
-var signingKey = []byte("theSecretPassword")
+var hashCost int //cost (5) must be above 4, the larger you make it the slower the hash function will run
+var signingKey []byte
 
-const JWTUsername, JWTExpiryTime, JWTAdminStatus = "username", "exp", "admin"
+//JWTUsername is the claim key for the username of the token's user
+//JWTExpiryTime is the claim key for the expiry time
+//JWTAdminStatus is the claim key for the admin status
+const (
+	JWTUsername    = "username"
+	JWTExpiryTime  = "exp"
+	JWTAdminStatus = "admin"
+)
 
+//AdminStatus is a type associated with an account - they are either users or admins
 type AdminStatus int
 
+//Admin is the admin status of administrators, User is for everyone else
 const (
 	Admin = iota
 	User
 )
 
+//LoginDetails consist of a username and a password
 type LoginDetails struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
+}
+
+func init() {
+	config.LoadEnvironmentalVariables()
+	signingKeyString, ok := os.LookupEnv("AUTH_SECRET")
+	if !ok {
+		panic("Could not load signing key")
+	}
+	signingKey = []byte(signingKeyString)
+
+	hashCostString, ok := os.LookupEnv("AUTH_HASH_COST")
+	if !ok {
+		panic("Could not load Hash Cost")
+	}
+	var err error
+	hashCost, err = strconv.Atoi(hashCostString)
+	if err != nil {
+		panic("Error converting hashCost to integer: " + err.Error())
+	}
 }
 
 //Authenticate Given a user's login details and a table name (indicating whether they are admin or users)
