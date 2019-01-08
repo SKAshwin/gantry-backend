@@ -87,11 +87,11 @@ func Update(username string, updateFields map[string]string) (bool, error) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Println("updateUser entered panic, recovered to rollback, with error: ", r)
+			log.Println("users.Update entered panic, recovered to rollback, with error: ", r)
 			if rollBackErr := tx.Rollback(); rollBackErr != nil {
 				log.Println("Could not rollback: " + rollBackErr.Error())
 			}
-			panic("Event.Create panicked")
+			panic("user.Update panicked")
 		}
 	}()
 
@@ -126,6 +126,8 @@ func Update(username string, updateFields map[string]string) (bool, error) {
 	return true, nil
 }
 
+//IsUpdateRequestValid checks if the fields provided in an update request
+//are allowed. Only specific columns are allowed to be updated
 func IsUpdateRequestValid(updateFields map[string]string) bool {
 	for attribute := range updateFields {
 		if _, exist := updateSchemaTranslator[attribute]; !exist {
