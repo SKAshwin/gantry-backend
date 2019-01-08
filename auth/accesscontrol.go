@@ -36,12 +36,7 @@ func AccessControl(h http.Handler, requirements ...AccessOption) http.Handler {
 		}
 		token, err := jwt.Parse(tokenString, KeyGetter)
 
-		if err != nil {
-			log.Println("Failed to extract token: " + err.Error())
-			response.WriteMessage(http.StatusBadRequest, "Could not decipher authorization token", w)
-			return
-		}
-		if !token.Valid { //always check for token validity
+		if err != nil { //err is non-nil is token is invalid
 			response.WriteMessage(http.StatusUnauthorized, "Token has expired", w)
 			return
 		}
