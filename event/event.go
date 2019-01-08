@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"registration-app/config"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 
@@ -13,21 +14,25 @@ import (
 
 //Event represents an event which will have an associated website
 type Event struct {
-	ID     string     `json:"id"`
-	Name   string     `json:"name" db:"name"`
-	Start  null.Time  `json:"start" db:"start"`
-	End    null.Time  `json:"end" db:"end"`
-	Lat    null.Float `json:"lat" db:"lat"`
-	Long   null.Float `json:"long" db:"long"`
-	Radius null.Float `json:"radius" db:"radius"` //in km
-	URL    string     `json:"url" db:"url"`
+	ID        string     `json:"id" db:"id"`
+	Name      string     `json:"name" db:"name"`
+	Start     null.Time  `json:"start" db:"start"`
+	End       null.Time  `json:"end" db:"end"`
+	Lat       null.Float `json:"lat" db:"lat"`
+	Long      null.Float `json:"long" db:"long"`
+	Radius    null.Float `json:"radius" db:"radius"` //in km
+	URL       string     `json:"url" db:"url"`
+	UpdatedAt time.Time  `json:"updatedAt" db:"updatedat"`
+	CreatedAt time.Time  `json:"createdAt" db:"createdat"`
 }
+
+var updateSchemaTranslator = map[string]string{"name": "name", "start": "start", "end": "end", "lat": "lat", "long": "long", "radius": "radius", "url": "url"}
 
 //GetAll Given a username as an argument
 //Returns an array of all the events hosted by that user
 //Will return an empty array (with no error) if that user hosts no events
 func GetAll(username string) ([]Event, error) {
-	rows, err := config.DB.Queryx("SELECT ID, name, \"start\", \"end\", lat, long, radius, url from event, hosts where hosts.username = $1 and hosts.eventID = event.ID",
+	rows, err := config.DB.Queryx("SELECT ID, name, \"start\", \"end\", lat, long, radius, url, createdAt, updatedAt from event, hosts where hosts.username = $1 and hosts.eventID = event.ID",
 		username)
 	if err != nil {
 		return nil, errors.New("Error fetching all events for user: " + err.Error())
@@ -51,9 +56,9 @@ func GetAll(username string) ([]Event, error) {
 //Get returns an Event object corresponding to the given eventID
 func Get(eventID string) (Event, error) {
 	var event Event
-	err := config.DB.QueryRowx("SELECT ID, name, \"start\", \"end\", lat, long, radius, url from event where ID = $1", eventID).StructScan(&event)
+	err := config.DB.QueryRowx("SELECT ID, name, \"start\", \"end\", lat, long, radius, url, createdAt, updatedAt from event where ID = $1", eventID).StructScan(&event)
 	if err != nil {
-		return Event{}, errors.New("Error fetching event details " + err.Error())
+		return Event{}, errors.New("Error fetching event details: " + err.Error())
 	}
 	return event, nil
 }
@@ -103,6 +108,53 @@ func (eventData Event) Create(hostUsername string) error {
 	return nil
 }
 
+//Update updates a particular event given their username, and a map of attributes to new values
+//Returns a boolean flag indicating if the arguments were valid
+//Returns a non-nil error if there was an error updating the event
+func Update(eventID string, updateFields map[string]string) (bool, error) {
+	//check if the update fields are valid
+	//this sanitizes the input for later
+	if !IsUpdateRequestValid(updateFields) {
+		return false, nil
+	}
+
+	tx, err := config.DB.Begin()
+	if err != nil {
+		return false, errors.New("Error opening transaction:" + err.Error())
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			log.Println("event.Update entered panic, recovered to rollback, with error: ", r)
+			if rollBackErr := tx.Rollback(); rollBackErr != nil {
+				log.Println("Could not rollback: " + rollBackErr.Error())
+			}
+			panic("Event.Update panicked")
+		}
+	}()
+
+	for attribute, newValue := range updateFields {
+		_, err := tx.Exec("UPDATE event SET \""+updateSchemaTranslator[attribute]+"\" = $1 where ID = $2", newValue, eventID)
+		if err != nil {
+			tx.Rollback()
+			return false, errors.New("Error while updating database: " + err.Error())
+		}
+	}
+
+	_, err = tx.Exec("UPDATE event SET updatedAt = NOW() where ID = $1", eventID)
+	if err != nil {
+		tx.Rollback()
+		return false, errors.New("Error when updating updated field in event: " + err.Error())
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		return false, errors.New("Error committing changes to database: " + err.Error())
+	}
+
+	return true, nil
+}
+
 //URLExists checks if the given URL is already used
 //Returns true if it is already used
 //Returns false otherwise
@@ -126,6 +178,17 @@ func CheckHost(username string, eventID string) (bool, error) {
 		return false, errors.New("Error checking if host relationship exists: " + err.Error())
 	}
 	return numHosts == 1, nil
+}
+
+//IsUpdateRequestValid checks if the fields provided in an update request
+//are allowed. Only specific columns are allowed to be updated
+func IsUpdateRequestValid(updateFields map[string]string) bool {
+	for attribute := range updateFields {
+		if _, exist := updateSchemaTranslator[attribute]; !exist {
+			return false
+		}
+	}
+	return true
 }
 
 func getNumberOfEvents(username string) (int, error) {

@@ -86,7 +86,25 @@ var DeleteEvent = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) 
 //using the fields provided in the body of the request
 //Only need to supply the fields that need updating
 var UpdateEvent = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	var updatedFields map[string]string
+	err := json.NewDecoder(r.Body).Decode(&updatedFields)
+	if err != nil {
+		log.Println("Error when decoding update fields: " + err.Error())
+		response.WriteMessage(http.StatusBadRequest, "JSON could not be decoded", w)
+		return
+	}
 
+	eventID := mux.Vars(r)["eventID"] //middleware already confirms event exists
+	validRequest, err := event.Update(eventID, updatedFields)
+
+	if err != nil {
+		log.Println("Error updating user: " + err.Error())
+		response.WriteMessage(http.StatusInternalServerError, "Error updating event", w)
+	} else if !validRequest {
+		response.WriteMessage(http.StatusBadRequest, "Incorrect fields for event update", w)
+	} else {
+		response.WriteOKMessage("Event updated", w)
+	}
 })
 
 //EventURLAvailable Checks if the eventURL provided in the endpoint is already used
