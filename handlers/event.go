@@ -107,6 +107,17 @@ var UpdateEvent = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if val, ok := updatedFields["url"]; ok { //if the caller is attempting to update the url
+		if ok, err := event.URLExists(val); err != nil {
+			log.Println("Error checking if URL taken: " + err.Error())
+			response.WriteMessage(http.StatusInternalServerError, "Error checking if URL already taken", w)
+			return
+		} else if ok {
+			response.WriteMessage(http.StatusConflict, "URL already exists", w)
+			return
+		}
+	}
+
 	eventID := mux.Vars(r)["eventID"] //middleware already confirms event exists
 	validRequest, err := event.Update(eventID, updatedFields)
 

@@ -72,6 +72,17 @@ var UpdateUser = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if val, ok := updatedFields["username"]; ok { //if the caller is attempting to update the username
+		if ok, err := users.CheckIfExists(val); err != nil {
+			log.Println("Error checking if username taken: " + err.Error())
+			response.WriteMessage(http.StatusInternalServerError, "Error checking if username already taken", w)
+			return
+		} else if ok {
+			response.WriteMessage(http.StatusConflict, "Username already exists", w)
+			return
+		}
+	}
+
 	username := mux.Vars(r)["username"] //middleware already confirms user exists
 	validRequest, err := users.Update(username, updatedFields)
 
