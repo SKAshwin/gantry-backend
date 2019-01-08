@@ -24,7 +24,8 @@ func main() {
 
 	handler := cors.New(cors.Options{
 		AllowedOrigins: allowedCorsOrigins,
-		//		AllowedMethods: []string{"POST", "DELETE", "PUT", "HEAD"},
+		AllowedMethods: []string{"GET", "POST", "DELETE", "PUT"},
+		AllowedHeaders: []string{"*"},
 	}).Handler(r)
 
 	http.ListenAndServe(":3000", RecoverWrap(handler))
