@@ -2,6 +2,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 
 	"registration-app/config"
@@ -27,5 +28,7 @@ func main() {
 		AllowedHeaders: corsConfig.AllowedHeaders,
 	}).Handler(r)
 
-	http.ListenAndServe(":3000", routing.RecoverWrap(handler))
+	if err := http.ListenAndServe(":3000", routing.RecoverWrap(handler)); err != nil {
+		log.Fatal("Could not listen and serve: " + err.Error())
+	}
 }
