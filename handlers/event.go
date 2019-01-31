@@ -20,8 +20,7 @@ var GetAllEvents = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request)
 		response.WriteMessage(http.StatusInternalServerError, "Error fetching all events", w)
 		return
 	}
-	type Events []event.Event
-	reply, _ := json.Marshal(map[string]Events{"events": events})
+	reply, _ := json.Marshal(events)
 	w.Write(reply)
 })
 
@@ -36,7 +35,7 @@ var GetUsersEvents = http.HandlerFunc(func(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	type Events []event.Event
-	reply, _ := json.Marshal(map[string]Events{"events": events})
+	reply, _ := json.Marshal(events)
 	w.Write(reply)
 })
 
@@ -49,7 +48,7 @@ var GetEvent = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Println("Error fetching event: " + err.Error())
 		response.WriteMessage(http.StatusInternalServerError, "Error fetching event", w)
 	} else {
-		reply, _ := json.Marshal(map[string]event.Event{"event": ev})
+		reply, _ := json.Marshal(ev)
 		w.Write(reply)
 	}
 })
