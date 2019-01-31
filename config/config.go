@@ -84,11 +84,11 @@ func InitDB() {
 
 	DB, err = sqlx.Open("postgres", psqlInfo)
 	if err != nil {
-		log.Fatal("Could not open databse")
+		log.Fatal("Could not open database: " + err.Error())
 	}
 	err = DB.Ping()
 	if err != nil {
-		log.Fatal("Could not ping database")
+		log.Fatal("Could not ping database " + err.Error())
 	}
 	log.Println("Successfully connected!")
 }
@@ -114,7 +114,7 @@ func dbConfig() map[string]string {
 	}
 	name, ok := os.LookupEnv(dbname)
 	if !ok {
-		panic("DBNAME environment variable required but not set")
+		log.Fatal("DBNAME environment variable required but not set")
 	}
 	conf[dbhost] = host
 	conf[dbport] = port
