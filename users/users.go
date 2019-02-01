@@ -8,8 +8,8 @@ import (
 	"github.com/guregu/null"
 	"github.com/jmoiron/sqlx"
 
-	"registration-app/auth"
-	"registration-app/config"
+	"checkin/auth"
+	"checkin/config"
 )
 
 //User represents a user of the website creator - i.e., hosts of events, who want to run an event

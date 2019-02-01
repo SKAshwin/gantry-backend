@@ -1,6 +1,6 @@
-// registrationApp project doc.go
+// checkin project doc.go
 
 /*
-registrationApp document
+Package checkin document
 */
-package main
+package checkin

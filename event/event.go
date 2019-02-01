@@ -1,10 +1,10 @@
 package event
 
 import (
+	"checkin/config"
 	"database/sql"
 	"errors"
 	"log"
-	"registration-app/config"
 	"time"
 
 	"github.com/jmoiron/sqlx"

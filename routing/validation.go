@@ -4,9 +4,9 @@ import (
 	"log"
 	"net/http"
 
-	"registration-app/auth"
-	"registration-app/event"
-	"registration-app/response"
+	"checkin/auth"
+	"checkin/event"
+	"checkin/response"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/gorilla/mux"

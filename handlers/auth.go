@@ -1,12 +1,12 @@
 package handlers
 
 import (
+	"checkin/auth"
+	"checkin/response"
+	"checkin/users"
 	"encoding/json"
 	"log"
 	"net/http"
-	"registration-app/auth"
-	"registration-app/response"
-	"registration-app/users"
 )
 
 //AdminLogin Handles administrator log in
