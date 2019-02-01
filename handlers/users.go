@@ -23,7 +23,7 @@ var ListUsers = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 })
 
 var CreateUser = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	var userData users.UserCreateData
+	var userData users.User
 	err := json.NewDecoder(r.Body).Decode(&userData)
 	if err != nil {
 		log.Println("Error when decoding name: " + err.Error())

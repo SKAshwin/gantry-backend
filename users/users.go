@@ -12,18 +12,17 @@ import (
 	"registration-app/config"
 )
 
-type UserPublicDetail struct {
-	Username     string    `json:"username"`
-	Name         string    `json:"name"`
-	CreatedAt    time.Time `json:"createdAt"`
-	UpdatedAt    time.Time `json:"updatedAt"`
-	LastLoggedIn null.Time `json:"lastLoggedIn"`
-}
-
-type UserCreateData struct {
-	Name     string `json:"name"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+//User represents a user of the website creator - i.e., hosts of events, who want to run an event
+//check-in page.
+//This is distinguished from guests, who attend events, and
+type User struct {
+	Username          string    `json:"username,omitempty" db:"username"`
+	PasswordPlaintext string    `json:"password,omitempty"`
+	PasswordHash      string    `json:"-" db:"passwordHash"` //always omitted upon JSON marshalling
+	Name              string    `json:"name,omitempty" db:"name"`
+	CreatedAt         time.Time `json:"createdAt,omitempty"`
+	UpdatedAt         time.Time `json:"updatedAt,omitempty"`
+	LastLoggedIn      null.Time `json:"lastLoggedIn,omitempty"`
 }
 
 const (
@@ -37,8 +36,10 @@ var (
 	updateSchemaTranslator = map[string]string{"username": dbUsername, "password": dbPassword, "name": dbName}
 )
 
-func (userData UserCreateData) CreateUser() error {
-	passwordHash, err := auth.HashAndSalt([]byte(userData.Password))
+//CreateUser Given a User object with a plaintext password, username and name,
+//enters a new user into the database
+func (userData User) CreateUser() error {
+	passwordHash, err := auth.HashAndSalt([]byte(userData.PasswordPlaintext))
 	if err != nil {
 		return errors.New("createUser: " + err.Error())
 	}
@@ -120,12 +121,14 @@ func IsUpdateRequestValid(updateFields map[string]string) bool {
 
 }
 
-func GetData(username string) (UserPublicDetail, error) {
-	var userDetail UserPublicDetail
+//GetData returns a User object with the username, name, creation/update/lastloggedin time stamps
+//for a user with the given username
+func GetData(username string) (User, error) {
+	var userDetail User
 	err := config.DB.QueryRowx("SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user where username = $1", username).StructScan(&userDetail)
 
 	if err != nil {
-		return UserPublicDetail{}, errors.New("Could not fetch user details: " + err.Error())
+		return User{}, errors.New("Could not fetch user details: " + err.Error())
 	}
 
 	return userDetail, nil
@@ -140,7 +143,7 @@ func CheckIfExists(username string) (bool, error) {
 	return numUsers != 0, nil
 }
 
-func GetAll() ([]UserPublicDetail, error) {
+func GetAll() ([]User, error) {
 	rows, err := config.DB.Queryx("SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user")
 	if err != nil {
 		return nil, errors.New("Cannot fetch user details: " + err.Error())
@@ -171,12 +174,12 @@ func getNumberOfUsers() (int, error) {
 	return numUsers, nil
 }
 
-func scanRowsIntoUserDetails(rows *sqlx.Rows, rowCount int) ([]UserPublicDetail, error) {
-	users := make([]UserPublicDetail, rowCount)
+func scanRowsIntoUserDetails(rows *sqlx.Rows, rowCount int) ([]User, error) {
+	users := make([]User, rowCount)
 
 	index := 0
 	for thereAreMore := rows.Next(); thereAreMore; thereAreMore = rows.Next() {
-		var userDetail UserPublicDetail
+		var userDetail User
 		err := rows.StructScan(&userDetail)
 		if err != nil {
 			return nil, errors.New("Could not extract user details: " + err.Error())
