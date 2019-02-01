@@ -29,7 +29,7 @@ type Event struct {
 //maps from json:db
 var updateSchemaTranslator = map[string]string{"name": "name", "startDateTime": "start", "endDateTime": "end", "lat": "lat", "long": "long", "radius": "radius", "url": "url"}
 
-//GetAll Re
+//GetAll Returns all events, by every user.
 func GetAll() ([]Event, error) {
 	rows, err := config.DB.Queryx("SELECT ID, name, \"start\", \"end\", lat, long, radius, url, createdAt, updatedAt from event")
 	if err != nil {
