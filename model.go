@@ -62,3 +62,10 @@ type HashMethod interface {
 	HashAndSalt(pwd string) (string, error)
 	CompareHashAndPassword(hash string, pwd string) bool
 }
+
+//AuthorizationInfo stores critical information about a particular request's authorizations
+//It provides the username and admin status of the user
+type AuthorizationInfo struct {
+	Username string
+	IsAdmin  bool
+}
