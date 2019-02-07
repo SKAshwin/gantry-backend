@@ -53,7 +53,7 @@ func (us *UserService) Users() ([]checkin.User, error) {
 
 //CreateUser Adds a user with the given username, password (will hash it) and name to the records
 func (us *UserService) CreateUser(u checkin.User) error {
-	passwordHash, err := us.HM.Hash(u.PasswordPlaintext)
+	passwordHash, err := us.HM.HashAndSalt(u.PasswordPlaintext)
 	if err != nil {
 		return errors.New("createUser: " + err.Error())
 	}
