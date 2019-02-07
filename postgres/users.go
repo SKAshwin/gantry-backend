@@ -85,11 +85,11 @@ func (us *UserService) UpdateUser(username string, updateFields map[string]strin
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Println("users.Update entered panic, recovered to rollback, with error: ", r)
+			log.Println("UpdateUser entered panic, recovered to rollback, with error: ", r)
 			if rollBackErr := tx.Rollback(); rollBackErr != nil {
 				log.Println("Could not rollback: " + rollBackErr.Error())
 			}
-			panic("user.Update panicked")
+			panic("UpdateUser panicked")
 		}
 	}()
 

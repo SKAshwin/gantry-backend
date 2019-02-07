@@ -96,11 +96,11 @@ func (es *EventService) CreateEvent(e checkin.Event, hostUsername string) error 
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Println("event.Create entered panic, recovered to rollback, with error: ", r)
+			log.Println("CreateEvent entered panic, recovered to rollback, with error: ", r)
 			if rollBackErr := tx.Rollback(); rollBackErr != nil {
 				log.Println("Could not rollback: " + rollBackErr.Error())
 			}
-			panic("Event.Create panicked")
+			panic("CreateEvent panicked")
 		}
 	}()
 
@@ -142,11 +142,11 @@ func (es *EventService) UpdateEvent(eventID string, updateFields map[string]stri
 
 	defer func() {
 		if r := recover(); r != nil {
-			log.Println("event.Update entered panic, recovered to rollback, with error: ", r)
+			log.Println("UpdateEvent entered panic, recovered to rollback, with error: ", r)
 			if rollBackErr := tx.Rollback(); rollBackErr != nil {
 				log.Println("Could not rollback: " + rollBackErr.Error())
 			}
-			panic("Event.Update panicked")
+			panic("UpdateEvent panicked")
 		}
 	}()
 
