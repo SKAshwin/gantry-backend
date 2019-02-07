@@ -59,6 +59,6 @@ type EventService interface {
 
 //HashMethod An interface allowing you to hash a string, and confirm if a string matches a given hash
 type HashMethod interface {
-	Hash(pwd string) (string, error)
+	HashAndSalt(pwd string) (string, error)
 	CompareHashAndPassword(hash string, pwd string) bool
 }

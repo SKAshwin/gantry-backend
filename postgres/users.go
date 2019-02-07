@@ -95,7 +95,7 @@ func (us *UserService) UpdateUser(username string, updateFields map[string]strin
 
 	for attribute, newValue := range updateFields {
 		if attribute == "password" { //password needs to be hashed for update
-			newValue, err = us.HM.Hash(newValue)
+			newValue, err = us.HM.HashAndSalt(newValue)
 			if err != nil {
 				return false, errors.New("Could not hash new password: " + err.Error())
 			}
