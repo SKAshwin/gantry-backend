@@ -13,7 +13,8 @@ import (
 )
 
 //EventHandler An extension of mux.Router which handles all event-related requests
-//Uses the given EventService and the given Logger
+//Uses the given EventService, the given Logger, and a given Authenticator to check if
+//requests are valid
 //Call NewEventHandler to initialize an EventHandler with the correct routes
 type EventHandler struct {
 	*mux.Router
