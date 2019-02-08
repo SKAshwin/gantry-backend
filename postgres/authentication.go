@@ -31,12 +31,12 @@ func (as *AuthenticationService) Authenticate(username string, pwdPlaintext stri
 		return false, errors.New("Statement preparation in authentication failed: " + err.Error())
 	}
 	var passwordHash string
-	err = stmt.QueryRow(u.Username).Scan(&passwordHash)
+	err = stmt.QueryRow(username).Scan(&passwordHash)
 	if err == sql.ErrNoRows {
 		return false, nil //no such username exists
 	} else if err != nil {
 		//any other error represents a failure
 		return false, errors.New("Database Querying in Authentication Failed: " + err.Error())
 	}
-	return as.HM.CompareHashAndPassword(passwordHash, u.PasswordPlaintext), nil
+	return as.HM.CompareHashAndPassword(passwordHash, pwdPlaintext), nil
 }
