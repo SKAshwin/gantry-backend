@@ -8,9 +8,11 @@ import (
 //Before or after it
 type Adapter func(http.Handler) http.Handler
 
-//Adapt calls the adapters, in reverse order, before the http Handler is executed
+//Adapt returns a handler that calls the adapters, in the given adapter,
+//before the original http Handler is executed
 func Adapt(h http.Handler, adapters ...Adapter) http.Handler {
-	for _, adapter := range adapters {
+	for i := len(adapters) - 1; i >= 0; i-- { //need to iterate through in reverse
+		adapter := adapters[i]
 		h = adapter(h)
 	}
 	return h
