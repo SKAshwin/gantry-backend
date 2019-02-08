@@ -1,14 +1,16 @@
 package http
 
 import (
+	"checkin"
 	"log"
 	"net/http"
 )
 
-//Authenticator An interface to check if a given request is authorized
+//Authenticator An interface to check if a given request is authorized, and to issue
+//authorization to a given destination
 type Authenticator interface {
-	WriteToken(checkin.AuthorizationInfo, w http.ResponseWriter)
-	GetAuthInfo(r *http.Request) checkin.AuthorizationInfo
+	IssueAuthorization(au checkin.AuthorizationInfo, w http.ResponseWriter)
+	GetAuthInfo(r *http.Request) (checkin.AuthorizationInfo, error)
 	Authenticate(r *http.Request) (bool, error)
 }
 
