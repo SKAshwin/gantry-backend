@@ -17,28 +17,36 @@ import (
 //Call NewEventHandler to initialize an EventHandler with the correct routes
 type EventHandler struct {
 	*mux.Router
-	EventService checkin.EventService
-	Logger       *log.Logger
+	EventService  checkin.EventService
+	Logger        *log.Logger
+	Authenticator Authenticator
 }
 
 //NewEventHandler Creates a new event handler using gorilla/mux for routing
 //and the default Logger.
-//UserService needs to be set by the calling function
+//EventService and Authenticator needs to be set by the calling function
 //API endpoint changes happen here, as well as changes to the routing library and logger to be used
-func NewEventHandler() *EventHandler {
+//and type of authenticator
+func NewEventHandler(auth Authenticator, es checkin.EventService) *EventHandler {
 	h := &EventHandler{
-		Router: mux.NewRouter(),
-		Logger: log.New(os.Stderr, "", log.LstdFlags),
-	}
+		Router:        mux.NewRouter(),
+		Logger:        log.New(os.Stderr, "", log.LstdFlags),
+		Authenticator: auth,
+		EventService:  es}
 
-	//ALL OF THESE NEED VALIDATION CHECKS LMAO
-	h.Handle("/api/events/v0", http.HandlerFunc(h.handleEventsBy)).Methods("GET")
-	h.Handle("/api/events/v0", http.HandlerFunc(h.handleCreateEvent)).Methods("POST")
-	h.Handle("/api/events/v0/exists/{eventURL}", http.HandlerFunc(h.handleURLExists)).Methods("GET")
+	h.Handle("/api/events/v0", Adapt(http.HandlerFunc(h.handleEventsBy),
+		checkAuth(auth))).Methods("GET")
+	h.Handle("/api/events/v0", Adapt(http.HandlerFunc(h.handleCreateEvent),
+		checkAuth(auth))).Methods("POST")
+	h.Handle("/api/events/v0/exists/{eventURL}", Adapt(http.HandlerFunc(h.handleURLExists),
+		checkAuth(auth))).Methods("GET")
 	//TODO add check to these methods to see if the event in question exists
-	h.Handle("/api/events/v0/{eventID}", http.HandlerFunc(h.handleEvent)).Methods("GET")
-	h.Handle("/api/events/v0/{eventID}", http.HandlerFunc(h.handleUpdateEvent)).Methods("PUT")
-	h.Handle("/api/events/v0/{eventID}", http.HandlerFunc(h.handleDeleteEvent)).Methods("DELETE")
+	h.Handle("/api/events/v0/{eventID}", Adapt(http.HandlerFunc(h.handleEvent),
+		checkAuth(auth), isAdminOrHost(auth, es, "eventID"))).Methods("GET")
+	h.Handle("/api/events/v0/{eventID}", Adapt(http.HandlerFunc(h.handleUpdateEvent),
+		checkAuth(auth), isAdminOrHost(auth, es, "eventID"))).Methods("PUT")
+	h.Handle("/api/events/v0/{eventID}", Adapt(http.HandlerFunc(h.handleDeleteEvent),
+		checkAuth(auth), isAdminOrHost(auth, es, "eventID"))).Methods("DELETE")
 
 	return h
 }
