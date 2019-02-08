@@ -35,19 +35,23 @@ func NewEventHandler(auth Authenticator, es checkin.EventService) *EventHandler 
 		Authenticator: auth,
 		EventService:  es}
 
+	//Adapters to check if handler should serve the request
+	tokenCheck := checkAuth(auth)
+	credentialsCheck := isAdminOrHost(auth, es, "eventID")
+	existCheck := eventExists(es, "eventID")
+
 	h.Handle("/api/events/v0", Adapt(http.HandlerFunc(h.handleEventsBy),
-		checkAuth(auth))).Methods("GET")
+		tokenCheck)).Methods("GET")
 	h.Handle("/api/events/v0", Adapt(http.HandlerFunc(h.handleCreateEvent),
-		checkAuth(auth))).Methods("POST")
+		tokenCheck)).Methods("POST")
 	h.Handle("/api/events/v0/exists/{eventURL}", Adapt(http.HandlerFunc(h.handleURLExists),
-		checkAuth(auth))).Methods("GET")
-	//TODO add check to these methods to see if the event in question exists
+		tokenCheck)).Methods("GET")
 	h.Handle("/api/events/v0/{eventID}", Adapt(http.HandlerFunc(h.handleEvent),
-		checkAuth(auth), isAdminOrHost(auth, es, "eventID"))).Methods("GET")
+		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
 	h.Handle("/api/events/v0/{eventID}", Adapt(http.HandlerFunc(h.handleUpdateEvent),
-		checkAuth(auth), isAdminOrHost(auth, es, "eventID"))).Methods("PUT")
+		tokenCheck, credentialsCheck, existCheck)).Methods("PUT")
 	h.Handle("/api/events/v0/{eventID}", Adapt(http.HandlerFunc(h.handleDeleteEvent),
-		checkAuth(auth), isAdminOrHost(auth, es, "eventID"))).Methods("DELETE")
+		tokenCheck, credentialsCheck, existCheck)).Methods("DELETE")
 
 	return h
 }
@@ -178,5 +182,22 @@ func (h *EventHandler) handleURLExists(w http.ResponseWriter, r *http.Request) {
 	} else {
 		reply, _ := json.Marshal(map[string]bool{"available": !exists})
 		w.Write(reply)
+	}
+}
+
+func eventExists(es checkin.EventService, eventIDKey string) Adapter {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			eventID := mux.Vars(r)[eventIDKey]
+			ok, err := es.CheckIfExists(eventID)
+			if err != nil {
+				log.Println("Error checking that event exists: " + err.Error())
+				WriteMessage(http.StatusInternalServerError, "Error checking if event exists", w)
+			} else if ok {
+				h.ServeHTTP(w, r)
+			} else {
+				WriteMessage(http.StatusNotFound, "Event does not exist with that ID", w)
+			}
+		})
 	}
 }
