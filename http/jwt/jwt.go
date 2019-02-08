@@ -28,7 +28,7 @@ const (
 //Authenticate returns true if the request has a valid (non-expired) token
 //Returns false if the token is expired or otherwise invalid
 //Returns false and error if the token isn't even formatted correctly
-func (jwta *Authenticator) Authenticate(r *http.Request) (bool, error) {
+func (jwta Authenticator) Authenticate(r *http.Request) (bool, error) {
 	jwtString, err := getJWTString(r)
 	if err != nil {
 		return false, errors.New("Error in authenticate: " + err.Error())
@@ -44,7 +44,7 @@ func (jwta *Authenticator) Authenticate(r *http.Request) (bool, error) {
 //GetAuthInfo From a web token, return the authorization info
 //Will return an error if: token string not in the request in the valid format
 //token string not parseable, or token invalid
-func (jwta *Authenticator) GetAuthInfo(r *http.Request) (checkin.AuthorizationInfo, error) {
+func (jwta Authenticator) GetAuthInfo(r *http.Request) (checkin.AuthorizationInfo, error) {
 	jwtString, err := getJWTString(r)
 	if err != nil {
 		return checkin.AuthorizationInfo{}, errors.New("Error extracting token string: " + err.Error())
@@ -61,7 +61,7 @@ func (jwta *Authenticator) GetAuthInfo(r *http.Request) (checkin.AuthorizationIn
 
 //IssueAuthorization Writes a response using the given ResponseWriter containing authorization info
 //For the recipient
-func (jwta *Authenticator) IssueAuthorization(au checkin.AuthorizationInfo, w http.ResponseWriter) error {
+func (jwta Authenticator) IssueAuthorization(au checkin.AuthorizationInfo, w http.ResponseWriter) error {
 	jwt, err := jwta.createToken(au)
 	if err != nil {
 		return errors.New("Error creating token: " + err.Error())
@@ -73,7 +73,7 @@ func (jwta *Authenticator) IssueAuthorization(au checkin.AuthorizationInfo, w ht
 
 //createToken Given a user (or admin's) authorization info, returns an encrypted web token string
 //Uses signing method HS256
-func (jwta *Authenticator) createToken(au checkin.AuthorizationInfo) (string, error) {
+func (jwta Authenticator) createToken(au checkin.AuthorizationInfo) (string, error) {
 	token := jwt.New(jwt.SigningMethodHS256)
 	claims := token.Claims.(jwt.MapClaims)
 
@@ -92,7 +92,7 @@ func (jwta *Authenticator) createToken(au checkin.AuthorizationInfo) (string, er
 //keyGetter checks if the provided token follows the appropriate signing method
 //Returns an error if not
 //Returns the signing key if it does follow the appropriate method
-func (jwta *Authenticator) keyGetter(token *jwt.Token) (interface{}, error) {
+func (jwta Authenticator) keyGetter(token *jwt.Token) (interface{}, error) {
 	if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 		log.Printf("Unexpected signing method: %v \n", token.Header["alg"])
 		return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])

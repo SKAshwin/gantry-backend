@@ -28,8 +28,6 @@ type UserService interface {
 	UpdateUser(username string, updateFields map[string]string) (bool, error)
 	CheckIfExists(username string) (bool, error)
 	UpdateLastLoggedIn(username string) error
-	AddHost(eventID string, username string) error
-	CheckHost(username string, eventID string) (bool, error)
 }
 
 //Event represents an event which will have an associated website

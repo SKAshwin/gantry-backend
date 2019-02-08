@@ -124,7 +124,7 @@ func (us *UserService) UpdateUser(username string, updateFields map[string]strin
 }
 
 //CheckIfExists sees if the username is already used
-func (us UserService) CheckIfExists(username string) (bool, error) {
+func (us *UserService) CheckIfExists(username string) (bool, error) {
 	var numUsers int
 	err := us.DB.QueryRow("SELECT COUNT(*) from app_user where username = $1", username).Scan(&numUsers)
 	if err != nil {
@@ -134,7 +134,7 @@ func (us UserService) CheckIfExists(username string) (bool, error) {
 }
 
 //UpdateLastLoggedIn Sets the lastLoggedIn attribute of this user to the current time
-func (us UserService) UpdateLastLoggedIn(username string) error {
+func (us *UserService) UpdateLastLoggedIn(username string) error {
 	_, err := us.DB.Exec("UPDATE app_user SET lastLoggedIn = NOW() where username = $1", username)
 	return err
 }

@@ -9,9 +9,9 @@ import (
 //sub-handlers
 //Implements the http.Handler interface
 type Handler struct {
-	EventHandler EventHandler
-	UserHandler  UserHandler
-	AuthHandler  AuthHandler
+	EventHandler *EventHandler
+	UserHandler  *UserHandler
+	AuthHandler  *AuthHandler
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {

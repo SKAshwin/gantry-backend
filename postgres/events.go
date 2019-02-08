@@ -196,13 +196,13 @@ func (es *EventService) CheckIfExists(id string) (bool, error) {
 }
 
 //AddHost creates a new host relationship between a user and an event
-func (es EventService) AddHost(eventID string, username string) error {
+func (es *EventService) AddHost(eventID string, username string) error {
 	_, err := es.DB.Exec("INSERT INTO hosts(eventID, username) VALUES ($1, $2)", eventID, username)
 	return err
 }
 
 //CheckHost returns true if that user is a host of the given event
-func (es EventService) CheckHost(username string, eventID string) (bool, error) {
+func (es *EventService) CheckHost(username string, eventID string) (bool, error) {
 	var numHosts int
 	err := es.DB.QueryRow("SELECT count(*) from hosts where hosts.eventID = $1 and hosts.username = $2",
 		eventID, username).Scan(&numHosts)
