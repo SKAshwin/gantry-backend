@@ -16,7 +16,7 @@ import (
 //Authenticator is an implementation of http.Authenticator which uses java web tokens
 //for authentication
 type Authenticator struct {
-	signingKey []byte
+	SigningKey []byte
 }
 
 const (
@@ -81,7 +81,7 @@ func (jwta *Authenticator) createToken(au checkin.AuthorizationInfo) (string, er
 	claims[jwtExpiryTime] = time.Now().Add(time.Hour).Unix()
 	claims[jwtAdminStatus] = au.IsAdmin
 
-	tokenSigned, err := token.SignedString(jwta.signingKey)
+	tokenSigned, err := token.SignedString(jwta.SigningKey)
 	if err != nil {
 		return "", errors.New("Token signing failed during creation: " + err.Error())
 	}
@@ -97,7 +97,7 @@ func (jwta *Authenticator) keyGetter(token *jwt.Token) (interface{}, error) {
 		log.Printf("Unexpected signing method: %v \n", token.Header["alg"])
 		return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 	}
-	return jwta.signingKey, nil
+	return jwta.SigningKey, nil
 }
 
 //getJWTString extracts the JWT string from the Authorization header, in a Bearer {{token}} format

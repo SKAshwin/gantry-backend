@@ -15,7 +15,7 @@ type HashMethod struct {
 
 //HashAndSalt Hashes a function (with a salt) using the bcrypt algorithm
 //With the hashcost specified in the bcrypt.HashMethod instance
-func (hm *HashMethod) HashAndSalt(pwd string) (string, error) {
+func (hm HashMethod) HashAndSalt(pwd string) (string, error) {
 	//Use GenerateFromPassword to hash & salt pwd.
 	//cost must be above 4
 	hash, err := bcrypt.GenerateFromPassword([]byte(pwd), hm.HashCost)
@@ -29,7 +29,7 @@ func (hm *HashMethod) HashAndSalt(pwd string) (string, error) {
 
 //CompareHashAndPassword Returns true if the hashed string matches the plaintex
 //Returns false otherwise
-func (hm *HashMethod) CompareHashAndPassword(hash string, pwd string) bool {
+func (hm HashMethod) CompareHashAndPassword(hash string, pwd string) bool {
 	//method returns error if hash does not match
 	//returns nil otherwise
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(pwd)) == nil
