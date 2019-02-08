@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq" //Loads postgres as our database of choice
 )
 
 //Open Returns a connection to the database, given the relevant credentials

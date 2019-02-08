@@ -7,7 +7,6 @@ import (
 	"log"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq" //Loads postgres as our database of choice
 )
 
 //EventService Implementation of an event service

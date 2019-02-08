@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"github.com/jmoiron/sqlx"
-	_ "github.com/lib/pq" //Loads postgres as our database of choice
 )
 
 //UserService Implementation of a user service
