@@ -11,6 +11,7 @@ import (
 type Handler struct {
 	EventHandler EventHandler
 	UserHandler  UserHandler
+	AuthHandler  AuthHandler
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -18,6 +19,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.EventHandler.ServeHTTP(w, r)
 	} else if strings.HasPrefix(r.URL.Path, "/api/users") {
 		h.UserHandler.ServeHTTP(w, r)
+	} else if strings.HasPrefix(r.URL.Path, "/api/auth") {
+		h.AuthHandler.ServeHTTP(w, r)
 	} else {
 		http.NotFound(w, r)
 	}
