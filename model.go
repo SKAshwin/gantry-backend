@@ -55,6 +55,9 @@ type EventService interface {
 	DeleteEvent(ID string) error
 	UpdateEvent(ID string, updateFields map[string]string) (bool, error)
 	URLExists(url string) (bool, error)
+	CheckIfExists(id string) (bool, error)
+	AddHost(eventID string, username string) error
+	CheckHost(username string, eventID string) (bool, error)
 }
 
 //HashMethod An interface allowing you to hash a string, and confirm if a string matches a given hash
