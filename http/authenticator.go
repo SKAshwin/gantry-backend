@@ -78,3 +78,18 @@ func isAdminOrHost(au Authenticator, es checkin.EventService, eventIDKey string)
 		})
 	}
 }
+
+func isAdminOrUser(au Authenticator, us checkin.UserService, usernameKey string) Adapter {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			authDetails, err := au.GetAuthInfo(r)
+			if err != nil {
+				log.Println("Error in fetching authorization info: " + err.Error())
+			} else if authDetails.IsAdmin || authDetails.Username == mux.Vars(r)[usernameKey] {
+				h.ServeHTTP(w, r)
+			} else {
+				WriteMessage(http.StatusForbidden, "Access Denied", w)
+			}
+		})
+	}
+}
