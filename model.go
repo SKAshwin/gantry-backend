@@ -25,9 +25,9 @@ type UserService interface {
 	Users() ([]User, error)
 	CreateUser(u User) error
 	DeleteUser(username string) error
-	UpdateUser(username string, updateFields map[string]string) error
-	CheckIfExists(username string)
-	UpdateLastLoggedIn(username string)
+	UpdateUser(username string, updateFields map[string]string) (bool, error)
+	CheckIfExists(username string) (bool, error)
+	UpdateLastLoggedIn(username string) error
 	AddHost(eventID string, username string) error
 	CheckHost(username string, eventID string) (bool, error)
 }
