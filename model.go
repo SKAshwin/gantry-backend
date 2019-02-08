@@ -66,6 +66,11 @@ type HashMethod interface {
 	CompareHashAndPassword(hash string, pwd string) bool
 }
 
+//AuthenticationService An interface for functions to perform authentication
+type AuthenticationService interface {
+	Authenticate(username string, pwdPlaintext string, isAdmin bool) (bool, error)
+}
+
 //AuthorizationInfo stores critical information about a particular request's authorizations
 //It provides the username and admin status of the user
 type AuthorizationInfo struct {
