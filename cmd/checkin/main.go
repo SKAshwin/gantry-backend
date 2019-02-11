@@ -17,6 +17,7 @@ import (
 )
 
 func main() {
+	loadEnvironmentalVariables()
 	config := dbConfig()
 	db, err := postgres.Open(config["DBHOST"], config["DBPORT"], config["DBUSER"],
 		config["DBPASS"], config["DBNAME"])
@@ -24,6 +25,7 @@ func main() {
 		log.Fatal(err)
 	}
 	defer db.Close()
+	log.Println("Successfully Connected!")
 
 	jwtAuthenticator := jwt.Authenticator{SigningKey: []byte("MyPassword")}
 	bcryptHashMethod := bcrypt.HashMethod{HashCost: 5}
@@ -50,6 +52,7 @@ func main() {
 	signal.Notify(c, os.Interrupt)
 	s := <-c
 	fmt.Println("Got signal:", s)
+	
 }
 
 func loadEnvironmentalVariables() {
