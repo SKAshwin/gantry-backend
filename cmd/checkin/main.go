@@ -3,9 +3,12 @@ package main
 import (
 	"checkin/bcrypt"
 	"checkin/http"
+	"checkin/http/cors"
 	"checkin/http/jwt"
 	"checkin/postgres"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -38,7 +41,7 @@ func main() {
 		EventHandler: eventHandler,
 		UserHandler:  userHandler,
 	}
-	server := http.Server{Handler: &handler, Addr: ":3000"}
+	server := http.Server{Handler: &handler, Addr: ":3000", PreFlightHandler: configurePFH()}
 	server.Open() //note that server.Open starts a new goroutine, so process will end
 	//unless blocked
 
@@ -86,4 +89,22 @@ func dbConfig() map[string]string {
 	conf["DBPASS"] = password
 	conf["DBNAME"] = name
 	return conf
+}
+
+func configurePFH() cors.PreFlightHandler {
+	corsFile, err := os.Open("../../config/cors.json")
+	if err != nil {
+		log.Fatal("Error opening cors.json: " + err.Error())
+	}
+	defer corsFile.Close()
+	byteValue, err := ioutil.ReadAll(corsFile)
+	if err != nil {
+		log.Fatal("Error reading cors.json: " + err.Error())
+	}
+	var pfh cors.PreFlightHandler
+	err = json.Unmarshal([]byte(byteValue), &pfh)
+	if err != nil {
+		log.Fatal("cors.json formatted wrongly, error when parsing: " + err.Error())
+	}
+	return pfh
 }
