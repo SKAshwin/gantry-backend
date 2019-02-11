@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"registration-app/config"
+	"checkin/config"
 
 	jwt "github.com/dgrijalva/jwt-go"
 	"golang.org/x/crypto/bcrypt"

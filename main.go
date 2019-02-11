@@ -1,14 +1,14 @@
-// registrationApp project main.go
-package main
+// Package checkin project main.go
+package checkin
 
 import (
 	"log"
 	"net/http"
 
-	"registration-app/config"
-	"registration-app/routing"
+	"checkin/config"
+	"checkin/routing"
 
-	_ "github.com/lib/pq"
+	_ "github.com/lib/pq" //this is the main package tf
 	"github.com/rs/cors"
 )
 

@@ -1,11 +1,11 @@
 package routing
 
 import (
+	"checkin/handlers"
+	"checkin/response"
 	"errors"
 	"log"
 	"net/http"
-	"registration-app/handlers"
-	"registration-app/response"
 
 	"github.com/gorilla/mux"
 )

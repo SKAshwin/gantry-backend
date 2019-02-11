@@ -1,11 +1,11 @@
 package handlers
 
 import (
+	"checkin/response"
+	"checkin/users"
 	"encoding/json"
 	"log"
 	"net/http"
-	"registration-app/response"
-	"registration-app/users"
 
 	"github.com/gorilla/mux"
 )

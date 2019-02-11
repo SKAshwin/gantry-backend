@@ -1,12 +1,12 @@
 package handlers
 
 import (
+	"checkin/auth"
+	"checkin/event"
+	"checkin/response"
 	"encoding/json"
 	"log"
 	"net/http"
-	"registration-app/auth"
-	"registration-app/event"
-	"registration-app/response"
 
 	"github.com/google/uuid"
 	"github.com/gorilla/mux"
