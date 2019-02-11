@@ -27,13 +27,18 @@ func main() {
 
 	us := &postgres.UserService{DB: db, HM: bcryptHashMethod}
 	as := &postgres.AuthenticationService{DB: db, HM: bcryptHashMethod}
+	es := &postgres.EventService{DB: db}
 
 	authHandler := http.NewAuthHandler(as, jwtAuthenticator, us)
+	userHandler := http.NewUserHandler(us, jwtAuthenticator)
+	eventHandler := http.NewEventHandler(es, jwtAuthenticator)
 
 	handler := http.Handler{
-		AuthHandler: authHandler,
+		AuthHandler:  authHandler,
+		EventHandler: eventHandler,
+		UserHandler:  userHandler,
 	}
-	server := http.Server{Handler: &handler, Addr: ":5000"}
+	server := http.Server{Handler: &handler, Addr: ":3000"}
 	server.Open() //note that server.Open starts a new goroutine, so process will end
 	//unless blocked
 
