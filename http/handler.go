@@ -14,7 +14,7 @@ type Handler struct {
 	AuthHandler  *AuthHandler
 }
 
-func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if strings.HasPrefix(r.URL.Path, "/api/v0/events") {
 		h.EventHandler.ServeHTTP(w, r)
 	} else if strings.HasPrefix(r.URL.Path, "/api/v0/users") {
