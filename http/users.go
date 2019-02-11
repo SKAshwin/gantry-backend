@@ -36,15 +36,15 @@ func NewUserHandler(us checkin.UserService, auth Authenticator) *UserHandler {
 	existCheck := userExists(us, "username")
 	adminOrUserCheck := isAdminOrUser(auth, us, "username")
 
-	h.Handle("/api/users/v0", Adapt(http.HandlerFunc(h.handleUsers),
+	h.Handle("/api/v0/users", Adapt(http.HandlerFunc(h.handleUsers),
 		tokenCheck, adminCheck)).Methods("GET")
-	h.Handle("/api/users/v0", Adapt(http.HandlerFunc(h.handleCreateUser),
+	h.Handle("/api/v0/users", Adapt(http.HandlerFunc(h.handleCreateUser),
 		tokenCheck, adminCheck)).Methods("POST")
-	h.Handle("/api/users/v0/{username}", Adapt(http.HandlerFunc(h.handleUser),
+	h.Handle("/api/v0/users/{username}", Adapt(http.HandlerFunc(h.handleUser),
 		tokenCheck, adminOrUserCheck, existCheck)).Methods("GET")
-	h.Handle("/api/users/v0/{username}", Adapt(http.HandlerFunc(h.handleUpdateUser),
+	h.Handle("/api/v0/users/{username}", Adapt(http.HandlerFunc(h.handleUpdateUser),
 		tokenCheck, adminOrUserCheck, existCheck)).Methods("PUT")
-	h.Handle("/api/users/v0/{username}", Adapt(http.HandlerFunc(h.handleDeleteUser),
+	h.Handle("/api/v0/users/{username}", Adapt(http.HandlerFunc(h.handleDeleteUser),
 		tokenCheck, adminOrUserCheck, existCheck)).Methods("DELETE")
 
 	return h

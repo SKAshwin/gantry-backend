@@ -15,11 +15,11 @@ type Handler struct {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if strings.HasPrefix(r.URL.Path, "/api/events") {
+	if strings.HasPrefix(r.URL.Path, "/api/v0/events") {
 		h.EventHandler.ServeHTTP(w, r)
-	} else if strings.HasPrefix(r.URL.Path, "/api/users") {
+	} else if strings.HasPrefix(r.URL.Path, "/api/v0/users") {
 		h.UserHandler.ServeHTTP(w, r)
-	} else if strings.HasPrefix(r.URL.Path, "/api/auth") {
+	} else if strings.HasPrefix(r.URL.Path, "/api/v0/auth") {
 		h.AuthHandler.ServeHTTP(w, r)
 	} else {
 		http.NotFound(w, r)

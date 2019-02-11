@@ -33,8 +33,8 @@ func NewAuthHandler(as checkin.AuthenticationService, auth Authenticator, us che
 		UserService:   us,
 		Authenticator: auth,
 	}
-	h.Handle("/api/auth/v0/admins/login", http.HandlerFunc(h.handleLogin(true))).Methods("POST")
-	h.Handle("/api/auth/v0/users/login", http.HandlerFunc(h.handleLogin(false))).Methods("POST")
+	h.Handle("/api/v0/auth/admins/login", http.HandlerFunc(h.handleLogin(true))).Methods("POST")
+	h.Handle("/api/v0/auth/users/login", http.HandlerFunc(h.handleLogin(false))).Methods("POST")
 	return h
 }
 

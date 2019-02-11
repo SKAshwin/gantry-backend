@@ -28,7 +28,7 @@ type EventHandler struct {
 //EventService and Authenticator needs to be set by the calling function
 //API endpoint changes happen here, as well as changes to the routing library and logger to be used
 //and type of authenticator
-func NewEventHandler(auth Authenticator, es checkin.EventService) *EventHandler {
+func NewEventHandler(es checkin.EventService, auth Authenticator) *EventHandler {
 	h := &EventHandler{
 		Router:        mux.NewRouter(),
 		Logger:        log.New(os.Stderr, "", log.LstdFlags),
@@ -40,17 +40,17 @@ func NewEventHandler(auth Authenticator, es checkin.EventService) *EventHandler 
 	credentialsCheck := isAdminOrHost(auth, es, "eventID")
 	existCheck := eventExists(es, "eventID")
 
-	h.Handle("/api/events/v0", Adapt(http.HandlerFunc(h.handleEventsBy),
+	h.Handle("/api/v0/events", Adapt(http.HandlerFunc(h.handleEventsBy),
 		tokenCheck)).Methods("GET")
-	h.Handle("/api/events/v0", Adapt(http.HandlerFunc(h.handleCreateEvent),
+	h.Handle("/api/v0/events", Adapt(http.HandlerFunc(h.handleCreateEvent),
 		tokenCheck)).Methods("POST")
-	h.Handle("/api/events/v0/exists/{eventURL}", Adapt(http.HandlerFunc(h.handleURLExists),
+	h.Handle("/api/v0/events/exists/{eventURL}", Adapt(http.HandlerFunc(h.handleURLExists),
 		tokenCheck)).Methods("GET")
-	h.Handle("/api/events/v0/{eventID}", Adapt(http.HandlerFunc(h.handleEvent),
+	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleEvent),
 		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
-	h.Handle("/api/events/v0/{eventID}", Adapt(http.HandlerFunc(h.handleUpdateEvent),
+	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleUpdateEvent),
 		tokenCheck, credentialsCheck, existCheck)).Methods("PUT")
-	h.Handle("/api/events/v0/{eventID}", Adapt(http.HandlerFunc(h.handleDeleteEvent),
+	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleDeleteEvent),
 		tokenCheck, credentialsCheck, existCheck)).Methods("DELETE")
 
 	return h
@@ -71,8 +71,13 @@ func (h *EventHandler) handleEvents(w http.ResponseWriter, r *http.Request) {
 //handleEventsBy is a handler which, given a username in the http request
 //Returns all the information regarding the events belonging to that user
 func (h *EventHandler) handleEventsBy(w http.ResponseWriter, r *http.Request) {
-	username := r.Header.Get("username")
-	events, err := h.EventService.EventsBy(username)
+	authInfo, err := h.Authenticator.GetAuthInfo(r)
+	if err != nil {
+		h.Logger.Println("Error fetching authorization info: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error in fetching authorization info", w)
+	}
+
+	events, err := h.EventService.EventsBy(authInfo.Username)
 	if err != nil {
 		h.Logger.Println("Error in GetUsersEvents: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching user's events", w)
@@ -82,7 +87,7 @@ func (h *EventHandler) handleEventsBy(w http.ResponseWriter, r *http.Request) {
 	w.Write(reply)
 }
 
-//handleEvent is a handler, which given a username in the http request and a eventID in the URL
+//handleEvent is a handler, which given a eventID in the URL, writes that event's details
 func (h *EventHandler) handleEvent(w http.ResponseWriter, r *http.Request) {
 	eventID := mux.Vars(r)["eventID"]
 	ev, err := h.EventService.Event(eventID)
@@ -128,7 +133,13 @@ func (h *EventHandler) handleCreateEvent(w http.ResponseWriter, r *http.Request)
 	}
 
 	eventData.ID = uuid.New().String()
-	err = h.EventService.CreateEvent(eventData, r.Header.Get("username"))
+	authInfo, err := h.Authenticator.GetAuthInfo(r)
+	if err != nil {
+		h.Logger.Println("Error fetching authorization info: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error in fetching authorization info", w)
+	}
+
+	err = h.EventService.CreateEvent(eventData, authInfo.Username)
 	if err != nil {
 		h.Logger.Println("Error in creating event: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error in creating event", w)
