@@ -38,7 +38,9 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, auth Auth
 	existCheck := eventExists(es, "eventID")
 
 	h.Handle("/api/v0/events/{eventID}/guests", Adapt(http.HandlerFunc(h.handleGuests),
-		tokenCheck, credentialsCheck, existCheck))
+		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
+	h.Handle("/api/v0/events/{eventID}/guests", Adapt(http.HandlerFunc(h.handleRegisterGuest),
+		tokenCheck, credentialsCheck, existCheck)).Methods("POST")
 
 	//GET /api/events/{eventID}/guests should return all Guests, requires a host token or admin token
 	//POST /api/events/{eventID}/guests with a JSON argument {name:"Hello",nric:"5678F"} should register
@@ -65,4 +67,37 @@ func (h *GuestHandler) handleGuests(w http.ResponseWriter, r *http.Request) {
 	}
 	reply, _ := json.Marshal(guests)
 	w.Write(reply)
+}
+
+func (h *GuestHandler) handleRegisterGuest(w http.ResponseWriter, r *http.Request) {
+	guest := struct {
+		Name string `json:"name"`
+		NRIC string `json:"nric"`
+	}{}
+	err := json.NewDecoder(r.Body).Decode(&guest)
+	if err != nil {
+		h.Logger.Println("Error when decoding guest details: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "Incorrect fields for adding new guest", w)
+		return
+	}
+
+	eventID := mux.Vars(r)["eventID"]
+
+	//check if the guest already exists first before attempting to create one
+	if guestExists, err := h.GuestService.GuestExists(eventID, guest.NRIC); err == nil && guestExists {
+		WriteMessage(http.StatusConflict, "Guest with that NRIC already in list", w)
+		return
+	} else if err != nil {
+		h.Logger.Println("Error checking if guest exists: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error checking if guest exists", w)
+		return
+	}
+
+	err = h.GuestService.RegisterGuest(eventID, guest.NRIC, guest.Name)
+	if err != nil {
+		h.Logger.Println("Error registering guest: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Guest registration failed", w)
+	} else {
+		WriteMessage(http.StatusCreated, "Registration successful", w)
+	}
 }
