@@ -37,33 +37,62 @@ type EventService struct {
 	CheckHostInvoked bool
 }
 
+//Event invokes the mock implementation and marks the function as invoked
 func (es *EventService) Event(ID string) (checkin.Event, error) {
-
+	es.EventInvoked = true
+	return es.EventFn(ID)
 }
+
+//EventsBy invokes the mock implementation and marks the function as invoked
 func (es *EventService) EventsBy(username string) ([]checkin.Event, error) {
-
+	es.EventsByInvoked = true
+	return es.EventsByFn(username)
 }
+
+//Events invokes the mock implementation and marks the function as invoked
 func (es *EventService) Events() ([]checkin.Event, error) {
-
+	es.EventsInvoked = true
+	return es.EventsFn()
 }
+
+//CreateEvent invokes the mock implementation and marks the function as invoked
 func (es *EventService) CreateEvent(e checkin.Event, hostUsername string) error {
-
+	es.CreateEventInvoked = true
+	return es.CreateEventFn(e, hostUsername)
 }
+
+//DeleteEvent invokes the mock implementation and marks the function as invoked
 func (es *EventService) DeleteEvent(ID string) error {
-
+	es.DeleteEventInvoked = true
+	return es.DeleteEventFn(ID)
 }
+
+//UpdateEvent invokes the mock implementation and marks the function as invoked
 func (es *EventService) UpdateEvent(ID string, updateFields map[string]string) (bool, error) {
-
+	es.UpdateEventInvoked = true
+	return es.UpdateEventFn(ID, updateFields)
 }
+
+//URLExists invokes the mock implementation and marks the function as invoked
 func (es *EventService) URLExists(url string) (bool, error) {
-
+	es.URLExistsInvoked = true
+	return es.URLExistsFn(url)
 }
+
+//CheckIfExists invokes the mock implementation and marks the function as invoked
 func (es *EventService) CheckIfExists(id string) (bool, error) {
-
+	es.CheckIfExistsInvoked = true
+	return es.CheckIfExistsFn(id)
 }
+
+//AddHost invokes the mock implementation and marks the function as invoked
 func (es *EventService) AddHost(eventID string, username string) error {
-
+	es.AddHostInvoked = true
+	return es.AddHostFn(eventID, username)
 }
-func (es *EventService) CheckHost(username string, eventID string) (bool, error) {
 
+//CheckHost invokes the mock implementation and marks the function as invoked
+func (es *EventService) CheckHost(username string, eventID string) (bool, error) {
+	es.CheckHostInvoked = true
+	return es.CheckHost(username, eventID)
 }
