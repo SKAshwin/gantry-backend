@@ -70,7 +70,7 @@ type AuthenticationService interface {
 }
 
 //GuestStats are statistics relating to attendance of the event
-type AttendanceStats struct {
+type GuestStats struct {
 	TotalUsers       int `json:"total"`
 	CheckedIn        int `json:"checkedIn"`
 	PercentCheckedIn int `json:"percentCheckedIn"`
@@ -82,9 +82,10 @@ type GuestService interface {
 	Guests(eventID string) ([]string, error)
 	GuestsCheckedIn(eventID string) ([]string, error)
 	GuestsNotCheckedIn(eventID string) ([]string, error)
-	RegisterGuest(nric string, name string) error
-	RemoveGuest(nric string) error
-	CheckInStats() (AttendanceStats, error)
+	GuestExists(eventID string, nric string) (bool, error)
+	RegisterGuest(eventID string, nric string, name string) error
+	RemoveGuest(eventID string, nric string) error
+	CheckInStats(eventID string) (GuestStats, error)
 }
 
 //AuthorizationInfo stores critical information about a particular request's authorizations

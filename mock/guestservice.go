@@ -18,13 +18,16 @@ type GuestService struct {
 	GuestsNotCheckedInFn      func(eventID string) ([]string, error)
 	GuestsNotCheckedInInvoked bool
 
-	RegisterGuestFn      func(nric string, name string) error
+	GuestExistsFn      func(eventID string, nric string) (bool, error)
+	GuestExistsInvoked bool
+
+	RegisterGuestFn      func(eventID string, nric string, name string) error
 	RegisterGuestInvoked bool
 
-	RemoveGuestFn      func(nric string) error
+	RemoveGuestFn      func(eventID string, nric string) error
 	RemoveGuestInvoked bool
 
-	CheckInStatsFn      func() (checkin.AttendanceStats, error)
+	CheckInStatsFn      func() (checkin.GuestStats, error)
 	CheckInStatsInvoked bool
 }
 
@@ -52,20 +55,26 @@ func (as *GuestService) GuestsNotCheckedIn(eventID string) ([]string, error) {
 	return as.GuestsNotCheckedInFn(eventID)
 }
 
+//GuestExists invokes the mock implementation and marks the function as invoked
+func (as *GuestService) GuestExists(eventID string, nric string) (bool, error) {
+	as.GuestExistsInvoked = true
+	return as.GuestExistsFn(eventID, nric)
+}
+
 //RegisterGuest invokes the mock implementation and marks the function as invoked
-func (as *GuestService) RegisterGuest(nric string, name string) error {
+func (as *GuestService) RegisterGuest(eventID string, nric string, name string) error {
 	as.RegisterGuestInvoked = true
-	return as.RegisterGuestFn(nric, name)
+	return as.RegisterGuestFn(eventID, nric, name)
 }
 
 //RemoveGuest invokes the mock implementation and marks the function as invoked
-func (as *GuestService) RemoveGuest(nric string) error {
+func (as *GuestService) RemoveGuest(eventID string, nric string) error {
 	as.RemoveGuestInvoked = true
-	return as.RemoveGuestFn(nric)
+	return as.RemoveGuestFn(eventID, nric)
 }
 
 //CheckInStats invokes the mock implementation and marks the function as invoked
-func (as *GuestService) CheckInStats() (checkin.AttendanceStats, error) {
+func (as *GuestService) CheckInStats(eventID string) (checkin.GuestStats, error) {
 	as.CheckInInvoked = true
-	return as.CheckInStats()
+	return as.CheckInStats(eventID)
 }
