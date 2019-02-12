@@ -69,15 +69,15 @@ type AuthenticationService interface {
 	Authenticate(username string, pwdPlaintext string, isAdmin bool) (bool, error)
 }
 
-//AttendanceStats are statistics relating to attendance of the event
+//GuestStats are statistics relating to attendance of the event
 type AttendanceStats struct {
 	TotalUsers       int `json:"total"`
 	CheckedIn        int `json:"checkedIn"`
 	PercentCheckedIn int `json:"percentCheckedIn"`
 }
 
-//AttendanceService is for checking in guests at a specific event
-type AttendanceService interface {
+//GuestService is for checking in guests at a specific event
+type GuestService interface {
 	CheckIn(eventID string, nric string) (string, error)
 	Guests(eventID string) ([]string, error)
 	GuestsCheckedIn(eventID string) ([]string, error)

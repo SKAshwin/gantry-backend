@@ -4,8 +4,8 @@ import (
 	"checkin"
 )
 
-//AttendanceService represents a mock implementation of the checkin.AttendanceService interface
-type AttendanceService struct {
+//GuestService represents a mock implementation of the checkin.GuestService interface
+type GuestService struct {
 	CheckInFn      func(eventID string, nric string) (string, error)
 	CheckInInvoked bool
 
@@ -29,43 +29,43 @@ type AttendanceService struct {
 }
 
 //CheckIn invokes the mock implementation and marks the function as invoked
-func (as *AttendanceService) CheckIn(eventID string, nric string) (string, error) {
+func (as *GuestService) CheckIn(eventID string, nric string) (string, error) {
 	as.CheckInInvoked = true
 	return as.CheckInFn(eventID, nric)
 }
 
 //Guests invokes the mock implementation and marks the function as invoked
-func (as *AttendanceService) Guests(eventID string) ([]string, error) {
+func (as *GuestService) Guests(eventID string) ([]string, error) {
 	as.GuestsInvoked = true
 	return as.GuestsFn(eventID)
 }
 
 //GuestsCheckedIn invokes the mock implementation and marks the function as invoked
-func (as *AttendanceService) GuestsCheckedIn(eventID string) ([]string, error) {
+func (as *GuestService) GuestsCheckedIn(eventID string) ([]string, error) {
 	as.GuestsCheckedInInvoked = true
 	return as.GuestsCheckedInFn(eventID)
 }
 
 //GuestsNotCheckedIn invokes the mock implementation and marks the function as invoked
-func (as *AttendanceService) GuestsNotCheckedIn(eventID string) ([]string, error) {
+func (as *GuestService) GuestsNotCheckedIn(eventID string) ([]string, error) {
 	as.GuestsNotCheckedInInvoked = true
 	return as.GuestsNotCheckedInFn(eventID)
 }
 
 //RegisterGuest invokes the mock implementation and marks the function as invoked
-func (as *AttendanceService) RegisterGuest(nric string, name string) error {
+func (as *GuestService) RegisterGuest(nric string, name string) error {
 	as.RegisterGuestInvoked = true
 	return as.RegisterGuestFn(nric, name)
 }
 
 //RemoveGuest invokes the mock implementation and marks the function as invoked
-func (as *AttendanceService) RemoveGuest(nric string) error {
+func (as *GuestService) RemoveGuest(nric string) error {
 	as.RemoveGuestInvoked = true
 	return as.RemoveGuestFn(nric)
 }
 
 //CheckInStats invokes the mock implementation and marks the function as invoked
-func (as *AttendanceService) CheckInStats() (checkin.AttendanceStats, error) {
+func (as *GuestService) CheckInStats() (checkin.AttendanceStats, error) {
 	as.CheckInInvoked = true
 	return as.CheckInStats()
 }
