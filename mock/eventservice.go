@@ -94,5 +94,5 @@ func (es *EventService) AddHost(eventID string, username string) error {
 //CheckHost invokes the mock implementation and marks the function as invoked
 func (es *EventService) CheckHost(username string, eventID string) (bool, error) {
 	es.CheckHostInvoked = true
-	return es.CheckHost(username, eventID)
+	return es.CheckHostFn(username, eventID)
 }
