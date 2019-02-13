@@ -76,6 +76,12 @@ type GuestStats struct {
 	PercentCheckedIn int `json:"percentCheckedIn"`
 }
 
+//Guest is all the information related to a particular guest
+type Guest struct {
+	Name string `json:"name,omitempty"`
+	NRIC string `json:"nric,omitempty"`
+}
+
 //GuestService is for checking in guests at a specific event
 type GuestService interface {
 	CheckIn(eventID string, nric string) (string, error)
