@@ -41,6 +41,16 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, auth Auth
 		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}/guests", Adapt(http.HandlerFunc(h.handleRegisterGuest),
 		tokenCheck, credentialsCheck, existCheck)).Methods("POST")
+	h.Handle("/api/v0/events/{eventID}/guests", Adapt(http.HandlerFunc(h.handleRemoveGuest),
+		tokenCheck, credentialsCheck, existCheck)).Methods("DELETE")
+	h.Handle("/api/v0/events/{eventID}/guests/checkedin", Adapt(http.HandlerFunc(h.handleGuestsCheckedIn),
+		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
+	h.Handle("/api/v0/events/{eventID}/guests/checkedin", Adapt(http.HandlerFunc(h.handleCheckInGuest),
+		existCheck)).Methods("POST")
+	h.Handle("/api/v0/events/{eventID}/guests/notcheckedin", Adapt(http.HandlerFunc(h.handleGuestsNotCheckedIn),
+		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
+	h.Handle("/api/v0/events/{eventID}/guests/stats", Adapt(http.HandlerFunc(h.handleStats),
+		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
 
 	//GET /api/events/{eventID}/guests should return all Guests, requires a host token or admin token
 	//POST /api/events/{eventID}/guests with a JSON argument {name:"Hello",nric:"5678F"} should register
@@ -53,7 +63,8 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, auth Auth
 	//guest that is already registered, no permissions (except CORS)
 	//GET /api/events/{eventID}/guests/notcheckedin should return Guests who haven't checked in,
 	//requires host or admin
-	//GET /api/events/{eventID}/guests/stats should return the summary statistics
+	//GET /api/events/{eventID}/guests/stats should return the summary statistics, requires host or
+	//admin
 
 	return h
 }
@@ -70,10 +81,7 @@ func (h *GuestHandler) handleGuests(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *GuestHandler) handleRegisterGuest(w http.ResponseWriter, r *http.Request) {
-	guest := struct {
-		Name string `json:"name"`
-		NRIC string `json:"nric"`
-	}{}
+	var guest checkin.Guest
 	err := json.NewDecoder(r.Body).Decode(&guest)
 	if err != nil {
 		h.Logger.Println("Error when decoding guest details: " + err.Error())
@@ -100,4 +108,88 @@ func (h *GuestHandler) handleRegisterGuest(w http.ResponseWriter, r *http.Reques
 	} else {
 		WriteMessage(http.StatusCreated, "Registration successful", w)
 	}
+}
+
+func (h *GuestHandler) handleRemoveGuest(w http.ResponseWriter, r *http.Request) {
+	eventID := mux.Vars(r)["eventID"]
+	var guest checkin.Guest
+	err := json.NewDecoder(r.Body).Decode(&guest)
+	if err != nil {
+		h.Logger.Println("Error when decoding guest NRIC: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "Incorrect fields for removing guest (need NRIC as string)", w)
+		return
+	}
+
+	err = h.GuestService.RemoveGuest(eventID, guest.NRIC)
+	if err != nil {
+		h.Logger.Println("Error deleting guest: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error deleting guest", w)
+	} else {
+		WriteOKMessage("Successfully deleted guest", w)
+	}
+}
+
+func (h *GuestHandler) handleGuestsCheckedIn(w http.ResponseWriter, r *http.Request) {
+	eventID := mux.Vars(r)["eventID"]
+	guests, err := h.GuestService.GuestsCheckedIn(eventID)
+	if err != nil {
+		h.Logger.Println("Error in handleGuestsCheckedIn: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error fetching checked-in guests for event", w)
+		return
+	}
+	reply, _ := json.Marshal(guests)
+	w.Write(reply)
+}
+
+func (h *GuestHandler) handleCheckInGuest(w http.ResponseWriter, r *http.Request) {
+	var guest checkin.Guest
+	err := json.NewDecoder(r.Body).Decode(&guest)
+	if err != nil {
+		h.Logger.Println("Error when decoding guest details: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "Incorrect fields for checking in guest", w)
+		return
+	}
+
+	eventID := mux.Vars(r)["eventID"]
+	//check if the guest exists before attempting to check it in
+	if guestExists, err := h.GuestService.GuestExists(eventID, guest.NRIC); err == nil && !guestExists {
+		WriteMessage(http.StatusNotFound, "No such guest to check in", w)
+		return
+	} else if err != nil {
+		h.Logger.Println("Error checking if guest exists: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error checking if guest exists", w)
+		return
+	}
+
+	name, err := h.GuestService.CheckIn(eventID, guest.NRIC)
+	if err != nil {
+		h.Logger.Println("Error check guest in: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Guest check-in failed", w)
+	}
+
+	reply, _ := json.Marshal(name)
+	w.Write(reply)
+}
+
+func (h *GuestHandler) handleGuestsNotCheckedIn(w http.ResponseWriter, r *http.Request) {
+	eventID := mux.Vars(r)["eventID"]
+	guests, err := h.GuestService.GuestsNotCheckedIn(eventID)
+	if err != nil {
+		h.Logger.Println("Error in handleNotGuestsCheckedIn: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error fetching not checked-in guests for event", w)
+		return
+	}
+	reply, _ := json.Marshal(guests)
+	w.Write(reply)
+}
+
+func (h *GuestHandler) handleStats(w http.ResponseWriter, r *http.Request) {
+	stats, err := h.GuestService.CheckInStats(mux.Vars(r)["eventID"])
+	if err != nil {
+		h.Logger.Println("Error in handleStats: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error fetching statistics for event", w)
+		return
+	}
+	reply, _ := json.Marshal(stats)
+	w.Write(reply)
 }
