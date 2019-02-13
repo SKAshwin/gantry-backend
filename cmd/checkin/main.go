@@ -36,7 +36,8 @@ func main() {
 
 	authHandler := http.NewAuthHandler(as, jwtAuthenticator, us)
 	userHandler := http.NewUserHandler(us, jwtAuthenticator)
-	eventHandler := http.NewEventHandler(es, jwtAuthenticator)
+	var guestHandler http.GuestHandler
+	eventHandler := http.NewEventHandler(es, jwtAuthenticator, guestHandler)
 
 	handler := http.Handler{
 		AuthHandler:  authHandler,
@@ -52,7 +53,7 @@ func main() {
 	signal.Notify(c, os.Interrupt)
 	s := <-c
 	fmt.Println("Got signal:", s)
-	
+
 }
 
 func loadEnvironmentalVariables() {

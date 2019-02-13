@@ -15,9 +15,12 @@ import (
 //EventHandler An extension of mux.Router which handles all event-related requests
 //Uses the given EventService, the given Logger, and a given Authenticator to check if
 //requests are valid
+//Also contains a GuestHandler to handle all the subset of event-related requests
+//that deal with guests
 //Call NewEventHandler to initialize an EventHandler with the correct routes
 type EventHandler struct {
 	*mux.Router
+	GuestHandler  GuestHandler
 	EventService  checkin.EventService
 	Logger        *log.Logger
 	Authenticator Authenticator
@@ -25,16 +28,17 @@ type EventHandler struct {
 
 //NewEventHandler Creates a new event handler using gorilla/mux for routing
 //and the default Logger.
-//EventService and Authenticator needs to be set by the calling function
+//GuestHandler, EventService, Authenticator needs to be set by the calling function
 //API endpoint changes happen here, as well as changes to the routing library and logger to be used
 //and type of authenticator
-func NewEventHandler(es checkin.EventService, auth Authenticator) *EventHandler {
+func NewEventHandler(es checkin.EventService, auth Authenticator, gh GuestHandler) *EventHandler {
 	h := &EventHandler{
 		Router:        mux.NewRouter(),
 		Logger:        log.New(os.Stderr, "", log.LstdFlags),
 		Authenticator: auth,
-		EventService:  es}
-
+		EventService:  es,
+		GuestHandler:  gh,
+	}
 	//Adapters to check if handler should serve the request
 	tokenCheck := checkAuth(auth)
 	credentialsCheck := isAdminOrHost(auth, es, "eventID")
@@ -52,6 +56,8 @@ func NewEventHandler(es checkin.EventService, auth Authenticator) *EventHandler 
 		tokenCheck, credentialsCheck, existCheck)).Methods("PUT")
 	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleDeleteEvent),
 		tokenCheck, credentialsCheck, existCheck)).Methods("DELETE")
+	//route all guest-related requests to the guest handler
+	h.PathPrefix("/api/v0/events/{eventID}/guests/").Handler(gh)
 
 	return h
 }
