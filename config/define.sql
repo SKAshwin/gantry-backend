@@ -30,6 +30,14 @@ create table event(
 	updatedAt TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
+create table guest(
+	nricHash text PRIMARY KEY NOT NULL,
+	eventID UUID NOT NULL REFERENCES event(ID) ON UPDATE CASCADE ON DELETE CASCADE,
+	name text NOT NULL,
+	checkedIn BOOLEAN,
+	checkInTime TIMESTAMP
+);
+
 create table hosts(
 	username text NOT NULL REFERENCES app_user(username) ON UPDATE CASCADE ON DELETE CASCADE,
 	eventID UUID NOT NULL REFERENCES event(ID) ON UPDATE CASCADE ON DELETE CASCADE,
@@ -42,3 +50,4 @@ grant SELECT, INSERT, UPDATE, DELETE on app_user to server_access;
 grant SELECT, INSERT, UPDATE on app_admin to server_access;
 grant SELECT, INSERT, UPDATE, DELETE on event to server_access;
 grant SELECT, INSERT, UPDATE, DELETE on hosts to server_access;
+grant SELECT, INSERT, UPDATE, DELETE on guest to server_access;
