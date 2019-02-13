@@ -27,7 +27,7 @@ type GuestService struct {
 	RemoveGuestFn      func(eventID string, nric string) error
 	RemoveGuestInvoked bool
 
-	CheckInStatsFn      func() (checkin.GuestStats, error)
+	CheckInStatsFn      func(eventID string) (checkin.GuestStats, error)
 	CheckInStatsInvoked bool
 }
 
@@ -76,5 +76,5 @@ func (as *GuestService) RemoveGuest(eventID string, nric string) error {
 //CheckInStats invokes the mock implementation and marks the function as invoked
 func (as *GuestService) CheckInStats(eventID string) (checkin.GuestStats, error) {
 	as.CheckInInvoked = true
-	return as.CheckInStats(eventID)
+	return as.CheckInStatsFn(eventID)
 }
