@@ -71,9 +71,9 @@ type AuthenticationService interface {
 
 //GuestStats are statistics relating to attendance of the event
 type GuestStats struct {
-	TotalGuests      int `json:"total"`
-	CheckedIn        int `json:"checkedIn"`
-	PercentCheckedIn int `json:"percentCheckedIn"`
+	TotalGuests      int     `json:"total"`
+	CheckedIn        int     `json:"checkedIn"`
+	PercentCheckedIn float64 `json:"percentCheckedIn"`
 }
 
 //Guest is all the information related to a particular guest
