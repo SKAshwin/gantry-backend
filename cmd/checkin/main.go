@@ -6,6 +6,7 @@ import (
 	"checkin/http/cors"
 	"checkin/http/jwt"
 	"checkin/postgres"
+	"checkin/sha512"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -35,11 +36,12 @@ func main() {
 
 	jwtAuthenticator := jwt.Authenticator{SigningKey: []byte(config["AUTH_SECRET"])}
 	bcryptHashMethod := bcrypt.HashMethod{HashCost: hashCost}
+	sha512HashMethod := sha512.HashMethod{}
 
 	us := &postgres.UserService{DB: db, HM: bcryptHashMethod}
 	as := &postgres.AuthenticationService{DB: db, HM: bcryptHashMethod}
 	es := &postgres.EventService{DB: db}
-	gs := &postgres.GuestService{DB: db, HM: bcryptHashMethod}
+	gs := &postgres.GuestService{DB: db, HM: sha512HashMethod}
 
 	authHandler := http.NewAuthHandler(as, jwtAuthenticator, us)
 	userHandler := http.NewUserHandler(us, jwtAuthenticator)
