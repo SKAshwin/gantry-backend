@@ -31,11 +31,12 @@ create table event(
 );
 
 create table guest(
-	nricHash text PRIMARY KEY NOT NULL,
+	nricHash text NOT NULL,
 	eventID UUID NOT NULL REFERENCES event(ID) ON UPDATE CASCADE ON DELETE CASCADE,
 	name text NOT NULL,
-	checkedIn BOOLEAN,
-	checkInTime TIMESTAMP
+	checkedIn BOOLEAN NOT NULL DEFAULT FALSE,
+	checkInTime TIMESTAMP,
+	PRIMARY KEY(nricHash, eventID)
 );
 
 create table hosts(
