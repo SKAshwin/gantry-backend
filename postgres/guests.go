@@ -43,7 +43,7 @@ func (gs *GuestService) CheckIn(eventID string, nric string) (string, error) {
 	}
 
 	var name string
-	err = tx.QueryRow("SELECT name FROM guest WHERE ventID = $1 and nricHash = $2",
+	err = tx.QueryRow("SELECT name FROM guest WHERE eventID = $1 and nricHash = $2",
 		eventID, nricHash).Scan(&name)
 	if err != nil {
 		tx.Rollback()
@@ -162,10 +162,16 @@ func (gs *GuestService) CheckInStats(eventID string) (checkin.GuestStats, error)
 	if err != nil {
 		return checkin.GuestStats{}, errors.New("Error fetching checked in count:" + err.Error())
 	}
+	var percent float64
+	if total == 0 {
+		percent = 0
+	} else {
+		percent = float64(checkedIn) / float64(total)
+	}
 	return checkin.GuestStats{
 		TotalGuests:      total,
 		CheckedIn:        checkedIn,
-		PercentCheckedIn: float64(checkedIn) / float64(total),
+		PercentCheckedIn: percent,
 	}, nil
 }
 
