@@ -20,7 +20,7 @@ import (
 //Call NewEventHandler to initialize an EventHandler with the correct routes
 type EventHandler struct {
 	*mux.Router
-	GuestHandler  GuestHandler
+	GuestHandler  *GuestHandler
 	EventService  checkin.EventService
 	Logger        *log.Logger
 	Authenticator Authenticator
@@ -31,7 +31,7 @@ type EventHandler struct {
 //GuestHandler, EventService, Authenticator needs to be set by the calling function
 //API endpoint changes happen here, as well as changes to the routing library and logger to be used
 //and type of authenticator
-func NewEventHandler(es checkin.EventService, auth Authenticator, gh GuestHandler) *EventHandler {
+func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandler) *EventHandler {
 	h := &EventHandler{
 		Router:        mux.NewRouter(),
 		Logger:        log.New(os.Stderr, "", log.LstdFlags),
