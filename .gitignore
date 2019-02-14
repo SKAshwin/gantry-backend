@@ -16,3 +16,6 @@
 
 #test coverage
 fmt
+
+#to ignore binary on linux
+checkin
