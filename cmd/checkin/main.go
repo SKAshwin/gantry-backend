@@ -12,13 +12,14 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
 
 func main() {
 	loadEnvironmentalVariables()
-	config := dbConfig()
+	config := getConfig()
 	db, err := postgres.Open(config["DBHOST"], config["DBPORT"], config["DBUSER"],
 		config["DBPASS"], config["DBNAME"])
 	if err != nil {
@@ -27,16 +28,22 @@ func main() {
 	defer db.Close()
 	log.Println("Successfully Connected!")
 
-	jwtAuthenticator := jwt.Authenticator{SigningKey: []byte("MyPassword")}
-	bcryptHashMethod := bcrypt.HashMethod{HashCost: 5}
+	hashCost, err := strconv.Atoi(config["HASH_COST"])
+	if err != nil {
+		log.Fatal("Error parsing HASH_COST env variable" + err.Error())
+	}
+
+	jwtAuthenticator := jwt.Authenticator{SigningKey: []byte(config["AUTH_SECRET"])}
+	bcryptHashMethod := bcrypt.HashMethod{HashCost: hashCost}
 
 	us := &postgres.UserService{DB: db, HM: bcryptHashMethod}
 	as := &postgres.AuthenticationService{DB: db, HM: bcryptHashMethod}
 	es := &postgres.EventService{DB: db}
+	gs := &postgres.GuestService{DB: db, HM: bcryptHashMethod}
 
 	authHandler := http.NewAuthHandler(as, jwtAuthenticator, us)
 	userHandler := http.NewUserHandler(us, jwtAuthenticator)
-	var guestHandler http.GuestHandler
+	guestHandler := http.NewGuestHandler(gs, es, jwtAuthenticator)
 	eventHandler := http.NewEventHandler(es, jwtAuthenticator, guestHandler)
 
 	handler := http.Handler{
@@ -64,8 +71,8 @@ func loadEnvironmentalVariables() {
 	}
 }
 
-func dbConfig() map[string]string {
-	//reads from environmental variables to work out details of the database
+func getConfig() map[string]string {
+	//reads from environmental variables
 	conf := make(map[string]string)
 	host, ok := os.LookupEnv("DBHOST")
 	if !ok {
@@ -87,11 +94,21 @@ func dbConfig() map[string]string {
 	if !ok {
 		log.Fatal("DBNAME environment variable required but not set")
 	}
+	authSecret, ok := os.LookupEnv("AUTH_SECRET")
+	if !ok {
+		log.Fatal("AUTH_SECRET environment variable required but not set")
+	}
+	hashCost, ok := os.LookupEnv("AUTH_HASH_COST")
+	if !ok {
+		log.Fatal("AUTH_HASH_COST environment variable required but not set")
+	}
 	conf["DBHOST"] = host
 	conf["DBPORT"] = port
 	conf["DBUSER"] = user
 	conf["DBPASS"] = password
 	conf["DBNAME"] = name
+	conf["AUTH_SECRET"] = authSecret
+	conf["HASH_COST"] = hashCost
 	return conf
 }
 
