@@ -11,5 +11,6 @@ require (
 	github.com/lib/pq v1.0.0
 	github.com/rs/cors v1.6.0
 	golang.org/x/crypto v0.0.0-20190130090550-b01c7a725664
+	golang.org/x/sys v0.0.0-20190214214411-e77772198cdc // indirect
 	golang.org/x/tools v0.0.0-20190211224914-44bee7e801e4 // indirect
 )

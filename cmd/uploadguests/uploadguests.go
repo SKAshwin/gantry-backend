@@ -8,39 +8,101 @@ import (
 	"checkin"
 	"encoding/csv"
 	"encoding/json"
+	"flag"
+	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
+	"strings"
+	"syscall"
+
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 func main() {
-	if len(os.Args) < 5 {
-		log.Println("uploadguests [serverAddress] [eventID] [filePathToCSV] [authToken]")
-		log.Println("Example:")
-		log.Println("uploadguests http://checkin.com 85fdbd2a-e879-4c1d-b4ae-f70dacbc7816 Documents/guests.csv")
-		log.Println("Do not include a / after the server address")
-		log.Println("guests.csv should be formatted as:")
-		log.Println("[last5DigitsOfNRIC],[Name]")
-		log.Println("Name displayed to guest upon check in")
-		log.Println("Do not include a title row in the CSV")
-	}
-	serverAddress := os.Args[1]
-	eventID := os.Args[2]
-	filePath := os.Args[3]
-	token := os.Args[4]
+	serverAddress := flag.String("addr", "http://localhost:3000", "The address of the server")
+	eventID := flag.String("event", "", "The eventID of the event")
+	filePath := flag.String("src", "guests.csv",
+		"The CSV file with guest names, in a (nric,name) format")
+	token := flag.String("auth", "",
+		"An authentication token with the rights to register new guests for the given event")
+	username := flag.String("u", "", "Username for log in (needed if no authentication token)")
+	loggerOutput := flag.String("out", "",
+		"Where the output of the program will be dumped. Optional, if not specified output"+
+			"dumped to standard output/the console")
 
-	f, err := os.Open(filePath)
+	flag.Parse()
+
+	if *eventID == "" {
+		log.Fatal("Need to provide event ID (-event). See -h for help")
+	}
+	if *token == "" && *username == "" {
+		log.Fatal("Need authentication token or username. See -h for help")
+	}
+	if *loggerOutput != "" {
+		out, err := os.Create(*loggerOutput)
+		if err != nil {
+			log.Fatal("Error opening file to write logs: " + err.Error())
+		}
+		log.SetOutput(out)
+	}
+	if *username != "" {
+		fmt.Println("Attempting log in...")
+		fmt.Print("Enter Password: ")
+		bytePwd, err := terminal.ReadPassword(int(syscall.Stdin))
+		if err != nil {
+			fmt.Println("Error reading password: " + err.Error())
+			return
+		}
+		pwd := strings.TrimSpace(string(bytePwd))
+		reqBody := "{\"username\":\"" + *username + "\",\"password\":\"" + pwd + "\"}"
+		//try the user log in, then the admin log in
+		authURL := *serverAddress + "/api/v0/auth/users/login"
+		resp, err := http.Post(authURL, "", strings.NewReader(reqBody))
+		if err != nil {
+			fmt.Println("Error fetching authentication: " + err.Error())
+			return
+		}
+		//if failed, try admin
+		if resp.StatusCode != http.StatusOK {
+			fmt.Println("Failed when trying to log in as user. Will log in as admin...")
+			authURL = *serverAddress + "/api/v0/auth/admins/login"
+			resp, err = http.Post(authURL, "", strings.NewReader(reqBody))
+			if err != nil {
+				fmt.Println("Error fetching authentication: " + err.Error())
+				return
+			}
+			if resp.StatusCode != http.StatusOK {
+				fmt.Println("Log-in failed")
+				return
+			}
+			reply := struct {
+				AccessToken string `json:"accessToken"`
+			}{}
+			err := json.NewDecoder(resp.Body).Decode(&reply)
+			if err != nil {
+				fmt.Println("Could not fetch auth token: " + err.Error())
+				return
+			}
+			token = &reply.AccessToken
+			fmt.Println("Authentication successful")
+		}
+	}
+	url := *serverAddress + "/api/v0/events/" + *eventID + "/guests"
+	log.Println("Reading from " + *filePath + " and sending data to " + url)
+
+	f, err := os.Open(*filePath)
 	if err != nil {
 		log.Fatal("Error opening CSV: " + err.Error())
 		return
 	}
 	defer f.Close() // this needs to be after the err check
-
 	lines, err := csv.NewReader(f).ReadAll()
 	if err != nil {
 		log.Fatal("Error reading CSV: " + err.Error())
 	}
+
 	for i := 0; i < len(lines); i++ {
 		guest := checkin.Guest{
 			Name: lines[i][1],
@@ -51,14 +113,13 @@ func main() {
 			log.Fatal("Error marshalling CSV into JSON for " + guest.NRIC + ", " + guest.Name + " : " +
 				err.Error())
 		}
-		url := serverAddress + "/api/v0/events/" + eventID + "/guests"
-		log.Println("POST (" + guest.NRIC + ", " + guest.Name + ") to " + url)
+		log.Println("POST (" + guest.NRIC + ", " + guest.Name + ")")
 
 		req, err := http.NewRequest("POST", url, bytes.NewReader(guestJSON))
 		if err != nil {
 			log.Fatal("Error creating request to " + url + " :" + err.Error())
 		}
-		req.Header.Add("Authorization", "Bearer "+token)
+		req.Header.Add("Authorization", "Bearer "+*token)
 
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
@@ -77,6 +138,11 @@ func main() {
 			}
 			log.Println(string(body))
 			log.Fatal("Error reading response: " + err.Error())
+		}
+
+		if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized {
+			//stop for loop, all further requests will fail
+			log.Fatal("Response to registering (" + guest.NRIC + ", " + guest.Name + "):" + reply.Message)
 		}
 
 		log.Println("Response to registering (" + guest.NRIC + ", " + guest.Name + "):" + reply.Message)
