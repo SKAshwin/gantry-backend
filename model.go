@@ -100,3 +100,8 @@ type AuthorizationInfo struct {
 	Username string
 	IsAdmin  bool
 }
+
+//QRGenerator generates a PNG qr code given a message and size.
+type QRGenerator interface {
+	Encode(msg string, size int) ([]byte, error)
+}

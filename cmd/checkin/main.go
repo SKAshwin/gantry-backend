@@ -6,6 +6,7 @@ import (
 	"checkin/http/cors"
 	"checkin/http/jwt"
 	"checkin/postgres"
+	"checkin/qrcode"
 	"checkin/sha512"
 	"encoding/json"
 	"fmt"
@@ -37,6 +38,7 @@ func main() {
 	jwtAuthenticator := jwt.Authenticator{SigningKey: []byte(config["AUTH_SECRET"])}
 	bcryptHashMethod := bcrypt.HashMethod{HashCost: hashCost}
 	sha512HashMethod := sha512.HashMethod{}
+	qrGenerator := qrcode.Generator{Level: qrcode.High}
 
 	us := &postgres.UserService{DB: db, HM: bcryptHashMethod}
 	as := &postgres.AuthenticationService{DB: db, HM: bcryptHashMethod}
@@ -45,7 +47,7 @@ func main() {
 
 	authHandler := http.NewAuthHandler(as, jwtAuthenticator, us)
 	userHandler := http.NewUserHandler(us, jwtAuthenticator)
-	guestHandler := http.NewGuestHandler(gs, es, jwtAuthenticator)
+	guestHandler := http.NewGuestHandler(gs, es, jwtAuthenticator, qrGenerator)
 	eventHandler := http.NewEventHandler(es, jwtAuthenticator, guestHandler)
 
 	handler := http.Handler{
