@@ -47,15 +47,17 @@ func main() {
 
 	authHandler := http.NewAuthHandler(as, jwtAuthenticator, us)
 	userHandler := http.NewUserHandler(us, jwtAuthenticator)
-	guestHandler := http.NewGuestHandler(gs, es, jwtAuthenticator, qrGenerator)
+	guestHandler := http.NewGuestHandler(gs, es, jwtAuthenticator)
 	eventHandler := http.NewEventHandler(es, jwtAuthenticator, guestHandler)
+	utilityHandler := http.NewUtilityHandler(qrGenerator)
 
 	handler := http.Handler{
-		AuthHandler:  authHandler,
-		EventHandler: eventHandler,
-		UserHandler:  userHandler,
+		AuthHandler:    authHandler,
+		EventHandler:   eventHandler,
+		UserHandler:    userHandler,
+		UtilityHandler: utilityHandler,
 	}
-	server := http.Server{Handler: &handler, Addr: ":3000", PreFlightHandler: configurePFH()}
+	server := http.Server{Handler: &handler, Addr: ":5000", PreFlightHandler: configurePFH()}
 	server.Open() //note that server.Open starts a new goroutine, so process will end
 	//unless blocked
 

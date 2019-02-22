@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strconv"
 
 	"github.com/gorilla/mux"
 )
@@ -20,19 +19,17 @@ type GuestHandler struct {
 	EventService  checkin.EventService
 	Logger        *log.Logger
 	Authenticator Authenticator
-	QRGenerator   checkin.QRGenerator
 }
 
 //NewGuestHandler creates a new GuestHandler, using the default logger, with the
 //pre-defined routing
-func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, auth Authenticator, qrg checkin.QRGenerator) *GuestHandler {
+func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, auth Authenticator) *GuestHandler {
 	h := &GuestHandler{
 		Router:        mux.NewRouter(),
 		Logger:        log.New(os.Stderr, "", log.LstdFlags),
 		GuestService:  gs,
 		EventService:  es,
 		Authenticator: auth,
-		QRGenerator:   qrg,
 	}
 
 	//Adapters to check if handler should serve the request
@@ -54,8 +51,6 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, auth Auth
 		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}/guests/stats", Adapt(http.HandlerFunc(h.handleStats),
 		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
-	h.Handle("/api/v0/events/{eventID}/guests/qrcode", Adapt(http.HandlerFunc(h.handleQRGeneration),
-		existCheck)).Methods("POST")
 
 	//GET /api/events/{eventID}/guests should return all Guests, requires a host token or admin token
 	//POST /api/events/{eventID}/guests with a JSON argument {name:"Hello",nric:"5678F"} should register
@@ -197,25 +192,4 @@ func (h *GuestHandler) handleStats(w http.ResponseWriter, r *http.Request) {
 	}
 	reply, _ := json.Marshal(stats)
 	w.Write(reply)
-}
-
-func (h *GuestHandler) handleQRGeneration(w http.ResponseWriter, r *http.Request) {
-	var guest checkin.Guest
-	err := json.NewDecoder(r.Body).Decode(&guest)
-	if err != nil {
-		h.Logger.Println("Error when decoding guest NRIC for QRGeneration: " + err.Error())
-		WriteMessage(http.StatusBadRequest, "Incorrect fields for generating QRCode (need NRIC as string)", w)
-		return
-	}
-
-	img, err := h.QRGenerator.Encode(guest.NRIC, 20)
-	if err != nil {
-		h.Logger.Println("Error when generating QR Code: " + err.Error())
-		WriteMessage(http.StatusInternalServerError, "Error generating QR Code", w)
-		return
-	}
-
-	w.Header().Set("Content-Type", http.DetectContentType(img))
-	w.Header().Set("Content-Length", strconv.Itoa(len(img)))
-	w.Write(img)
 }
