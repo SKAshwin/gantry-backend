@@ -56,7 +56,7 @@ func main() {
 		UserHandler:    userHandler,
 		UtilityHandler: utilityHandler,
 	}
-	server := http.Server{Handler: &handler, Addr: ":3000", PreFlightHandler: configurePFH()}
+	server := http.Server{Handler: &handler, Addr: ":" + config["PORT"], PreFlightHandler: configurePFH()}
 	server.Open() //note that server.Open starts a new goroutine, so process will end
 	//unless blocked
 
@@ -91,9 +91,14 @@ func getConfig() map[string]string {
 	if !ok {
 		log.Fatal("AUTH_HASH_COST environment variable required but not set")
 	}
+	port, ok := os.LookupEnv("PORT")
+	if !ok {
+		log.Fatal("PORT environment variable required but not set")
+	}
 	conf["DATABASE_URL"] = dbURL
 	conf["AUTH_SECRET"] = authSecret
 	conf["HASH_COST"] = hashCost
+	conf["PORT"] = port
 	return conf
 }
 
