@@ -101,7 +101,11 @@ type AuthorizationInfo struct {
 	IsAdmin  bool
 }
 
-//QRGenerator generates a PNG qr code given a message and size.
+//QRGenerator generates a QR code given a message and size.
 type QRGenerator interface {
+	//Encode encodes a message in a QR code with minimum padding
+	//and a given size
+	//The QR Code can be a byte array of any image type
+	//up to caller to check
 	Encode(msg string, size int) ([]byte, error)
 }

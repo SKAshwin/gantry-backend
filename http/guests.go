@@ -208,14 +208,14 @@ func (h *GuestHandler) handleQRGeneration(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	img, err := h.QRGenerator.Encode(guest.NRIC, 256)
+	img, err := h.QRGenerator.Encode(guest.NRIC, 20)
 	if err != nil {
 		h.Logger.Println("Error when generating QR Code: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error generating QR Code", w)
 		return
 	}
 
-	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Content-Type", http.DetectContentType(img))
 	w.Header().Set("Content-Length", strconv.Itoa(len(img)))
 	w.Write(img)
 }

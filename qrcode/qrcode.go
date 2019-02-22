@@ -32,5 +32,5 @@ const (
 
 //Encode generates a PNG qr code given a message and size.
 func (qrg Generator) Encode(msg string, size int) ([]byte, error) {
-	return qrcode.Encode(msg, qrcode.RecoveryLevel(qrg.Level), 256)
+	return qrcode.Encode(msg, qrcode.RecoveryLevel(qrg.Level), -size)
 }
