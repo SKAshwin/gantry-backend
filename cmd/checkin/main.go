@@ -103,7 +103,7 @@ func getConfig() map[string]string {
 }
 
 func configurePFH() cors.PreFlightHandler {
-	corsFile, err := os.Open("../../config/cors.json")
+	corsFile, err := os.Open("config/cors.json")
 	if err != nil {
 		log.Fatal("Error opening cors.json: " + err.Error())
 	}
