@@ -6,6 +6,7 @@ import (
 	"checkin/http/cors"
 	"checkin/http/jwt"
 	"checkin/postgres"
+	"checkin/qrcode"
 	"checkin/sha512"
 	"encoding/json"
 	"fmt"
@@ -37,6 +38,7 @@ func main() {
 	jwtAuthenticator := jwt.Authenticator{SigningKey: []byte(config["AUTH_SECRET"])}
 	bcryptHashMethod := bcrypt.HashMethod{HashCost: hashCost}
 	sha512HashMethod := sha512.HashMethod{}
+	qrGenerator := qrcode.Generator{Level: qrcode.High}
 
 	us := &postgres.UserService{DB: db, HM: bcryptHashMethod}
 	as := &postgres.AuthenticationService{DB: db, HM: bcryptHashMethod}
@@ -47,13 +49,15 @@ func main() {
 	userHandler := http.NewUserHandler(us, jwtAuthenticator)
 	guestHandler := http.NewGuestHandler(gs, es, jwtAuthenticator)
 	eventHandler := http.NewEventHandler(es, jwtAuthenticator, guestHandler)
+	utilityHandler := http.NewUtilityHandler(qrGenerator)
 
 	handler := http.Handler{
-		AuthHandler:  authHandler,
-		EventHandler: eventHandler,
-		UserHandler:  userHandler,
+		AuthHandler:    authHandler,
+		EventHandler:   eventHandler,
+		UserHandler:    userHandler,
+		UtilityHandler: utilityHandler,
 	}
-	server := http.Server{Handler: &handler, Addr: ":3000", PreFlightHandler: configurePFH()}
+	server := http.Server{Handler: &handler, Addr: ":5000", PreFlightHandler: configurePFH()}
 	server.Open() //note that server.Open starts a new goroutine, so process will end
 	//unless blocked
 

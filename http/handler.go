@@ -9,9 +9,10 @@ import (
 //sub-handlers
 //Implements the http.Handler interface
 type Handler struct {
-	EventHandler *EventHandler
-	UserHandler  *UserHandler
-	AuthHandler  *AuthHandler
+	EventHandler   *EventHandler
+	UserHandler    *UserHandler
+	AuthHandler    *AuthHandler
+	UtilityHandler *UtilityHandler
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -21,6 +22,8 @@ func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		h.UserHandler.ServeHTTP(w, r)
 	} else if strings.HasPrefix(r.URL.Path, "/api/v0/auth") {
 		h.AuthHandler.ServeHTTP(w, r)
+	} else if strings.HasPrefix(r.URL.Path, "/api/v0/utility") {
+		h.UtilityHandler.ServeHTTP(w, r)
 	} else {
 		http.NotFound(w, r)
 	}
