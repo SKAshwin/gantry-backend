@@ -20,10 +20,9 @@ import (
 )
 
 func main() {
-	loadEnvironmentalVariables()
+	loadEnvironmentalVariables() //comment this out for heroku production
 	config := getConfig()
-	db, err := postgres.Open(config["DBHOST"], config["DBPORT"], config["DBUSER"],
-		config["DBPASS"], config["DBNAME"])
+	db, err := postgres.Open(config["DATABASE_URL"])
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -57,7 +56,7 @@ func main() {
 		UserHandler:    userHandler,
 		UtilityHandler: utilityHandler,
 	}
-	server := http.Server{Handler: &handler, Addr: ":5000", PreFlightHandler: configurePFH()}
+	server := http.Server{Handler: &handler, Addr: ":3000", PreFlightHandler: configurePFH()}
 	server.Open() //note that server.Open starts a new goroutine, so process will end
 	//unless blocked
 
@@ -80,25 +79,9 @@ func loadEnvironmentalVariables() {
 func getConfig() map[string]string {
 	//reads from environmental variables
 	conf := make(map[string]string)
-	host, ok := os.LookupEnv("DBHOST")
+	dbURL, ok := os.LookupEnv("DATABASE_URL")
 	if !ok {
-		log.Fatal("DBHOST environment variable required but not set")
-	}
-	port, ok := os.LookupEnv("DBPORT")
-	if !ok {
-		log.Fatal("DBPORT environment variable required but not set")
-	}
-	user, ok := os.LookupEnv("DBUSER")
-	if !ok {
-		log.Fatal("DBUSER environment variable required but not set")
-	}
-	password, ok := os.LookupEnv("DBPASS")
-	if !ok {
-		log.Fatal("DBPASS environment variable required but not set")
-	}
-	name, ok := os.LookupEnv("DBNAME")
-	if !ok {
-		log.Fatal("DBNAME environment variable required but not set")
+		log.Fatal("DATABASE_URL environment variable required but not set")
 	}
 	authSecret, ok := os.LookupEnv("AUTH_SECRET")
 	if !ok {
@@ -108,11 +91,7 @@ func getConfig() map[string]string {
 	if !ok {
 		log.Fatal("AUTH_HASH_COST environment variable required but not set")
 	}
-	conf["DBHOST"] = host
-	conf["DBPORT"] = port
-	conf["DBUSER"] = user
-	conf["DBPASS"] = password
-	conf["DBNAME"] = name
+	conf["DATABASE_URL"] = dbURL
 	conf["AUTH_SECRET"] = authSecret
 	conf["HASH_COST"] = hashCost
 	return conf
