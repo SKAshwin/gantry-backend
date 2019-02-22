@@ -20,7 +20,7 @@ import (
 )
 
 func main() {
-	loadEnvironmentalVariables() //comment this out for heroku production
+	//loadEnvironmentalVariables() //comment this out for heroku production
 	config := getConfig()
 	db, err := postgres.Open(config["DATABASE_URL"])
 	if err != nil {
