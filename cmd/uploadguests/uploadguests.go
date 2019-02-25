@@ -77,17 +77,17 @@ func main() {
 				fmt.Println("Log-in failed")
 				return
 			}
-			reply := struct {
-				AccessToken string `json:"accessToken"`
-			}{}
-			err := json.NewDecoder(resp.Body).Decode(&reply)
-			if err != nil {
-				fmt.Println("Could not fetch auth token: " + err.Error())
-				return
-			}
-			token = &reply.AccessToken
-			fmt.Println("Authentication successful")
 		}
+		reply := struct {
+			AccessToken string `json:"accessToken"`
+		}{}
+		err = json.NewDecoder(resp.Body).Decode(&reply)
+		if err != nil {
+			fmt.Println("Could not fetch auth token: " + err.Error())
+			return
+		}
+		token = &reply.AccessToken
+		fmt.Println("Authentication successful")
 	}
 	url := *serverAddress + "/api/v0/events/" + *eventID + "/guests"
 	log.Println("Reading from " + *filePath + " and sending data to " + url)
