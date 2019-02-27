@@ -17,6 +17,7 @@ import (
 //for authentication
 type Authenticator struct {
 	SigningKey []byte
+	ExpiryTime time.Duration
 }
 
 const (
@@ -78,7 +79,7 @@ func (jwta Authenticator) createToken(au checkin.AuthorizationInfo) (string, err
 	claims := token.Claims.(jwt.MapClaims)
 
 	claims[jwtUsername] = au.Username
-	claims[jwtExpiryTime] = time.Now().Add(time.Hour).Unix()
+	claims[jwtExpiryTime] = time.Now().Add(jwta.ExpiryTime).Unix()
 	claims[jwtAdminStatus] = au.IsAdmin
 
 	tokenSigned, err := token.SignedString(jwta.SigningKey)

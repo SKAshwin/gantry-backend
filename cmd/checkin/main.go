@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"time"
 
 	"github.com/joho/godotenv"
 )
@@ -34,7 +35,12 @@ func main() {
 		log.Fatal("Error parsing HASH_COST env variable" + err.Error())
 	}
 
-	jwtAuthenticator := jwt.Authenticator{SigningKey: []byte(config["AUTH_SECRET"])}
+	authHours, err := strconv.Atoi(config["AUTH_HOURS"])
+	if err != nil {
+		log.Fatal("Error parsing AUTH_HOURS env variable" + err.Error())
+	}
+
+	jwtAuthenticator := jwt.Authenticator{SigningKey: []byte(config["AUTH_SECRET"]), ExpiryTime: time.Duration(authHours) * time.Hour}
 	bcryptHashMethod := bcrypt.HashMethod{HashCost: hashCost}
 	sha512HashMethod := sha512.HashMethod{}
 	qrGenerator := qrcode.Generator{Level: qrcode.High}
@@ -87,9 +93,13 @@ func getConfig() map[string]string {
 	if !ok {
 		log.Fatal("AUTH_SECRET environment variable required but not set")
 	}
-	hashCost, ok := os.LookupEnv("AUTH_HASH_COST")
+	authHours, ok := os.LookupEnv("AUTH_HOURS")
 	if !ok {
-		log.Fatal("AUTH_HASH_COST environment variable required but not set")
+		log.Fatal("AUTH_HOURS environment variable required but not set")
+	}
+	hashCost, ok := os.LookupEnv("HASH_COST")
+	if !ok {
+		log.Fatal("HASH_COST environment variable required but not set")
 	}
 	port, ok := os.LookupEnv("PORT")
 	if !ok {
@@ -98,6 +108,7 @@ func getConfig() map[string]string {
 	conf["DATABASE_URL"] = dbURL
 	conf["AUTH_SECRET"] = authSecret
 	conf["HASH_COST"] = hashCost
+	conf["AUTH_HOURS"] = authHours
 	conf["PORT"] = port
 	return conf
 }
