@@ -62,6 +62,13 @@ func (h *AuthHandler) handleLogin(isAdmin bool) http.HandlerFunc {
 		}
 
 		if isAuthenticated {
+			if !isAdmin {
+				if err := h.UserService.UpdateLastLoggedIn(loginDetails["username"]); err != nil {
+					h.Logger.Println("Login faced an error in updated last logged in: " + err.Error())
+					WriteMessage(http.StatusInternalServerError, "Error updating last logged in", w)
+					return
+				}
+			}
 			err := h.Authenticator.IssueAuthorization(checkin.AuthorizationInfo{
 				Username: loginDetails["username"],
 				IsAdmin:  isAdmin,
@@ -69,15 +76,6 @@ func (h *AuthHandler) handleLogin(isAdmin bool) http.HandlerFunc {
 			if err != nil {
 				h.Logger.Println("Login faced an error in token creation: " + err.Error())
 				WriteMessage(http.StatusInternalServerError, "Token creation failed", w)
-			} else {
-				if !isAdmin {
-					if err := h.UserService.UpdateLastLoggedIn(loginDetails["username"]); err != nil {
-						h.Logger.Println("Login faced an error in updated last logged in: " + err.Error())
-						WriteMessage(http.StatusInternalServerError, "Error updating last logged in", w)
-						return
-					}
-				}
-
 			}
 		} else {
 			WriteMessage(http.StatusUnauthorized, "Incorrect Username or Password", w)
