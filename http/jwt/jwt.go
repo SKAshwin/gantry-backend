@@ -78,7 +78,7 @@ func (jwta Authenticator) createToken(au checkin.AuthorizationInfo) (string, err
 	claims := token.Claims.(jwt.MapClaims)
 
 	claims[jwtUsername] = au.Username
-	claims[jwtExpiryTime] = time.Now().Add(time.Hour).Unix()
+	claims[jwtExpiryTime] = time.Now().Add(24 * time.Hour).Unix()
 	claims[jwtAdminStatus] = au.IsAdmin
 
 	tokenSigned, err := token.SignedString(jwta.SigningKey)
