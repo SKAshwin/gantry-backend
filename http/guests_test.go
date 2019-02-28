@@ -5,7 +5,9 @@ import (
 	myhttp "checkin/http"
 	"checkin/mock"
 	"checkin/test"
+	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -533,4 +535,127 @@ func TestHandleStats(t *testing.T) {
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+}
+
+func TestHandleReport(t *testing.T) {
+	var gs mock.GuestService
+	var es mock.EventService
+	var auth mock.Authenticator
+	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+
+	es.CheckIfExistsFn = func(eventID string) (bool, error) {
+		return eventID == "100", nil
+	}
+	es.CheckHostFn = func(username string, eventID string) (bool, error) {
+		if username != "testing_username" {
+			return false, nil
+		} else if eventID != "100" {
+			return false, nil
+		}
+		return true, nil
+	}
+	gs.GuestsCheckedInFn = func(eventID string) ([]string, error) {
+		if eventID != "100" {
+			t.Fatalf("unexpected id: %s", eventID)
+		}
+		return []string{"Alice", "Jim", "Bob"}, nil
+	}
+	gs.GuestsNotCheckedInFn = func(eventID string) ([]string, error) {
+		if eventID != "100" {
+			t.Fatalf("unexpected id: %s", eventID)
+		}
+		return []string{"Herman", "Ritchie"}, nil
+	}
+	auth.AuthenticateFn = func(r *http.Request) (bool, error) {
+		return true, nil
+	}
+	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
+		return checkin.AuthorizationInfo{
+			Username: "testing_username",
+			IsAdmin:  false,
+		}, nil
+	}
+
+	r := httptest.NewRequest("GET", "/api/v0/events/100/guests/report", nil)
+
+	//Test normal behavior
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	reader := csv.NewReader(w.Result().Body)
+	data, err := reader.ReadAll()
+	test.Ok(t, err)
+	for _, row := range data {
+		if row[0] == "Alice" || row[0] == "Jim" || row[0] == "Bob" {
+			test.Equals(t, "1", row[1])
+		} else if row[0] == "Herman" || row[0] == "Ritchie" {
+			test.Equals(t, "0", row[1])
+		} else {
+			test.Equals(t, row[0], "Name")
+		}
+	}
+
+	//Access control checks
+	//Test access by another user, should be 403
+	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
+		return checkin.AuthorizationInfo{
+			Username: "unauthorized_person",
+			IsAdmin:  false,
+		}, nil
+	}
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusForbidden, w.Result().StatusCode)
+
+	//Test access by admin, should work
+	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
+		return checkin.AuthorizationInfo{
+			Username: "admin_person",
+			IsAdmin:  true,
+		}, nil
+	}
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	reader = csv.NewReader(w.Result().Body)
+	data, err = reader.ReadAll()
+	test.Ok(t, err)
+	for _, row := range data {
+		if row[0] == "Alice" || row[0] == "Jim" || row[0] == "Bob" {
+			test.Equals(t, "1", row[1])
+		} else if row[0] == "Herman" || row[0] == "Ritchie" {
+			test.Equals(t, "0", row[1])
+		} else {
+			test.Equals(t, row[0], "Name")
+		}
+	}
+
+	//Test invalid eventID, should be 404
+	r = httptest.NewRequest("GET", "/api/v0/events/1001/guests/stats", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+
+	//check internal server error handling
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests/report", nil)
+
+	gs.GuestsCheckedInFn = func(eventID string) ([]string, error) {
+		return nil, errors.New("An error")
+	}
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+
+	gs.GuestsCheckedInFn = func(eventID string) ([]string, error) {
+		if eventID != "100" {
+			t.Fatalf("unexpected id: %s", eventID)
+		}
+		return []string{"Alice", "Jim", "Bob"}, nil
+	}
+
+	gs.GuestsNotCheckedInFn = func(eventID string) ([]string, error) {
+		return nil, errors.New("An error")
+	}
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+
 }
