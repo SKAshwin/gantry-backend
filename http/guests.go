@@ -1,7 +1,9 @@
 package http
 
 import (
+	"bytes"
 	"checkin"
+	"encoding/csv"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -50,6 +52,8 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, auth Auth
 	h.Handle("/api/v0/events/{eventID}/guests/notcheckedin", Adapt(http.HandlerFunc(h.handleGuestsNotCheckedIn),
 		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}/guests/stats", Adapt(http.HandlerFunc(h.handleStats),
+		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
+	h.Handle("/api/v0/events/{eventID}/guests/report", Adapt(http.HandlerFunc(h.handleReport),
 		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
 
 	//GET /api/events/{eventID}/guests should return all Guests, requires a host token or admin token
@@ -192,4 +196,36 @@ func (h *GuestHandler) handleStats(w http.ResponseWriter, r *http.Request) {
 	}
 	reply, _ := json.Marshal(stats)
 	w.Write(reply)
+}
+
+func (h *GuestHandler) handleReport(w http.ResponseWriter, r *http.Request) {
+	eventID := mux.Vars(r)["eventID"]
+	absent, err := h.GuestService.GuestsNotCheckedIn(eventID)
+	if err != nil {
+		h.Logger.Println("Error in handleReport when getting absent guests: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error fetching absentees", w)
+		return
+	}
+	present, err := h.GuestService.GuestsCheckedIn(eventID)
+	if err != nil {
+		h.Logger.Println("Error in handleReport when getting present guests: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error fetching those present", w)
+		return
+	}
+
+	b := &bytes.Buffer{}
+	wr := csv.NewWriter(b)
+	wr.Write([]string{"Name", "Present"})
+	for _, guestName := range present {
+		wr.Write([]string{guestName, "1"})
+	}
+	for _, guestName := range absent {
+		wr.Write([]string{guestName, "0"})
+	}
+	wr.Flush()
+
+	w.Header().Set("Content-Type", "text/csv")
+	//set the file name here
+	w.Header().Set("Content-Disposition", "attachment;filename=AttendanceReport.csv")
+	w.Write(b.Bytes())
 }
