@@ -43,7 +43,7 @@ func NewUserHandler(us checkin.UserService, auth Authenticator) *UserHandler {
 	h.Handle("/api/v0/users/{username}", Adapt(http.HandlerFunc(h.handleUser),
 		tokenCheck, adminOrUserCheck, existCheck)).Methods("GET")
 	h.Handle("/api/v0/users/{username}", Adapt(http.HandlerFunc(h.handleUpdateUser),
-		tokenCheck, adminOrUserCheck, existCheck)).Methods("PUT")
+		tokenCheck, adminOrUserCheck, existCheck)).Methods("PATCH")
 	h.Handle("/api/v0/users/{username}", Adapt(http.HandlerFunc(h.handleDeleteUser),
 		tokenCheck, adminOrUserCheck, existCheck)).Methods("DELETE")
 

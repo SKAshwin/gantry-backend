@@ -53,7 +53,7 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleEvent),
 		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleUpdateEvent),
-		tokenCheck, credentialsCheck, existCheck)).Methods("PUT")
+		tokenCheck, credentialsCheck, existCheck)).Methods("PATCH")
 	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleDeleteEvent),
 		tokenCheck, credentialsCheck, existCheck)).Methods("DELETE")
 	//route all guest-related requests to the guest handler
