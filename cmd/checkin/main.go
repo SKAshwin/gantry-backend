@@ -8,13 +8,12 @@ import (
 	"checkin/postgres"
 	"checkin/qrcode"
 	"checkin/sha512"
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -62,7 +61,7 @@ func main() {
 		UserHandler:    userHandler,
 		UtilityHandler: utilityHandler,
 	}
-	server := http.Server{Handler: &handler, Addr: ":" + config["PORT"], PreFlightHandler: configurePFH()}
+	server := http.Server{Handler: &handler, Addr: ":" + config["PORT"], PreFlightHandler: configurePFH(config)}
 	server.Open() //note that server.Open starts a new goroutine, so process will end
 	//unless blocked
 
@@ -105,28 +104,43 @@ func getConfig() map[string]string {
 	if !ok {
 		log.Fatal("PORT environment variable required but not set")
 	}
+	origins, ok := os.LookupEnv("ALLOWED_ORIGINS")
+	if !ok {
+		log.Fatal("ALLOWED_ORIGINS environment variable required but not set")
+	}
+	methods, ok := os.LookupEnv("ALLOWED_METHODS")
+	if !ok {
+		log.Fatal("ALLOWED_METHODS environment variable required but not set")
+	}
+	headers, ok := os.LookupEnv("ALLOWED_HEADERS")
+	if !ok {
+		log.Fatal("ALLOWED_HEADERS environment variable required but not set")
+	}
+
 	conf["DATABASE_URL"] = dbURL
 	conf["AUTH_SECRET"] = authSecret
 	conf["HASH_COST"] = hashCost
 	conf["AUTH_HOURS"] = authHours
 	conf["PORT"] = port
+	conf["ALLOWED_ORIGINS"] = origins
+	conf["ALLOWED_METHODS"] = methods
+	conf["ALLOWED_HEADERS"] = headers
+
 	return conf
 }
 
-func configurePFH() cors.PreFlightHandler {
-	corsFile, err := os.Open("../../config/cors.json")
-	if err != nil {
-		log.Fatal("Error opening cors.json: " + err.Error())
+func configurePFH(env map[string]string) cors.PreFlightHandler {
+	return cors.PreFlightHandler{
+		AllowedOrigins: tokenizeAndTrim(env["ALLOWED_ORIGINS"]),
+		AllowedMethods: tokenizeAndTrim(env["ALLOWED_METHODS"]),
+		AllowedHeaders: tokenizeAndTrim(env["ALLOWED_HEADERS"]),
 	}
-	defer corsFile.Close()
-	byteValue, err := ioutil.ReadAll(corsFile)
-	if err != nil {
-		log.Fatal("Error reading cors.json: " + err.Error())
+}
+
+func tokenizeAndTrim(str string) []string {
+	substrs := strings.Split(str, ",")
+	for i, s := range substrs {
+		substrs[i] = strings.TrimSpace(s)
 	}
-	var pfh cors.PreFlightHandler
-	err = json.Unmarshal([]byte(byteValue), &pfh)
-	if err != nil {
-		log.Fatal("cors.json formatted wrongly, error when parsing: " + err.Error())
-	}
-	return pfh
+	return substrs
 }

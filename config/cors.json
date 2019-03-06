@@ -1,5 +1,0 @@
-{
-    "allowedOrigins": ["http://localhost:8080"],
-    "allowedMethods": ["GET", "POST", "DELETE", "PUT", "PATCH"],
-    "allowedHeaders": ["*"]
-}
