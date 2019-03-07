@@ -184,6 +184,16 @@ func (h *EventHandler) handleUpdateEvent(w http.ResponseWriter, r *http.Request)
 		} else if ok {
 			WriteMessage(http.StatusConflict, "URL already exists", w)
 			return
+		} else if val == "" {
+			WriteMessage(http.StatusBadRequest, "Cannot have blank URL", w)
+			return
+		}
+	}
+
+	if val, ok := updatedFields["name"]; ok { //if caller is attempting to update the name
+		if val == "" {
+			WriteMessage(http.StatusBadRequest, "Cannot have blank name", w)
+			return
 		}
 	}
 
