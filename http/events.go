@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -124,6 +125,10 @@ func (h *EventHandler) handleCreateEvent(w http.ResponseWriter, r *http.Request)
 	err := json.NewDecoder(r.Body).Decode(&eventData)
 	if err != nil {
 		h.Logger.Println("Error decoding event JSON: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "Badly formatted JSON in event", w)
+		return
+	}
+	if !validCreateInputs(eventData) {
 		WriteMessage(http.StatusBadRequest, "Invalid arguments to create event", w)
 		return
 	}
@@ -150,8 +155,13 @@ func (h *EventHandler) handleCreateEvent(w http.ResponseWriter, r *http.Request)
 		h.Logger.Println("Error in creating event: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error in creating event", w)
 	} else {
-		WriteOKMessage("Event created", w)
+		WriteMessage(http.StatusCreated, "Event created", w)
 	}
+}
+
+//make sure the event creation data is valid
+func validCreateInputs(event checkin.Event) bool {
+	return event.URL != "" && event.Name != "" && event.UpdatedAt == time.Time{} && event.CreatedAt == time.Time{}
 }
 
 //handleUpdateEvent updates the event given by the eventID provided in the endpoint
