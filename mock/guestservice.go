@@ -9,6 +9,9 @@ type GuestService struct {
 	CheckInFn      func(eventID string, nric string) (string, error)
 	CheckInInvoked bool
 
+	AbsentFn      func(eventID string, nric string) error
+	AbsentInvoked bool
+
 	GuestsFn      func(eventID string) ([]string, error)
 	GuestsInvoked bool
 
@@ -35,6 +38,12 @@ type GuestService struct {
 func (as *GuestService) CheckIn(eventID string, nric string) (string, error) {
 	as.CheckInInvoked = true
 	return as.CheckInFn(eventID, nric)
+}
+
+//Absent invokes the mock implementation and marks the function as invoked
+func (as *GuestService) Absent(eventID string, nric string) (string, error) {
+	as.AbsentInvoked = true
+	return as.Absent(eventID, nric)
 }
 
 //Guests invokes the mock implementation and marks the function as invoked

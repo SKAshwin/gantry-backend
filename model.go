@@ -85,6 +85,7 @@ type Guest struct {
 //GuestService is for checking in guests at a specific event
 type GuestService interface {
 	CheckIn(eventID string, nric string) (string, error)
+	Absent(eventID string, nric string) error
 	Guests(eventID string) ([]string, error)
 	GuestsCheckedIn(eventID string) ([]string, error)
 	GuestsNotCheckedIn(eventID string) ([]string, error)

@@ -63,6 +63,25 @@ func (gs *GuestService) CheckIn(eventID string, nric string) (string, error) {
 	return name, nil
 }
 
+//Absent marks a guest of a particular event as being absent, the opposite of check in
+//Will return an error if said guest does not exist, or even with that
+//ID does not exist
+//Will not throw an error if the guest is already not checked in
+func (gs *GuestService) Absent(eventID string, nric string) error {
+	guest, err := gs.getGuestWithNRIC(eventID, nric)
+	if err != nil {
+		return errors.New("Error getting guest with that NRIC: " + err.Error())
+	}
+	if guest == (checkin.Guest{}) {
+		return errors.New("Guest with that NRIC does not exist: " + nric)
+	}
+	nricHash := guest.NRIC
+
+	_, err = gs.DB.Exec("UPDATE guest SET checkedIn = False, checkInTime = NOW() WHERE eventID = $1 and nricHash = $2",
+		eventID, nricHash)
+	return err
+}
+
 //Guests returns an array of names of the guests who are registered/signed up for
 //an event given by the eventID
 func (gs *GuestService) Guests(eventID string) ([]string, error) {
