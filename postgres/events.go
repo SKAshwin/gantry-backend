@@ -17,19 +17,21 @@ type EventService struct {
 
 //maps from json:db
 var eventUpdateSchema = map[string]string{
-	"name":          "name",
-	"startDateTime": "start",
-	"endDateTime":   "end",
-	"lat":           "lat",
-	"long":          "long",
-	"radius":        "radius",
-	"url":           "url"}
+	"name":            "name",
+	"startDateTime":   "start",
+	"endDateTime":     "end",
+	"lat":             "lat",
+	"long":            "long",
+	"radius":          "radius",
+	"url":             "url",
+	"releaseDateTime": "release",
+}
 
 //Event Fetches the details of an event, given its ID
 func (es *EventService) Event(eventID string) (checkin.Event, error) {
 	var event checkin.Event
 	err := es.DB.QueryRowx(
-		"SELECT ID, name, \"start\", \"end\", lat, long, radius, url, createdAt, updatedAt from event where ID = $1",
+		"SELECT * from event where ID = $1",
 		eventID).StructScan(&event)
 	if err != nil {
 		return checkin.Event{}, errors.New("Error fetching event details: " + err.Error())
@@ -40,7 +42,7 @@ func (es *EventService) Event(eventID string) (checkin.Event, error) {
 //Events Returns every event, by every user
 func (es *EventService) Events() ([]checkin.Event, error) {
 	rows, err := es.DB.Queryx(
-		"SELECT ID, name, \"start\", \"end\", lat, long, radius, url, createdAt, updatedAt from event")
+		"SELECT * from event")
 	if err != nil {
 		return nil, errors.New("Error fetching all events: " + err.Error())
 	}
@@ -64,7 +66,7 @@ func (es *EventService) Events() ([]checkin.Event, error) {
 //Returns an array of all the events hosted by that user
 //Will return an empty array (with no error) if that user hosts no events
 func (es *EventService) EventsBy(username string) ([]checkin.Event, error) {
-	rows, err := es.DB.Queryx("SELECT ID, name, \"start\", \"end\", lat, long, radius, url, createdAt, updatedAt from event, hosts where hosts.username = $1 and hosts.eventID = event.ID",
+	rows, err := es.DB.Queryx("SELECT ID, name, \"start\", \"end\", release, lat, long, radius, url, createdAt, updatedAt from event, hosts where hosts.username = $1 and hosts.eventID = event.ID",
 		username)
 	if err != nil {
 		return nil, errors.New("Error fetching all events for user: " + err.Error())

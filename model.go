@@ -34,6 +34,7 @@ type UserService interface {
 type Event struct {
 	ID        string     `json:"eventId" db:"id"`
 	Name      string     `json:"name" db:"name"`
+	Release   null.Time  `json:"releaseDateTime" db:"release"`
 	Start     null.Time  `json:"startDateTime" db:"start"`
 	End       null.Time  `json:"endDateTime" db:"end"`
 	Lat       null.Float `json:"lat" db:"lat"`

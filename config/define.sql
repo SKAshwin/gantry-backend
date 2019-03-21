@@ -21,6 +21,7 @@ create table event(
 	ID UUID PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
 	name text NOT NULL,
 	url text UNIQUE NOT NULL,
+	release TIMESTAMP,
 	"start" TIMESTAMP,
 	"end" TIMESTAMP,
 	lat float8,

@@ -63,7 +63,7 @@ func (gs *GuestService) CheckIn(eventID string, nric string) (string, error) {
 	return name, nil
 }
 
-//Absent marks a guest of a particular event as being absent, the opposite of check in
+//MarkAbsent marks a guest of a particular event as being absent, the opposite of check in
 //Will return an error if said guest does not exist, or even with that
 //ID does not exist
 //Will not throw an error if the guest is already not checked in
