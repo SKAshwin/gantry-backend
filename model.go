@@ -45,6 +45,19 @@ type Event struct {
 	CreatedAt time.Time  `json:"createdAt" db:"createdat"`
 }
 
+//Released returns true if the current time in Singapore is beyond
+//the release time in UTC
+func (event *Event) Released() bool {
+	loc, _ := time.LoadLocation("Asia/Singapore")
+	now := time.Now().In(loc)
+
+	if !event.Release.Valid {
+		//if no release time set, return true
+		return true
+	}
+	return event.Release.Time.Before(now)
+}
+
 //EventService An interface for functions that modify/fetch event data in the database
 type EventService interface {
 	Event(ID string) (Event, error)

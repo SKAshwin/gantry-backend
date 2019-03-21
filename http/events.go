@@ -57,10 +57,23 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 		tokenCheck, credentialsCheck, existCheck)).Methods("PATCH")
 	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleDeleteEvent),
 		tokenCheck, credentialsCheck, existCheck)).Methods("DELETE")
+	h.Handle("/api/v0/events/{eventID}/released", Adapt(http.HandlerFunc(h.handleReleased),
+		existCheck)).Methods("GET")
 	//route all guest-related requests to the guest handler
 	h.PathPrefix("/api/v0/events/{eventID}/guests").Handler(gh)
 
 	return h
+}
+
+func (h *EventHandler) handleReleased(w http.ResponseWriter, r *http.Request) {
+	event, err := h.EventService.Event(mux.Vars(r)["eventID"])
+	if err != nil {
+		h.Logger.Println("Error fetching event info: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error in fetching event info", w)
+	}
+
+	reply, _ := json.Marshal(event.Released())
+	w.Write(reply)
 }
 
 //handleEvents is a handler which returns all information pertaining to all events
@@ -222,6 +235,10 @@ func (h *EventHandler) handleURLExists(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+//An Adapter generator which produces an adapter which checks if
+//an event exists before allowing the handler to execute
+//Returns a 404 otherwise (or a 500 if an error occurred when checking
+//if event exists)
 func eventExists(es checkin.EventService, eventIDKey string) Adapter {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -234,6 +251,23 @@ func eventExists(es checkin.EventService, eventIDKey string) Adapter {
 				h.ServeHTTP(w, r)
 			} else {
 				WriteMessage(http.StatusNotFound, "Event does not exist with that ID", w)
+			}
+		})
+	}
+}
+
+func eventReleased(es checkin.EventService, eventIDKey string) Adapter {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			eventID := mux.Vars(r)[eventIDKey]
+			event, err := es.Event(eventID)
+			if err != nil {
+				log.Println("Error fetching event data in eventReleased: " + err.Error())
+				WriteMessage(http.StatusInternalServerError, "Error fetching event data", w)
+			} else if event.Released() {
+				h.ServeHTTP(w, r)
+			}else{
+				WriteMessage(http.StatusForbidden, "Event has not been released yet", w)
 			}
 		})
 	}
