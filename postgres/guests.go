@@ -29,6 +29,9 @@ func (gs *GuestService) CheckIn(eventID string, nric string) (string, error) {
 	if err != nil {
 		return "", errors.New("Error getting guest with that NRIC: " + err.Error())
 	}
+	if guest == (checkin.Guest{}) {
+		return "", errors.New("Guest with that NRIC does not exist: " + nric)
+	}
 	nricHash := guest.NRIC
 
 	tx, err := gs.DB.Begin()
@@ -111,18 +114,11 @@ func (gs *GuestService) GuestsNotCheckedIn(eventID string) ([]string, error) {
 //GuestExists returns true if a Guest with the given NRIC identifier (last 5 digits of NRIC)
 //and attending the given event exists
 func (gs *GuestService) GuestExists(eventID string, nric string) (bool, error) {
-	nricHash, err := gs.HM.HashAndSalt(nric)
+	guest, err := gs.getGuestWithNRIC(eventID, nric)
 	if err != nil {
-		return false, errors.New("Error hashing NRIC: " + err.Error())
+		return false, errors.New("Error getting guests: " + err.Error())
 	}
-
-	var numGuests int
-	err = gs.DB.QueryRow("SELECT COUNT(*) from guest where eventID = $1 and nricHash = $2",
-		eventID, nricHash).Scan(&numGuests)
-	if err != nil {
-		return false, err
-	}
-	return numGuests != 0, nil
+	return (guest != checkin.Guest{}), nil
 }
 
 //RegisterGuest adds a guest with the given nric, name and event that they're attending
@@ -140,11 +136,17 @@ func (gs *GuestService) RegisterGuest(eventID string, nric string, name string) 
 }
 
 //RemoveGuest removes a given guest (indicated by nric) from the database
+//will not return an error if guest does not exist, will merely delete no one
 func (gs *GuestService) RemoveGuest(eventID string, nric string) error {
-	nricHash, err := gs.HM.HashAndSalt(nric)
+	guest, err := gs.getGuestWithNRIC(eventID, nric)
 	if err != nil {
-		return errors.New("Error hashing NRIC: " + err.Error())
+		return errors.New("Error getting guest with that NRIC: " + err.Error())
 	}
+	if guest == (checkin.Guest{}) {
+		return nil
+	}
+	nricHash := guest.NRIC
+
 	_, err = gs.DB.Exec("DELETE from guest where eventID = $1 and nricHash = $2",
 		eventID, nricHash)
 
@@ -214,6 +216,9 @@ func (gs *GuestService) scanRowsIntoNames(rows *sql.Rows, rowCount int) ([]strin
 	return names, nil
 }
 
+//Returns a guest and true if one could be found with that nric
+//Returns an empty guest object (and no error) if the guest could not be found
+//Returns an error if there is an error getting a guest
 func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.Guest, error) {
 	rows, err := gs.DB.Queryx("SELECT name, nricHash from guest where eventID = $1", eventID)
 	if err != nil {
@@ -235,7 +240,7 @@ func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.G
 		}
 	}
 
-	return checkin.Guest{}, errors.New("No such guest exists with that NRIC")
+	return checkin.Guest{}, nil
 }
 
 func (gs *GuestService) scanRowsIntoGuests(rows *sqlx.Rows, rowCount int) ([]checkin.Guest, error) {
