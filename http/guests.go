@@ -40,21 +40,23 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, auth Auth
 	existCheck := eventExists(es, "eventID")
 
 	h.Handle("/api/v0/events/{eventID}/guests", Adapt(http.HandlerFunc(h.handleGuests),
-		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
+		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}/guests", Adapt(http.HandlerFunc(h.handleRegisterGuest),
-		tokenCheck, credentialsCheck, existCheck)).Methods("POST")
+		tokenCheck, existCheck, credentialsCheck)).Methods("POST")
 	h.Handle("/api/v0/events/{eventID}/guests", Adapt(http.HandlerFunc(h.handleRemoveGuest),
-		tokenCheck, credentialsCheck, existCheck)).Methods("DELETE")
+		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
 	h.Handle("/api/v0/events/{eventID}/guests/checkedin", Adapt(http.HandlerFunc(h.handleGuestsCheckedIn),
-		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
+		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}/guests/checkedin", Adapt(http.HandlerFunc(h.handleCheckInGuest),
 		existCheck)).Methods("POST")
+	h.Handle("/api/v0/events/{eventID}/guests/checkedin", Adapt(http.HandlerFunc(h.handleMarkGuestAbsent),
+		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
 	h.Handle("/api/v0/events/{eventID}/guests/notcheckedin", Adapt(http.HandlerFunc(h.handleGuestsNotCheckedIn),
-		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
+		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}/guests/stats", Adapt(http.HandlerFunc(h.handleStats),
-		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
+		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}/guests/report", Adapt(http.HandlerFunc(h.handleReport),
-		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
+		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 
 	//GET /api/events/{eventID}/guests should return all Guests, requires a host token or admin token
 	//POST /api/events/{eventID}/guests with a JSON argument {name:"Hello",nric:"5678F"} should register
@@ -143,6 +145,35 @@ func (h *GuestHandler) handleGuestsCheckedIn(w http.ResponseWriter, r *http.Requ
 	}
 	reply, _ := json.Marshal(guests)
 	w.Write(reply)
+}
+
+func (h *GuestHandler) handleMarkGuestAbsent(w http.ResponseWriter, r *http.Request) {
+	var guest checkin.Guest
+	err := json.NewDecoder(r.Body).Decode(&guest)
+	if err != nil {
+		h.Logger.Println("Error when decoding guest details: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "Incorrect fields for marking guest absent", w)
+		return
+	}
+
+	eventID := mux.Vars(r)["eventID"]
+	//check if the guest exists before attempting to mark it as absent
+	if guestExists, err := h.GuestService.GuestExists(eventID, guest.NRIC); err == nil && !guestExists {
+		WriteMessage(http.StatusNotFound, "No such guest to mark absent", w)
+		return
+	} else if err != nil {
+		h.Logger.Println("Error checking if guest exists: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error checking if guest exists", w)
+		return
+	}
+
+	err = h.GuestService.MarkAbsent(eventID, guest.NRIC)
+	if err != nil {
+		h.Logger.Println("Error check guest in: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Guest check-in failed", w)
+	} else {
+		WriteOKMessage("Successfully marked guest as absent", w)
+	}
 }
 
 func (h *GuestHandler) handleCheckInGuest(w http.ResponseWriter, r *http.Request) {

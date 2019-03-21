@@ -377,6 +377,102 @@ func TestHandleCheckInGuest(t *testing.T) {
 	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
 }
 
+func TestHandleMarkGuestAbsent(t *testing.T) {
+	// Inject our mock into our handler.
+	var gs mock.GuestService
+	var es mock.EventService
+	var auth mock.Authenticator
+	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+
+	//mock the required calls
+	es.CheckIfExistsFn = func(eventID string) (bool, error) {
+		return eventID == "300", nil
+	}
+	auth.AuthenticateFn = func(r *http.Request) (bool, error) {
+		return true, nil
+	}
+	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
+		return checkin.AuthorizationInfo{
+			Username: "testing_username",
+			IsAdmin:  false,
+		}, nil
+	}
+	es.CheckHostFn = func(username string, eventID string) (bool, error) {
+		if username != "testing_username" {
+			return false, nil
+		} else if eventID != "300" {
+			return false, nil
+		}
+		return true, nil
+	}
+	gs.MarkAbsentFn = func(eventID string, nric string) error {
+		test.Equals(t, "300", eventID)
+		test.Equals(t, "1234F", nric)
+		return nil
+	}
+	gs.GuestExistsFn = func(eventID string, nric string) (bool, error) {
+		test.Equals(t, "300", eventID)
+		return nric == "1234F", nil
+	}
+
+	//Test normal behavior
+	r := httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+
+	//Test guest does not exist with that nric
+	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"5678F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+
+	//Test badly formatted JSON
+	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\""))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	//Test error when marking as absent
+	gs.MarkAbsentFn = func(eventID string, nric string) error {
+		return errors.New("An error")
+	}
+	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gs.MarkAbsentFn = func(eventID string, nric string) error {
+		test.Equals(t, "300", eventID)
+		test.Equals(t, "1234F", nric)
+		return nil
+	}
+
+	//Test error when checking if guest exists
+	gs.GuestExistsFn = func(eventID string, nric string) (bool, error) {
+		return false, errors.New("An error")
+	}
+	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gs.GuestExistsFn = func(eventID string, nric string) (bool, error) {
+		test.Equals(t, "300", eventID)
+		return nric == "1234F", nil
+	}
+
+	//Test invalid eventID
+	r = httptest.NewRequest("DELETE", "/api/v0/events/200/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+}
+
 func TestHandleGuestsNotCheckedIn(t *testing.T) {
 	// Inject our mock into our handler.
 	var gs mock.GuestService

@@ -43,7 +43,7 @@ func (as *GuestService) CheckIn(eventID string, nric string) (string, error) {
 //MarkAbsent invokes the mock implementation and marks the function as invoked
 func (as *GuestService) MarkAbsent(eventID string, nric string) error {
 	as.MarkAbsentInvoked = true
-	return as.MarkAbsent(eventID, nric)
+	return as.MarkAbsentFn(eventID, nric)
 }
 
 //Guests invokes the mock implementation and marks the function as invoked
