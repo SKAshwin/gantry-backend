@@ -25,10 +25,11 @@ type GuestService struct {
 //Will not throw an error if the guest is already checked in
 //If any error occurs, check in status of the guest will not be edited
 func (gs *GuestService) CheckIn(eventID string, nric string) (string, error) {
-	nricHash, err := gs.HM.HashAndSalt(nric)
+	guest, err := gs.getGuestWithNRIC(eventID, nric)
 	if err != nil {
-		return "", errors.New("Error hashing NRIC: " + err.Error())
+		return "", errors.New("Error getting guest with that NRIC: " + err.Error())
 	}
+	nricHash := guest.NRIC
 
 	tx, err := gs.DB.Begin()
 	if err != nil {
@@ -211,4 +212,45 @@ func (gs *GuestService) scanRowsIntoNames(rows *sql.Rows, rowCount int) ([]strin
 	}
 
 	return names, nil
+}
+
+func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.Guest, error) {
+	rows, err := gs.DB.Queryx("SELECT name, nricHash from guest where eventID = $1", eventID)
+	if err != nil {
+		return checkin.Guest{}, errors.New("Cannot fetch all guests: " + err.Error())
+	}
+
+	numGuests, err := gs.getNumberOfGuests(eventID)
+	if err != nil {
+		return checkin.Guest{}, errors.New("Error fetching number of guests: " + err.Error())
+	}
+	guests, err := gs.scanRowsIntoGuests(rows, numGuests)
+	if err != nil {
+		return checkin.Guest{}, errors.New("Error reading guest data from database: " + err.Error())
+	}
+
+	for _, guest := range guests {
+		if gs.HM.CompareHashAndPassword(guest.NRIC, nric) {
+			return guest, nil
+		}
+	}
+
+	return checkin.Guest{}, errors.New("No such guest exists with that NRIC")
+}
+
+func (gs *GuestService) scanRowsIntoGuests(rows *sqlx.Rows, rowCount int) ([]checkin.Guest, error) {
+	guests := make([]checkin.Guest, rowCount)
+
+	index := 0
+	for thereAreMore := rows.Next(); thereAreMore; thereAreMore = rows.Next() {
+		var guest checkin.Guest
+		err := rows.StructScan(&guest)
+		if err != nil {
+			return nil, errors.New("Could not extract guest: " + err.Error())
+		}
+		guests[index] = guest
+		index++
+	}
+
+	return guests, nil
 }

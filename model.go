@@ -79,7 +79,7 @@ type GuestStats struct {
 //Guest is all the information related to a particular guest
 type Guest struct {
 	Name string `json:"name,omitempty"`
-	NRIC string `json:"nric,omitempty"`
+	NRIC string `json:"nric,omitempty" db:"nrichash"`
 }
 
 //GuestService is for checking in guests at a specific event
