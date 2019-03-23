@@ -38,6 +38,7 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, auth Auth
 	tokenCheck := checkAuth(auth)
 	credentialsCheck := isAdminOrHost(auth, es, "eventID")
 	existCheck := eventExists(es, "eventID")
+	releaseCheck := eventReleased(es, "eventID")
 
 	h.Handle("/api/v0/events/{eventID}/guests", Adapt(http.HandlerFunc(h.handleGuests),
 		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
@@ -48,7 +49,7 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, auth Auth
 	h.Handle("/api/v0/events/{eventID}/guests/checkedin", Adapt(http.HandlerFunc(h.handleGuestsCheckedIn),
 		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}/guests/checkedin", Adapt(http.HandlerFunc(h.handleCheckInGuest),
-		existCheck)).Methods("POST")
+		existCheck, releaseCheck)).Methods("POST")
 	h.Handle("/api/v0/events/{eventID}/guests/checkedin", Adapt(http.HandlerFunc(h.handleMarkGuestAbsent),
 		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
 	h.Handle("/api/v0/events/{eventID}/guests/notcheckedin", Adapt(http.HandlerFunc(h.handleGuestsNotCheckedIn),
