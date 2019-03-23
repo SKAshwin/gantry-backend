@@ -7,6 +7,8 @@ part of the application.
 
 Binaries are stored in cmd, and there are 2 binaries (`checkin` and `uploadguests`). 
 
+#### checkin
+
 `checkin` is the web server, and takes no arguments to start up, but if run locally requires a .env in the cmd/checkin folder, with the keys in the .env.example file in the root directory. Make sure before building a binary that is ment to be run locally that the first line of the main function is uncommented in cmd/checkin/main.go:
 
 ```go
@@ -16,6 +18,8 @@ func main() {
 ```
 
 Note that .env folders themselves are git ignored for security reasons.
+
+#### uploadguests
 
 `uploadguests` is a command line tool to take a CSV with NRICs and names in the following format:
 
@@ -88,3 +92,27 @@ Compile `cmd/checkin/main.go` by running `go build .` when in that folder. Commi
 Any changes in the deployment branch (hotfixes during an event; by right, a version release should be tested and not require further changes once deployed) require a recompiling of the executable and committing the new executable to the deployment branch in order for changes to actually go through.
 
 Link heroku to auto deploy from the deployment branch. Never commit a Procfile or executable to the master branch.
+
+### Testing
+
+To test a particular package, navigate to that package in the command line, and then run `go test`. To generate a coverage report, do 
+
+```
+go test -coverprofile fmt
+```
+
+Which will produce output as such:
+
+```
+...logging statements...
+PASS
+coverage: 41.9% of statements
+ok      checkin/http    0.811s
+```
+
+In order to view exactly which lines in each file were tested and which were not, run 
+
+```
+go tool cover -html=fmt
+```
+
