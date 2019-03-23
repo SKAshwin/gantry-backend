@@ -22,8 +22,6 @@ func TestHandleReleased(t *testing.T) {
 	var auth mock.Authenticator
 	gh := myhttp.GuestHandler{}
 	h := myhttp.NewEventHandler(&es, &auth, &gh)
-	loc, err := time.LoadLocation("Asia/Singapore")
-	test.Ok(t, err)
 
 	es.CheckIfExistsFn = func(id string) (bool, error) {
 		if id == "300" {
@@ -36,7 +34,7 @@ func TestHandleReleased(t *testing.T) {
 			t.Fatalf("unexpected id: %s", ID)
 		}
 		return checkin.Event{
-			Release: null.Time{Time: time.Now().In(loc).Add(-1 * time.Hour),
+			Release: null.Time{Time: time.Now().UTC().Add(-1 * time.Hour),
 				Valid: true,
 			},
 		}, nil
@@ -58,7 +56,7 @@ func TestHandleReleased(t *testing.T) {
 			t.Fatalf("unexpected id: %s", ID)
 		}
 		return checkin.Event{
-			Release: null.Time{Time: time.Now().In(loc).Add(1 * time.Hour),
+			Release: null.Time{Time: time.Now().UTC().Add(1 * time.Hour),
 				Valid: true,
 			},
 		}, nil
@@ -102,7 +100,7 @@ func TestHandleReleased(t *testing.T) {
 			t.Fatalf("unexpected id: %s", ID)
 		}
 		return checkin.Event{
-			Release: null.Time{Time: time.Now().In(loc).Add(-1 * time.Hour),
+			Release: null.Time{Time: time.Now().UTC().Add(-1 * time.Hour),
 				Valid: true,
 			},
 		}, nil

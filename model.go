@@ -48,14 +48,13 @@ type Event struct {
 //Released returns true if the current time in Singapore is beyond
 //the release time in UTC
 func (event *Event) Released() bool {
-	loc, _ := time.LoadLocation("Asia/Singapore")
-	now := time.Now().In(loc)
+	now := time.Now().UTC()
 
 	if !event.Release.Valid {
 		//if no release time set, return true
 		return true
 	}
-	return event.Release.Time.Before(now)
+	return event.Release.Time.UTC().Before(now)
 }
 
 //EventService An interface for functions that modify/fetch event data in the database
