@@ -12,6 +12,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/guregu/null"
 )
 
 func TestHandleGuests(t *testing.T) {
@@ -332,6 +335,16 @@ func TestHandleCheckInGuest(t *testing.T) {
 	h := myhttp.NewGuestHandler(&gs, &es, &auth)
 
 	//mock the required calls
+	es.EventFn = func(ID string) (checkin.Event, error) {
+		if ID != "300" {
+			t.Fatalf("unexpected id: %s", ID)
+		}
+		return checkin.Event{
+			Release: null.Time{Time: time.Now().UTC().Add(-1 * time.Hour),
+				Valid: true,
+			},
+		}, nil
+	}
 	es.CheckIfExistsFn = func(eventID string) (bool, error) {
 		return eventID == "300", nil
 	}
@@ -375,6 +388,40 @@ func TestHandleCheckInGuest(t *testing.T) {
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+
+	//Test not yet released
+	es.EventFn = func(ID string) (checkin.Event, error) {
+		if ID != "300" {
+			t.Fatalf("unexpected id: %s", ID)
+		}
+		return checkin.Event{
+			Release: null.Time{Time: time.Now().UTC().Add(1 * time.Hour),
+				Valid: true,
+			},
+		}, nil
+	}
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusForbidden, w.Result().StatusCode)
+
+	//Test no release date set
+	es.EventFn = func(ID string) (checkin.Event, error) {
+		if ID != "300" {
+			t.Fatalf("unexpected id: %s", ID)
+		}
+		return checkin.Event{
+			Release: null.Time{},
+		}, nil
+	}
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&name)
+	test.Equals(t, "Jim", name)
+
 }
 
 func TestHandleMarkGuestAbsent(t *testing.T) {
