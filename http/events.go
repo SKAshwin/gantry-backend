@@ -76,17 +76,18 @@ func (h *EventHandler) handleReleased(w http.ResponseWriter, r *http.Request) {
 	w.Write(reply)
 }
 
+//CURRENTLY UNUSED/UNTESTED (SHOULD BE FINE THOUGH)
 //handleEvents is a handler which returns all information pertaining to all events
-func (h *EventHandler) handleEvents(w http.ResponseWriter, r *http.Request) {
-	events, err := h.EventService.Events()
-	if err != nil {
-		h.Logger.Println("Error in GetAllEvents: " + err.Error())
-		WriteMessage(http.StatusInternalServerError, "Error fetching all events", w)
-		return
-	}
-	reply, _ := json.Marshal(events)
-	w.Write(reply)
-}
+//func (h *EventHandler) handleEvents(w http.ResponseWriter, r *http.Request) {
+//	events, err := h.EventService.Events()
+//	if err != nil {
+//		h.Logger.Println("Error in GetAllEvents: " + err.Error())
+//		WriteMessage(http.StatusInternalServerError, "Error fetching all events", w)
+//		return
+//	}
+//	reply, _ := json.Marshal(events)
+//	w.Write(reply)
+//}
 
 //handleEventsBy is a handler which, given a username in the http request
 //Returns all the information regarding the events belonging to that user
@@ -95,6 +96,7 @@ func (h *EventHandler) handleEventsBy(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.Logger.Println("Error fetching authorization info: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error in fetching authorization info", w)
+		return
 	}
 
 	events, err := h.EventService.EventsBy(authInfo.Username)
@@ -266,7 +268,7 @@ func eventReleased(es checkin.EventService, eventIDKey string) Adapter {
 				WriteMessage(http.StatusInternalServerError, "Error fetching event data", w)
 			} else if event.Released() {
 				h.ServeHTTP(w, r)
-			}else{
+			} else {
 				WriteMessage(http.StatusForbidden, "Event has not been released yet", w)
 			}
 		})
