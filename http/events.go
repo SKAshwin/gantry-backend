@@ -49,7 +49,7 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 		tokenCheck)).Methods("GET")
 	h.Handle("/api/v0/events", Adapt(http.HandlerFunc(h.handleCreateEvent),
 		tokenCheck)).Methods("POST")
-	h.Handle("/api/v0/events/exists/{eventURL}", Adapt(http.HandlerFunc(h.handleURLExists),
+	h.Handle("/api/v0/events/takenurls/{eventURL}", Adapt(http.HandlerFunc(h.handleURLTaken),
 		tokenCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleEvent),
 		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
@@ -75,19 +75,6 @@ func (h *EventHandler) handleReleased(w http.ResponseWriter, r *http.Request) {
 	reply, _ := json.Marshal(event.Released())
 	w.Write(reply)
 }
-
-//CURRENTLY UNUSED/UNTESTED (SHOULD BE FINE THOUGH)
-//handleEvents is a handler which returns all information pertaining to all events
-//func (h *EventHandler) handleEvents(w http.ResponseWriter, r *http.Request) {
-//	events, err := h.EventService.Events()
-//	if err != nil {
-//		h.Logger.Println("Error in GetAllEvents: " + err.Error())
-//		WriteMessage(http.StatusInternalServerError, "Error fetching all events", w)
-//		return
-//	}
-//	reply, _ := json.Marshal(events)
-//	w.Write(reply)
-//}
 
 //handleEventsBy is a handler which, given a username in the http request
 //Returns all the information regarding the events belonging to that user
@@ -226,13 +213,13 @@ func (h *EventHandler) handleUpdateEvent(w http.ResponseWriter, r *http.Request)
 }
 
 //handleURLExists Checks if the eventURL provided in the endpoint is already used
-func (h *EventHandler) handleURLExists(w http.ResponseWriter, r *http.Request) {
+func (h *EventHandler) handleURLTaken(w http.ResponseWriter, r *http.Request) {
 	url := mux.Vars(r)["eventURL"]
 	if exists, err := h.EventService.URLExists(url); err != nil {
 		h.Logger.Println("Error checking if URL already taken: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error checking if URL exists", w)
 	} else {
-		reply, _ := json.Marshal(map[string]bool{"available": !exists})
+		reply, _ := json.Marshal(exists)
 		w.Write(reply)
 	}
 }
@@ -274,3 +261,16 @@ func eventReleased(es checkin.EventService, eventIDKey string) Adapter {
 		})
 	}
 }
+
+//CURRENTLY UNUSED/UNTESTED (SHOULD BE FINE THOUGH)
+//handleEvents is a handler which returns all information pertaining to all events
+//func (h *EventHandler) handleEvents(w http.ResponseWriter, r *http.Request) {
+//	events, err := h.EventService.Events()
+//	if err != nil {
+//		h.Logger.Println("Error in GetAllEvents: " + err.Error())
+//		WriteMessage(http.StatusInternalServerError, "Error fetching all events", w)
+//		return
+//	}
+//	reply, _ := json.Marshal(events)
+//	w.Write(reply)
+//}
