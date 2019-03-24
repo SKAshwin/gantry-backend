@@ -52,11 +52,11 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 	h.Handle("/api/v0/events/exists/{eventURL}", Adapt(http.HandlerFunc(h.handleURLExists),
 		tokenCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleEvent),
-		tokenCheck, credentialsCheck, existCheck)).Methods("GET")
+		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleUpdateEvent),
-		tokenCheck, credentialsCheck, existCheck)).Methods("PATCH")
+		tokenCheck, existCheck, credentialsCheck)).Methods("PATCH")
 	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleDeleteEvent),
-		tokenCheck, credentialsCheck, existCheck)).Methods("DELETE")
+		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
 	h.Handle("/api/v0/events/{eventID}/released", Adapt(http.HandlerFunc(h.handleReleased),
 		existCheck)).Methods("GET")
 	//route all guest-related requests to the guest handler
@@ -95,7 +95,7 @@ func (h *EventHandler) handleEventsBy(w http.ResponseWriter, r *http.Request) {
 	authInfo, err := h.Authenticator.GetAuthInfo(r)
 	if err != nil {
 		h.Logger.Println("Error fetching authorization info: " + err.Error())
-		WriteMessage(http.StatusInternalServerError, "Error in fetching authorization info", w)
+		WriteMessage(http.StatusBadRequest, "Error in fetching authorization info", w)
 		return
 	}
 
