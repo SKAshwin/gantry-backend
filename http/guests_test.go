@@ -25,70 +25,61 @@ func TestHandleGuests(t *testing.T) {
 	h := myhttp.NewGuestHandler(&gs, &es, &auth)
 
 	//mock the required calls
-	es.CheckIfExistsFn = func(eventID string) (bool, error) {
-		return eventID == "100", nil
-	}
-	es.CheckHostFn = func(username string, eventID string) (bool, error) {
-		if username != "testing_username" {
-			return false, nil
-		} else if eventID != "100" {
-			return false, nil
+	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
+	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
+	auth.AuthenticateFn = authenticateGenerator(true, nil)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
+	guestsGenerator := func(names []string, err error) func(string) ([]string, error) {
+		return func(eventID string) ([]string, error) {
+			if eventID != "100" {
+				t.Fatalf("unexpected id: %s", eventID)
+			}
+			if err != nil {
+				return nil, err
+			}
+			return names, nil
 		}
-		return true, nil
 	}
-	auth.AuthenticateFn = func(r *http.Request) (bool, error) {
-		return true, nil
-	}
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "testing_username",
-			IsAdmin:  false,
-		}, nil
-	}
-	gs.GuestsFn = func(eventID string) ([]string, error) {
-		if eventID != "100" {
-			t.Fatalf("unexpected id: %s", eventID)
-		}
-		return []string{"Bob", "Jim", "Jacob"}, nil
-	}
-
-	r := httptest.NewRequest("GET", "/api/v0/events/100/guests", nil)
+	gs.GuestsFn = guestsGenerator([]string{"Bob", "Jim", "Jacob"}, nil)
 
 	//Test normal behavior
+	r := httptest.NewRequest("GET", "/api/v0/events/100/guests", nil)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	var guests []string
 	json.NewDecoder(w.Result().Body).Decode(&guests)
 	test.Equals(t, []string{"Bob", "Jim", "Jacob"}, guests)
 
-	//Test access by another user
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "unauthorized_person",
-			IsAdmin:  false,
-		}, nil
-	}
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusForbidden, w.Result().StatusCode)
-
-	//Test access by admin
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "admin_person",
-			IsAdmin:  true,
-		}, nil
-	}
+	//Test no guests
+	gs.GuestsFn = guestsGenerator([]string{}, nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	json.NewDecoder(w.Result().Body).Decode(&guests)
-	test.Equals(t, []string{"Bob", "Jim", "Jacob"}, guests)
+	test.Equals(t, []string{}, guests)
 
-	//Test invalid eventID
-	r = httptest.NewRequest("GET", "/api/v0/events/101/guests", nil)
+	//Test error getting guests
+	gs.GuestsFn = guestsGenerator(nil, errors.New("An error"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gs.GuestsFn = guestsGenerator([]string{"Bob", "Jim", "Jacob"}, nil)
+
+	//access restriction tests
+	//Test access by another user
+	nonHostAccessTest(t, r, h, &auth, &es, "unauthorized_person")
+
+	//Test access by admin
+	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
+		json.NewDecoder(r.Body).Decode(&guests)
+		test.Equals(t, []string{"Bob", "Jim", "Jacob"}, guests)
+	})
+
+	//Test invalid token
+	noValidTokenTest(t, r, h, &auth)
+
+	//Test invalid eventID
+	r = httptest.NewRequest("GET", "/api/v0/events/200/guests", nil)
+	eventDoesNotExistTest(t, r, h, &es)
 }
 
 func TestHandleRegisterGuest(t *testing.T) {
@@ -99,36 +90,29 @@ func TestHandleRegisterGuest(t *testing.T) {
 	h := myhttp.NewGuestHandler(&gs, &es, &auth)
 
 	//mock the required calls
-	es.CheckIfExistsFn = func(eventID string) (bool, error) {
-		return eventID == "300", nil
-	}
-	es.CheckHostFn = func(username string, eventID string) (bool, error) {
-		if username != "testing_username" {
-			return false, nil
-		} else if eventID != "300" {
-			return false, nil
+	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
+	es.CheckHostFn = checkHostGenerator("testing_username", "300", nil)
+	auth.AuthenticateFn = authenticateGenerator(true, nil)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
+	registerGuestGenerator := func(err error) func(string, string, string) error {
+		return func(eventID string, nric string, name string) error {
+			test.Equals(t, "300", eventID)
+			test.Equals(t, "5678F", nric)
+			test.Equals(t, "Jim", name)
+			return err
 		}
-		return true, nil
 	}
-	auth.AuthenticateFn = func(r *http.Request) (bool, error) {
-		return true, nil
+	gs.RegisterGuestFn = registerGuestGenerator(nil)
+	guestExistsGenerator := func(err error) func(string, string) (bool, error) {
+		return func(eventID string, nric string) (bool, error) {
+			test.Equals(t, "300", eventID)
+			if err != nil {
+				return false, err
+			}
+			return nric == "1234F", nil
+		}
 	}
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "testing_username",
-			IsAdmin:  false,
-		}, nil
-	}
-	gs.RegisterGuestFn = func(eventID string, nric string, name string) error {
-		test.Equals(t, "300", eventID)
-		test.Equals(t, "5678F", nric)
-		test.Equals(t, "Jim", name)
-		return nil
-	}
-	gs.GuestExistsFn = func(eventID string, nric string) (bool, error) {
-		test.Equals(t, "300", eventID)
-		return nric == "1234F", nil
-	}
+	gs.GuestExistsFn = guestExistsGenerator(nil)
 
 	//Test normal behavior
 	r := httptest.NewRequest("POST", "/api/v0/events/300/guests",
@@ -140,43 +124,61 @@ func TestHandleRegisterGuest(t *testing.T) {
 	//Test guest already exists with that nric
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
 		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"1234F\"}"))
+	gs.RegisterGuestInvoked = false
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusConflict, w.Result().StatusCode)
+	test.Assert(t, !gs.RegisterGuestInvoked, "Register guest invoked even though could not tell if guest exists")
 
-	//Now the standard credential checks
-	//Test access by another user
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "unauthorized_person",
-			IsAdmin:  false,
-		}, nil
-	}
-	w = httptest.NewRecorder()
+	//Test error checking if guest exists
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
 		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
+	gs.RegisterGuestInvoked = false
+	gs.GuestExistsFn = guestExistsGenerator(errors.New("An error"))
+	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusForbidden, w.Result().StatusCode)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	test.Assert(t, !gs.RegisterGuestInvoked, "Register guest invoked even though guest already exists")
+	gs.GuestExistsFn = guestExistsGenerator(nil)
+
+	//Test error registering guest
+	gs.RegisterGuestFn = registerGuestGenerator(errors.New("An error"))
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
+		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gs.RegisterGuestFn = registerGuestGenerator(nil)
+
+	//Test invalid JSON
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
+		strings.NewReader("{\"name\":\"Jim\", nric\":\"5678F\""))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	//access restriction tests
+	//Test access by another user
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
+		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
+	nonHostAccessTest(t, r, h, &auth, &es, "unauthorized_person")
 
 	//Test access by admin
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "admin_person",
-			IsAdmin:  true,
-		}, nil
-	}
-	w = httptest.NewRecorder()
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
 		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
+	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
+		test.Equals(t, http.StatusCreated, r.StatusCode)
+	})
+
+	//Test invalid token
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
+		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
+	noValidTokenTest(t, r, h, &auth)
 
 	//Test invalid eventID
-	r = httptest.NewRequest("GET", "/api/v0/events/101/guests",
+	r = httptest.NewRequest("POST", "/api/v0/events/100/guests",
 		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+	eventDoesNotExistTest(t, r, h, &es)
 }
 
 func TestHandleRemoveGuest(t *testing.T) {
@@ -187,31 +189,18 @@ func TestHandleRemoveGuest(t *testing.T) {
 	h := myhttp.NewGuestHandler(&gs, &es, &auth)
 
 	//mock the required calls
-	es.CheckIfExistsFn = func(eventID string) (bool, error) {
-		return eventID == "300", nil
-	}
-	es.CheckHostFn = func(username string, eventID string) (bool, error) {
-		if username != "testing_username" {
-			return false, nil
-		} else if eventID != "300" {
-			return false, nil
+	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
+	es.CheckHostFn = checkHostGenerator("testing_username", "300", nil)
+	auth.AuthenticateFn = authenticateGenerator(true, nil)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
+	removeGuestGenerator := func(err error) func(string, string) error {
+		return func(eventID string, nric string) error {
+			test.Equals(t, "300", eventID)
+			test.Equals(t, "5678F", nric)
+			return err
 		}
-		return true, nil
 	}
-	auth.AuthenticateFn = func(r *http.Request) (bool, error) {
-		return true, nil
-	}
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "testing_username",
-			IsAdmin:  false,
-		}, nil
-	}
-	gs.RemoveGuestFn = func(eventID string, nric string) error {
-		test.Equals(t, "300", eventID)
-		test.Equals(t, "5678F", nric)
-		return nil
-	}
+	gs.RemoveGuestFn = removeGuestGenerator(nil)
 
 	//Test normal behavior
 	r := httptest.NewRequest("DELETE", "/api/v0/events/300/guests",
@@ -220,37 +209,44 @@ func TestHandleRemoveGuest(t *testing.T) {
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusOK, w.Result().StatusCode)
 
-	//Now the standard credentials checks
-	//Test access by another user
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "unauthorized_person",
-			IsAdmin:  false,
-		}, nil
-	}
+	//Test badly formatted JSON
+	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests",
+		strings.NewReader(""))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusForbidden, w.Result().StatusCode)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 
-	//Test access by admin
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "admin_person",
-			IsAdmin:  true,
-		}, nil
-	}
-	w = httptest.NewRecorder()
+	//Test error removing guest
+	gs.RemoveGuestFn = removeGuestGenerator(errors.New("An error"))
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests",
 		strings.NewReader("{\"nric\":\"5678F\"}"))
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusOK, w.Result().StatusCode)
-
-	//Test invalid eventID
-	r = httptest.NewRequest("GET", "/api/v0/events/101/guests",
-		strings.NewReader("{\"nric\":\"5678F\"}"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gs.RemoveGuestFn = removeGuestGenerator(nil)
+
+	//access restriction tests
+	//Test access by another user
+	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests",
+		strings.NewReader("{\"nric\":\"5678F\"}"))
+	nonHostAccessTest(t, r, h, &auth, &es, "unauthorized_person")
+
+	//Test access by admin
+	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests",
+		strings.NewReader("{\"nric\":\"5678F\"}"))
+	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
+		test.Equals(t, http.StatusOK, r.StatusCode)
+	})
+
+	//Test invalid token
+	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests",
+		strings.NewReader("{\"nric\":\"5678F\"}"))
+	noValidTokenTest(t, r, h, &auth)
+
+	//Test invalid eventID
+	r = httptest.NewRequest("DELETE", "/api/v0/events/200/guests",
+		strings.NewReader("{\"nric\":\"5678F\"}"))
+	eventDoesNotExistTest(t, r, h, &es)
 }
 
 func TestHandleGuestsCheckedIn(t *testing.T) {
@@ -261,32 +257,19 @@ func TestHandleGuestsCheckedIn(t *testing.T) {
 	h := myhttp.NewGuestHandler(&gs, &es, &auth)
 
 	//mock the required calls
-	es.CheckIfExistsFn = func(eventID string) (bool, error) {
-		return eventID == "100", nil
-	}
-	es.CheckHostFn = func(username string, eventID string) (bool, error) {
-		if username != "testing_username" {
-			return false, nil
-		} else if eventID != "100" {
-			return false, nil
+	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
+	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
+	auth.AuthenticateFn = authenticateGenerator(true, nil)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
+	guestsCheckedInGenerator := func(names []string, err error) func(string) ([]string, error) {
+		return func(eventID string) ([]string, error) {
+			if eventID != "100" {
+				t.Fatalf("unexpected id: %s", eventID)
+			}
+			return names, err
 		}
-		return true, nil
 	}
-	auth.AuthenticateFn = func(r *http.Request) (bool, error) {
-		return true, nil
-	}
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "testing_username",
-			IsAdmin:  false,
-		}, nil
-	}
-	gs.GuestsCheckedInFn = func(eventID string) ([]string, error) {
-		if eventID != "100" {
-			t.Fatalf("unexpected id: %s", eventID)
-		}
-		return []string{"Bob", "Jim", "Jacob"}, nil
-	}
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Bob", "Jim", "Jacob"}, nil)
 
 	r := httptest.NewRequest("GET", "/api/v0/events/100/guests/checkedin", nil)
 
@@ -297,34 +280,36 @@ func TestHandleGuestsCheckedIn(t *testing.T) {
 	json.NewDecoder(w.Result().Body).Decode(&guests)
 	test.Equals(t, []string{"Bob", "Jim", "Jacob"}, guests)
 
-	//Test access by another user
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "unauthorized_person",
-			IsAdmin:  false,
-		}, nil
-	}
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusForbidden, w.Result().StatusCode)
-
-	//Test access by admin
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "admin_person",
-			IsAdmin:  true,
-		}, nil
-	}
+	//Test no guests checked in
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	json.NewDecoder(w.Result().Body).Decode(&guests)
-	test.Equals(t, []string{"Bob", "Jim", "Jacob"}, guests)
+	test.Equals(t, []string{}, guests)
 
-	//Test invalid eventID
-	r = httptest.NewRequest("GET", "/api/v0/events/101/guests/checkedin", nil)
+	//Test error getting checked in guests
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, errors.New("An error"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Bob", "Jim", "Jacob"}, nil)
+
+	//access restriction tests
+	//Test access by another user
+	nonHostAccessTest(t, r, h, &auth, &es, "unauthorized_person")
+
+	//Test access by admin
+	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
+		json.NewDecoder(r.Body).Decode(&guests)
+		test.Equals(t, []string{"Bob", "Jim", "Jacob"}, guests)
+	})
+
+	//Test invalid token
+	noValidTokenTest(t, r, h, &auth)
+
+	//Test invalid eventID
+	r = httptest.NewRequest("GET", "/api/v0/events/200/guests/checkedin", nil)
+	eventDoesNotExistTest(t, r, h, &es)
 }
 
 func TestHandleCheckInGuest(t *testing.T) {
@@ -334,37 +319,50 @@ func TestHandleCheckInGuest(t *testing.T) {
 	var auth mock.Authenticator
 	h := myhttp.NewGuestHandler(&gs, &es, &auth)
 
+	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
 	//mock the required calls
-	es.EventFn = func(ID string) (checkin.Event, error) {
-		if ID != "300" {
-			t.Fatalf("unexpected id: %s", ID)
+	eventFnGenerator := func(offset time.Duration, valid bool, err error) func(string) (checkin.Event, error) {
+		return func(ID string) (checkin.Event, error) {
+			if ID != "300" {
+				t.Fatalf("unexpected id: %s", ID)
+			}
+
+			if err != nil {
+				return checkin.Event{}, err
+			}
+			if !valid {
+				return checkin.Event{Release: null.Time{}}, nil
+			}
+			return checkin.Event{
+				Release: null.Time{Time: time.Now().UTC().Add(offset),
+					Valid: true,
+				},
+			}, nil
+
 		}
-		return checkin.Event{
-			Release: null.Time{Time: time.Now().UTC().Add(-1 * time.Hour),
-				Valid: true,
-			},
-		}, nil
 	}
-	es.CheckIfExistsFn = func(eventID string) (bool, error) {
-		return eventID == "300", nil
-	}
-	es.CheckHostFn = func(username string, eventID string) (bool, error) {
-		if username != "testing_username" {
-			return false, nil
-		} else if eventID != "300" {
-			return false, nil
+	es.EventFn = eventFnGenerator(-1*time.Hour, true, nil)
+	checkInFnGenerator := func(err error) func(string, string) (string, error) {
+		return func(eventID string, nric string) (string, error) {
+			test.Equals(t, "300", eventID)
+			test.Equals(t, "1234F", nric)
+			if err != nil {
+				return "", err
+			}
+			return "Jim", nil
 		}
-		return true, nil
 	}
-	gs.CheckInFn = func(eventID string, nric string) (string, error) {
-		test.Equals(t, "300", eventID)
-		test.Equals(t, "1234F", nric)
-		return "Jim", nil
+	gs.CheckInFn = checkInFnGenerator(nil)
+	guestExistsFnGenerator := func(err error) func(string, string) (bool, error) {
+		return func(eventID string, nric string) (bool, error) {
+			test.Equals(t, "300", eventID)
+			if err != nil {
+				return false, err
+			}
+			return nric == "1234F", nil
+		}
 	}
-	gs.GuestExistsFn = func(eventID string, nric string) (bool, error) {
-		test.Equals(t, "300", eventID)
-		return nric == "1234F", nil
-	}
+	gs.GuestExistsFn = guestExistsFnGenerator(nil)
 
 	//Test normal behavior
 	r := httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
@@ -376,30 +374,48 @@ func TestHandleCheckInGuest(t *testing.T) {
 	test.Equals(t, "Jim", name)
 
 	//Test guest does not exist with that nric
+	gs.CheckInInvoked = false
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
 		strings.NewReader("{\"nric\":\"5678F\"}"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+	test.Assert(t, !gs.CheckInInvoked, "Check-in was invoked even though guest did not exist")
+
+	//Test empty body
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader(""))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	//Test error checking if guest exists
+	gs.GuestExistsFn = guestExistsFnGenerator(errors.New("An error"))
+	gs.CheckInInvoked = false
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	test.Assert(t, !gs.CheckInInvoked, "Check-in was invoked even though guest existance not confirmed")
+	gs.GuestExistsFn = guestExistsFnGenerator(nil)
+
+	//Test error checking in guest
+	gs.CheckInFn = checkInFnGenerator(errors.New("An error"))
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gs.CheckInFn = checkInFnGenerator(nil)
 
 	//Test invalid eventID
 	r = httptest.NewRequest("POST", "/api/v0/events/200/guests/checkedin",
 		strings.NewReader("{\"nric\":\"5678F\"}"))
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+	eventDoesNotExistTest(t, r, h, &es)
 
 	//Test not yet released
-	es.EventFn = func(ID string) (checkin.Event, error) {
-		if ID != "300" {
-			t.Fatalf("unexpected id: %s", ID)
-		}
-		return checkin.Event{
-			Release: null.Time{Time: time.Now().UTC().Add(1 * time.Hour),
-				Valid: true,
-			},
-		}, nil
-	}
+	es.EventFn = eventFnGenerator(time.Hour, true, nil)
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
 		strings.NewReader("{\"nric\":\"1234F\"}"))
 	w = httptest.NewRecorder()
@@ -407,20 +423,21 @@ func TestHandleCheckInGuest(t *testing.T) {
 	test.Equals(t, http.StatusForbidden, w.Result().StatusCode)
 
 	//Test no release date set
-	es.EventFn = func(ID string) (checkin.Event, error) {
-		if ID != "300" {
-			t.Fatalf("unexpected id: %s", ID)
-		}
-		return checkin.Event{
-			Release: null.Time{},
-		}, nil
-	}
+	es.EventFn = eventFnGenerator(0, false, nil)
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
 		strings.NewReader("{\"nric\":\"1234F\"}"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	json.NewDecoder(w.Result().Body).Decode(&name)
 	test.Equals(t, "Jim", name)
+
+	//Test error getting release date
+	es.EventFn = eventFnGenerator(time.Hour, false, errors.New("An error"))
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
 
 }
 
@@ -432,35 +449,28 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 	h := myhttp.NewGuestHandler(&gs, &es, &auth)
 
 	//mock the required calls
-	es.CheckIfExistsFn = func(eventID string) (bool, error) {
-		return eventID == "300", nil
-	}
-	auth.AuthenticateFn = func(r *http.Request) (bool, error) {
-		return true, nil
-	}
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "testing_username",
-			IsAdmin:  false,
-		}, nil
-	}
-	es.CheckHostFn = func(username string, eventID string) (bool, error) {
-		if username != "testing_username" {
-			return false, nil
-		} else if eventID != "300" {
-			return false, nil
+	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
+	es.CheckHostFn = checkHostGenerator("testing_username", "300", nil)
+	auth.AuthenticateFn = authenticateGenerator(true, nil)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
+	markAbsentFnGenerator := func(err error) func(string, string) error {
+		return func(eventID string, nric string) error {
+			test.Equals(t, "300", eventID)
+			test.Equals(t, "1234F", nric)
+			return err
 		}
-		return true, nil
 	}
-	gs.MarkAbsentFn = func(eventID string, nric string) error {
-		test.Equals(t, "300", eventID)
-		test.Equals(t, "1234F", nric)
-		return nil
+	gs.MarkAbsentFn = markAbsentFnGenerator(nil)
+	guestExistsFnGenerator := func(err error) func(string, string) (bool, error) {
+		return func(eventID string, nric string) (bool, error) {
+			test.Equals(t, "300", eventID)
+			if err != nil {
+				return false, err
+			}
+			return nric == "1234F", nil
+		}
 	}
-	gs.GuestExistsFn = func(eventID string, nric string) (bool, error) {
-		test.Equals(t, "300", eventID)
-		return nric == "1234F", nil
-	}
+	gs.GuestExistsFn = guestExistsFnGenerator(nil)
 
 	//Test normal behavior
 	r := httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
@@ -484,40 +494,45 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 
 	//Test error when marking as absent
-	gs.MarkAbsentFn = func(eventID string, nric string) error {
-		return errors.New("An error")
-	}
+	gs.MarkAbsentFn = markAbsentFnGenerator(errors.New("An error"))
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
 		strings.NewReader("{\"nric\":\"1234F\"}"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
-	gs.MarkAbsentFn = func(eventID string, nric string) error {
-		test.Equals(t, "300", eventID)
-		test.Equals(t, "1234F", nric)
-		return nil
-	}
+	gs.MarkAbsentFn = markAbsentFnGenerator(nil)
 
 	//Test error when checking if guest exists
-	gs.GuestExistsFn = func(eventID string, nric string) (bool, error) {
-		return false, errors.New("An error")
-	}
+	gs.GuestExistsFn = guestExistsFnGenerator(errors.New("An error"))
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
 		strings.NewReader("{\"nric\":\"1234F\"}"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
-	gs.GuestExistsFn = func(eventID string, nric string) (bool, error) {
-		test.Equals(t, "300", eventID)
-		return nric == "1234F", nil
-	}
+	gs.GuestExistsFn = guestExistsFnGenerator(nil)
+
+	//access restriction tests
+	//Test access by another user
+	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	nonHostAccessTest(t, r, h, &auth, &es, "unauthorized_person")
+
+	//Test access by admin
+	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
+		test.Equals(t, http.StatusOK, r.StatusCode)
+	})
+
+	//Test invalid token
+	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	noValidTokenTest(t, r, h, &auth)
 
 	//Test invalid eventID
 	r = httptest.NewRequest("DELETE", "/api/v0/events/200/guests/checkedin",
 		strings.NewReader("{\"nric\":\"1234F\"}"))
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+	eventDoesNotExistTest(t, r, h, &es)
 }
 
 func TestHandleGuestsNotCheckedIn(t *testing.T) {
@@ -528,32 +543,19 @@ func TestHandleGuestsNotCheckedIn(t *testing.T) {
 	h := myhttp.NewGuestHandler(&gs, &es, &auth)
 
 	//mock the required calls
-	es.CheckIfExistsFn = func(eventID string) (bool, error) {
-		return eventID == "100", nil
-	}
-	es.CheckHostFn = func(username string, eventID string) (bool, error) {
-		if username != "testing_username" {
-			return false, nil
-		} else if eventID != "100" {
-			return false, nil
+	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
+	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
+	auth.AuthenticateFn = authenticateGenerator(true, nil)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
+	guestsNotCheckedInFnGenerator := func(names []string, err error) func(string) ([]string, error) {
+		return func(eventID string) ([]string, error) {
+			if eventID != "100" {
+				t.Fatalf("unexpected id: %s", eventID)
+			}
+			return names, err
 		}
-		return true, nil
 	}
-	auth.AuthenticateFn = func(r *http.Request) (bool, error) {
-		return true, nil
-	}
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "testing_username",
-			IsAdmin:  false,
-		}, nil
-	}
-	gs.GuestsNotCheckedInFn = func(eventID string) ([]string, error) {
-		if eventID != "100" {
-			t.Fatalf("unexpected id: %s", eventID)
-		}
-		return []string{"Bob", "Jim", "Jacob"}, nil
-	}
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Bob", "Jim", "Jacob"}, nil)
 
 	r := httptest.NewRequest("GET", "/api/v0/events/100/guests/notcheckedin", nil)
 
@@ -564,34 +566,37 @@ func TestHandleGuestsNotCheckedIn(t *testing.T) {
 	json.NewDecoder(w.Result().Body).Decode(&guests)
 	test.Equals(t, []string{"Bob", "Jim", "Jacob"}, guests)
 
-	//Test access by another user
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "unauthorized_person",
-			IsAdmin:  false,
-		}, nil
-	}
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusForbidden, w.Result().StatusCode)
-
-	//Test access by admin
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "admin_person",
-			IsAdmin:  true,
-		}, nil
-	}
+	//Test nobody not checked in
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	json.NewDecoder(w.Result().Body).Decode(&guests)
-	test.Equals(t, []string{"Bob", "Jim", "Jacob"}, guests)
+	test.Equals(t, []string{}, guests)
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Bob", "Jim", "Jacob"}, nil)
+
+	//Test error getting those who have not checked in
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, errors.New("An error"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Bob", "Jim", "Jacob"}, nil)
+
+	//access restriction tests
+	//Test access by another user
+	nonHostAccessTest(t, r, h, &auth, &es, "unauthorized_person")
+
+	//Test access by admin
+	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
+		json.NewDecoder(r.Body).Decode(&guests)
+		test.Equals(t, []string{"Bob", "Jim", "Jacob"}, guests)
+	})
+
+	//Test invalid token
+	noValidTokenTest(t, r, h, &auth)
 
 	//Test invalid eventID
 	r = httptest.NewRequest("GET", "/api/v0/events/101/guests/notcheckedin", nil)
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+	eventDoesNotExistTest(t, r, h, &es)
 }
 
 func TestHandleStats(t *testing.T) {
@@ -602,36 +607,26 @@ func TestHandleStats(t *testing.T) {
 	h := myhttp.NewGuestHandler(&gs, &es, &auth)
 
 	//mock the required calls
-	es.CheckIfExistsFn = func(eventID string) (bool, error) {
-		return eventID == "100", nil
-	}
-	es.CheckHostFn = func(username string, eventID string) (bool, error) {
-		if username != "testing_username" {
-			return false, nil
-		} else if eventID != "100" {
-			return false, nil
+	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
+	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
+	auth.AuthenticateFn = authenticateGenerator(true, nil)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
+	checkInStatsFnGenerator := func(err error) func(string) (checkin.GuestStats, error) {
+		return func(eventID string) (checkin.GuestStats, error) {
+			if eventID != "100" {
+				t.Fatalf("unexpected id: %s", eventID)
+			}
+			if err != nil {
+				return checkin.GuestStats{}, err
+			}
+			return checkin.GuestStats{
+				TotalGuests:      10,
+				CheckedIn:        5,
+				PercentCheckedIn: 0.5,
+			}, nil
 		}
-		return true, nil
 	}
-	auth.AuthenticateFn = func(r *http.Request) (bool, error) {
-		return true, nil
-	}
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "testing_username",
-			IsAdmin:  false,
-		}, nil
-	}
-	gs.CheckInStatsFn = func(eventID string) (checkin.GuestStats, error) {
-		if eventID != "100" {
-			t.Fatalf("unexpected id: %s", eventID)
-		}
-		return checkin.GuestStats{
-			TotalGuests:      10,
-			CheckedIn:        5,
-			PercentCheckedIn: 0.5,
-		}, nil
-	}
+	gs.CheckInStatsFn = checkInStatsFnGenerator(nil)
 
 	r := httptest.NewRequest("GET", "/api/v0/events/100/guests/stats", nil)
 
@@ -646,38 +641,33 @@ func TestHandleStats(t *testing.T) {
 		PercentCheckedIn: 0.5,
 	}, stats)
 
-	//Test access by another user
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "unauthorized_person",
-			IsAdmin:  false,
-		}, nil
-	}
+	//Test error getting stats
+	gs.CheckInStatsFn = checkInStatsFnGenerator(errors.New("An error"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusForbidden, w.Result().StatusCode)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gs.CheckInStatsFn = checkInStatsFnGenerator(nil)
+
+	//access restriction tests
+	//Test access by another user
+	nonHostAccessTest(t, r, h, &auth, &es, "unauthorized_person")
 
 	//Test access by admin
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "admin_person",
-			IsAdmin:  true,
-		}, nil
-	}
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	json.NewDecoder(w.Result().Body).Decode(&stats)
-	test.Equals(t, checkin.GuestStats{
-		TotalGuests:      10,
-		CheckedIn:        5,
-		PercentCheckedIn: 0.5,
-	}, stats)
+	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
+		json.NewDecoder(r.Body).Decode(&stats)
+		test.Equals(t, checkin.GuestStats{
+			TotalGuests:      10,
+			CheckedIn:        5,
+			PercentCheckedIn: 0.5,
+		}, stats)
+	})
+
+	//Test invalid token
+	noValidTokenTest(t, r, h, &auth)
 
 	//Test invalid eventID
 	r = httptest.NewRequest("GET", "/api/v0/events/1001/guests/stats", nil)
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+	eventDoesNotExistTest(t, r, h, &es)
 }
 
 func TestHandleReport(t *testing.T) {
@@ -686,38 +676,28 @@ func TestHandleReport(t *testing.T) {
 	var auth mock.Authenticator
 	h := myhttp.NewGuestHandler(&gs, &es, &auth)
 
-	es.CheckIfExistsFn = func(eventID string) (bool, error) {
-		return eventID == "100", nil
-	}
-	es.CheckHostFn = func(username string, eventID string) (bool, error) {
-		if username != "testing_username" {
-			return false, nil
-		} else if eventID != "100" {
-			return false, nil
+	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
+	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
+	auth.AuthenticateFn = authenticateGenerator(true, nil)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
+	guestsCheckedInGenerator := func(names []string, err error) func(string) ([]string, error) {
+		return func(eventID string) ([]string, error) {
+			if eventID != "100" {
+				t.Fatalf("unexpected id: %s", eventID)
+			}
+			return names, err
 		}
-		return true, nil
 	}
-	gs.GuestsCheckedInFn = func(eventID string) ([]string, error) {
-		if eventID != "100" {
-			t.Fatalf("unexpected id: %s", eventID)
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, nil)
+	guestsNotCheckedInFnGenerator := func(names []string, err error) func(string) ([]string, error) {
+		return func(eventID string) ([]string, error) {
+			if eventID != "100" {
+				t.Fatalf("unexpected id: %s", eventID)
+			}
+			return names, err
 		}
-		return []string{"Alice", "Jim", "Bob"}, nil
 	}
-	gs.GuestsNotCheckedInFn = func(eventID string) ([]string, error) {
-		if eventID != "100" {
-			t.Fatalf("unexpected id: %s", eventID)
-		}
-		return []string{"Herman", "Ritchie"}, nil
-	}
-	auth.AuthenticateFn = func(r *http.Request) (bool, error) {
-		return true, nil
-	}
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "testing_username",
-			IsAdmin:  false,
-		}, nil
-	}
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Herman", "Ritchie"}, nil)
 
 	r := httptest.NewRequest("GET", "/api/v0/events/100/guests/report", nil)
 
@@ -737,68 +717,82 @@ func TestHandleReport(t *testing.T) {
 		}
 	}
 
-	//Access control checks
-	//Test access by another user, should be 403
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "unauthorized_person",
-			IsAdmin:  false,
-		}, nil
-	}
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusForbidden, w.Result().StatusCode)
-
-	//Test access by admin, should work
-	auth.GetAuthInfoFn = func(r *http.Request) (checkin.AuthorizationInfo, error) {
-		return checkin.AuthorizationInfo{
-			Username: "admin_person",
-			IsAdmin:  true,
-		}, nil
-	}
+	//check empty lists
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	reader = csv.NewReader(w.Result().Body)
 	data, err = reader.ReadAll()
 	test.Ok(t, err)
 	for _, row := range data {
-		if row[0] == "Alice" || row[0] == "Jim" || row[0] == "Bob" {
-			test.Equals(t, "1", row[1])
-		} else if row[0] == "Herman" || row[0] == "Ritchie" {
+		if row[0] != "Name" {
 			test.Equals(t, "0", row[1])
-		} else {
-			test.Equals(t, row[0], "Name")
+		}
+	}
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, nil)
+
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	reader = csv.NewReader(w.Result().Body)
+	data, err = reader.ReadAll()
+	test.Ok(t, err)
+	for _, row := range data {
+		if row[0] != "Name" {
+			test.Equals(t, "1", row[1])
 		}
 	}
 
-	//Test invalid eventID, should be 404
-	r = httptest.NewRequest("GET", "/api/v0/events/1001/guests/stats", nil)
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, nil)
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+	reader = csv.NewReader(w.Result().Body)
+	data, err = reader.ReadAll()
+	test.Ok(t, err)
+	test.Equals(t, 1, len(data))
+	test.Equals(t, "Name", data[0][0])
+	test.Equals(t, "Present", data[0][1])
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Herman", "Ritchie"}, nil)
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, nil)
 
 	//check internal server error handling
-	r = httptest.NewRequest("GET", "/api/v0/events/100/guests/report", nil)
-
-	gs.GuestsCheckedInFn = func(eventID string) ([]string, error) {
-		return nil, errors.New("An error")
-	}
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, errors.New("An error"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, nil)
 
-	gs.GuestsCheckedInFn = func(eventID string) ([]string, error) {
-		if eventID != "100" {
-			t.Fatalf("unexpected id: %s", eventID)
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, errors.New("An error"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Herman", "Ritchie"}, nil)
+
+	//access restriction tests
+	//Test access by another user
+	nonHostAccessTest(t, r, h, &auth, &es, "unauthorized_person")
+
+	//Test access by admin
+	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
+		reader := csv.NewReader(r.Body)
+		data, err := reader.ReadAll()
+		test.Ok(t, err)
+		for _, row := range data {
+			if row[0] == "Alice" || row[0] == "Jim" || row[0] == "Bob" {
+				test.Equals(t, "1", row[1])
+			} else if row[0] == "Herman" || row[0] == "Ritchie" {
+				test.Equals(t, "0", row[1])
+			} else {
+				test.Equals(t, row[0], "Name")
+			}
 		}
-		return []string{"Alice", "Jim", "Bob"}, nil
-	}
+	})
 
-	gs.GuestsNotCheckedInFn = func(eventID string) ([]string, error) {
-		return nil, errors.New("An error")
-	}
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	//Test invalid token
+	noValidTokenTest(t, r, h, &auth)
 
+	//Test invalid eventID
+	r = httptest.NewRequest("GET", "/api/v0/events/1001/guests/report", nil)
+	eventDoesNotExistTest(t, r, h, &es)
 }
