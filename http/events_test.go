@@ -60,7 +60,7 @@ func getAuthInfoGenerator(username string, admin bool, err error) func(r *http.R
 	}
 }
 
-func noValidTokenTest(t *testing.T, r *http.Request, h *myhttp.EventHandler, auth *mock.Authenticator) {
+func noValidTokenTest(t *testing.T, r *http.Request, h http.Handler, auth *mock.Authenticator) {
 	original := auth.AuthenticateFn
 	auth.AuthenticateFn = authenticateGenerator(false, nil)
 	w := httptest.NewRecorder()
@@ -365,12 +365,12 @@ func TestHandleURLTaken(t *testing.T) {
 
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	urlExistsGenerator := func(err error) func(url string) (bool, error){
+	urlExistsGenerator := func(err error) func(url string) (bool, error) {
 		return func(url string) (bool, error) {
 			if url != "testurl" {
 				t.Fatal("Expected test_url, instead: " + url)
 			}
-			
+
 			return false, err
 		}
 	}

@@ -201,6 +201,7 @@ func (h *GuestHandler) handleCheckInGuest(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		h.Logger.Println("Error check guest in: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Guest check-in failed", w)
+		return
 	}
 
 	reply, _ := json.Marshal(name)
