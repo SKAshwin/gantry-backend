@@ -170,43 +170,36 @@ func validCreateInputs(event checkin.Event) bool {
 //using the fields provided in the body of the request
 //Only need to supply the fields that need updating
 func (h *EventHandler) handleUpdateEvent(w http.ResponseWriter, r *http.Request) {
-	var updatedFields map[string]string
-	err := json.NewDecoder(r.Body).Decode(&updatedFields)
+	var event checkin.Event
+	err := json.NewDecoder(r.Body).Decode(&event)
 	if err != nil {
 		h.Logger.Println("Error when decoding update fields: " + err.Error())
 		WriteMessage(http.StatusBadRequest, "JSON could not be decoded", w)
 		return
 	}
 
-	if val, ok := updatedFields["url"]; ok { //if the caller is attempting to update the url
-		if ok, err := h.EventService.URLExists(val); err != nil {
+	if event.URL != "" { //if the caller is attempting to update the url
+		if ok, err := h.EventService.URLExists(event.URL); err != nil {
 			h.Logger.Println("Error checking if URL taken: " + err.Error())
 			WriteMessage(http.StatusInternalServerError, "Error checking if URL already taken", w)
 			return
 		} else if ok {
 			WriteMessage(http.StatusConflict, "URL already exists", w)
 			return
-		} else if val == "" {
-			WriteMessage(http.StatusBadRequest, "Cannot have blank URL", w)
-			return
 		}
 	}
-
-	if val, ok := updatedFields["name"]; ok { //if caller is attempting to update the name
-		if val == "" {
-			WriteMessage(http.StatusBadRequest, "Cannot have blank name", w)
-			return
-		}
+	if (event.ID != "") || (event.UpdatedAt != time.Time{}) || (event.CreatedAt != time.Time{}) {
+		//if caller trying to update this non-updatable fields
+		WriteMessage(http.StatusBadRequest, "Cannot update ID or update and create times", w)
+		return
 	}
 
-	eventID := mux.Vars(r)["eventID"] //middleware already confirms event exists
-	validRequest, err := h.EventService.UpdateEvent(eventID, updatedFields)
+	event.ID = mux.Vars(r)["eventID"] //middleware already confirms event exists
+	err = h.EventService.UpdateEvent(event)
 
 	if err != nil {
 		h.Logger.Println("Error updating user: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error updating event", w)
-	} else if !validRequest {
-		WriteMessage(http.StatusBadRequest, "Incorrect fields for event update", w)
 	} else {
 		WriteOKMessage("Event updated", w)
 	}

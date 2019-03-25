@@ -64,7 +64,7 @@ type EventService interface {
 	Events() ([]Event, error)
 	CreateEvent(e Event, hostUsername string) error
 	DeleteEvent(ID string) error
-	UpdateEvent(ID string, updateFields map[string]string) (bool, error)
+	UpdateEvent(e Event) error
 	URLExists(url string) (bool, error)
 	CheckIfExists(id string) (bool, error)
 	AddHost(eventID string, username string) error

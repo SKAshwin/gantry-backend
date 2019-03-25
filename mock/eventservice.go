@@ -21,7 +21,7 @@ type EventService struct {
 	DeleteEventFn      func(ID string) error
 	DeleteEventInvoked bool
 
-	UpdateEventFn      func(ID string, updateFields map[string]string) (bool, error)
+	UpdateEventFn      func(event checkin.Event) error
 	UpdateEventInvoked bool
 
 	URLExistsFn      func(url string) (bool, error)
@@ -68,9 +68,9 @@ func (es *EventService) DeleteEvent(ID string) error {
 }
 
 //UpdateEvent invokes the mock implementation and marks the function as invoked
-func (es *EventService) UpdateEvent(ID string, updateFields map[string]string) (bool, error) {
+func (es *EventService) UpdateEvent(event checkin.Event) error {
 	es.UpdateEventInvoked = true
-	return es.UpdateEventFn(ID, updateFields)
+	return es.UpdateEventFn(event)
 }
 
 //URLExists invokes the mock implementation and marks the function as invoked
