@@ -18,6 +18,9 @@ import (
 	"github.com/guregu/null"
 )
 
+//Generates a CheckIfExists mock function which will return true if the ID passed is equal to
+//expectedID
+//If err is non-nil, function generated will always return an error (and zero values)
 func checkIfExistsGenerator(expectedID string, err error) func(string) (bool, error) {
 	return func(id string) (bool, error) {
 		if err != nil {
@@ -28,6 +31,9 @@ func checkIfExistsGenerator(expectedID string, err error) func(string) (bool, er
 	}
 }
 
+//Generates a CheckHost mock function which will return true if the username and eventID passed in
+//both match the expectedUsername and expectedID - returns false otherwise
+//If err is non-nil, will always return an error (and zero values)
 func checkHostGenerator(expectedUsername string, expectedID string, err error) func(string, string) (bool, error) {
 	return func(username string, eventID string) (bool, error) {
 		if err != nil {
@@ -43,12 +49,16 @@ func checkHostGenerator(expectedUsername string, expectedID string, err error) f
 	}
 }
 
+//Generates an Authenticate mock function which will return (authenticate, err)
 func authenticateGenerator(authenticate bool, err error) func(r *http.Request) (bool, error) {
 	return func(r *http.Request) (bool, error) {
 		return authenticate, err
 	}
 }
 
+//Generates a GetAuthInfo mock function which will return a checkin.AuthorizationInfo object with the username
+//and admin status supplied.
+//If error is non-nil, will return an error and an empty checkin.AuthorizationInfo{}
 func getAuthInfoGenerator(username string, admin bool, err error) func(r *http.Request) (checkin.AuthorizationInfo, error) {
 	return func(r *http.Request) (checkin.AuthorizationInfo, error) {
 		if err != nil {
@@ -61,6 +71,9 @@ func getAuthInfoGenerator(username string, admin bool, err error) func(r *http.R
 	}
 }
 
+//Generates a URLExists mock function which returns true if the url passed in matches
+//the expected string
+//If error is non-nil, will return error and false.
 func urlExistsGenerator(expected string, err error) func(string) (bool, error) {
 	return func(url string) (bool, error) {
 		if err != nil {
@@ -70,6 +83,12 @@ func urlExistsGenerator(expected string, err error) func(string) (bool, error) {
 	}
 }
 
+//Tests the checkAuth access control
+//The request r must be made to an endpoint with said access control
+//A mock AuthenticateFn is set up to return false
+//Tests whether this results in a 401 error
+//Also tests what happens if the authenticate function returns an error, which suggests
+//the token was badly formed, so checks for a 400 error
 func noValidTokenTest(t *testing.T, r *http.Request, h http.Handler, auth *mock.Authenticator) {
 	original := auth.AuthenticateFn
 	auth.AuthenticateFn = authenticateGenerator(false, nil)
@@ -83,6 +102,13 @@ func noValidTokenTest(t *testing.T, r *http.Request, h http.Handler, auth *mock.
 	auth.AuthenticateFn = original
 }
 
+//Tests one half of the isAdminOrHost access control
+//The request r must be made to an endpoint with said access control, and a username
+//must be provided that is not recognized as the username by the CheckHost function (consider deprecating
+//in future, set CheckHost within this test as well)
+//A mock GetAuthInfoFn is set to return the fake host without admin controls, and check if this results in
+//a 403 error
+//Also checks for handling of errors in GetAuthInfo (400 Bad Request) and CheckHost (500 Internal Server Error)
 func nonHostAccessTest(t *testing.T, r *http.Request, h http.Handler, auth *mock.Authenticator, es *mock.EventService,
 	nonHostUsername string) {
 
@@ -106,6 +132,12 @@ func nonHostAccessTest(t *testing.T, r *http.Request, h http.Handler, auth *mock
 	es.CheckHostFn = originalCheckHost
 }
 
+//Tests one half of the isAdminOrHost access control
+//The request r must be made to an endpoint with said access control
+//Sets up GetAuthInfoFn to return an admin account
+//Note that this request is supposed to succeed, so an outputTester function must be supplied
+//Which should test if the output (the http Response) is what is expected in a success case
+//Also test for handling of error in GetAuthInfo (400 Bad Request)
 func adminAccessTest(t *testing.T, r *http.Request, h http.Handler, auth *mock.Authenticator,
 	outputTester func(*http.Response)) {
 
@@ -121,6 +153,9 @@ func adminAccessTest(t *testing.T, r *http.Request, h http.Handler, auth *mock.A
 	auth.GetAuthInfoFn = original
 }
 
+//Tests a request that is made to an endpoint which the mock event service CheckIfExists should
+//return false (IE a non-existent endpoint). Checks that a 404 is returnd
+//Also checks for a 500 if checkIfExists returns an error
 func eventDoesNotExistTest(t *testing.T, badRequest *http.Request, h http.Handler, es *mock.EventService) {
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, badRequest)
@@ -183,7 +218,7 @@ func TestHandleCreateEvent(t *testing.T) {
 	r = httptest.NewRequest("POST", "/api/v0/events",
 		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\",\"startDateTime\":\"2019-03-15T08:20:00Z\","+
 			"\"endDateTime\":\"2019-03-15T10:00:00Z\", \"releaseDateTime\":\"2019-03-15T08:00:00Z\","+
-			"\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\", \"updatedAt\":\"2019-3-12T09:30:00Z\"}"))
+			"\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\", \"updatedAt\":\"2019-03-12T09:30:00Z\"}"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
@@ -192,7 +227,7 @@ func TestHandleCreateEvent(t *testing.T) {
 	r = httptest.NewRequest("POST", "/api/v0/events",
 		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\",\"startDateTime\":\"2019-03-15T08:20:00Z\","+
 			"\"endDateTime\":\"2019-03-15T10:00:00Z\", \"releaseDateTime\":\"2019-03-15T08:00:00Z\","+
-			"\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\", \"createdAt\":\"2019-3-12T16:00:30Z\"}"))
+			"\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\", \"createdAt\":\"2019-03-12T16:00:30Z\"}"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
@@ -282,6 +317,185 @@ func TestHandleCreateEvent(t *testing.T) {
 	r = httptest.NewRequest("POST", "/api/v0/events",
 		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\"}"))
 	noValidTokenTest(t, r, h, &auth)
+}
+
+func TestHandleUpdateEvent(t *testing.T) {
+	//TODO
+	var es mock.EventService
+	var auth mock.Authenticator
+	gh := myhttp.GuestHandler{}
+	h := myhttp.NewEventHandler(&es, &auth, &gh)
+
+	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
+	es.CheckHostFn = checkHostGenerator("testing_username", "300", nil)
+	auth.AuthenticateFn = authenticateGenerator(true, nil)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
+	srcEvent := checkin.Event{ID: "300",
+		Name:      "Hello",
+		URL:       "/someplace",
+		CreatedAt: time.Date(2019, 3, 26, 15, 35, 10, 0, time.UTC),
+		UpdatedAt: time.Date(2019, 3, 26, 15, 35, 10, 0, time.UTC),
+	}
+	eventGenerator := func(srcEvent checkin.Event, err error) func(string) (checkin.Event, error) {
+		return func(ID string) (checkin.Event, error) {
+			if ID != "300" {
+				t.Fatal("Unexpected username: " + ID + ", expected 300")
+			}
+			if err != nil {
+				return checkin.Event{}, err
+			}
+			return srcEvent, nil
+		}
+	}
+	es.EventFn = eventGenerator(srcEvent, nil)
+	es.URLExistsFn = urlExistsGenerator("/knownurl", nil)
+	updateEventGenerator := func(expectedEvent checkin.Event, err error) func(checkin.Event) error {
+		return func(event checkin.Event) error {
+			if event != expectedEvent {
+				t.Fatal("Unexpected event. Expected: ", expectedEvent, ", received ", event)
+			}
+			return err
+		}
+	}
+	expEvent := checkin.Event{
+		ID:        "300",
+		Name:      "MyEvent",
+		URL:       "/hello2",
+		Start:     null.Time{Time: time.Date(2019, 3, 15, 8, 20, 0, 0, time.UTC), Valid: true},
+		End:       null.Time{Time: time.Date(2019, 3, 15, 10, 0, 0, 0, time.UTC), Valid: true},
+		Release:   null.Time{Time: time.Date(2019, 3, 15, 8, 0, 0, 0, time.UTC), Valid: true},
+		Lat:       null.FloatFrom(1.388),
+		Long:      null.FloatFrom(2),
+		Radius:    null.FloatFrom(5),
+		CreatedAt: time.Date(2019, 3, 26, 15, 35, 10, 0, time.UTC),
+		UpdatedAt: time.Date(2019, 3, 26, 15, 35, 10, 0, time.UTC),
+	}
+	es.UpdateEventFn = updateEventGenerator(expEvent, nil)
+
+	//test normal functionality, replace everything
+	r := httptest.NewRequest("PATCH", "/api/v0/events/300",
+		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\",\"startDateTime\":\"2019-03-15T08:20:00Z\","+
+			"\"endDateTime\":\"2019-03-15T10:00:00Z\", \"releaseDateTime\":\"2019-03-15T08:00:00Z\","+
+			"\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\"}"))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+
+	//test try to change update/create/ID
+	es.UpdateEventInvoked = false
+	r = httptest.NewRequest("PATCH", "/api/v0/events/300",
+		strings.NewReader("{\"name\":\"MyEvent\", \"updatedAt\":\"2019-03-12T09:30:00Z\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.UpdateEventInvoked, "Update event invoked even though updatedAt changed")
+	es.UpdateEventInvoked = false
+	r = httptest.NewRequest("PATCH", "/api/v0/events/300",
+		strings.NewReader("{\"name\":\"MyEvent\", \"createdAt\":\"2019-03-12T16:00:30Z\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.UpdateEventInvoked, "Update event invoked even though createdAt changed")
+	es.UpdateEventInvoked = false
+	r = httptest.NewRequest("PATCH", "/api/v0/events/300",
+		strings.NewReader("{\"name\":\"MyEvent\", \"eventId\":\"200\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.UpdateEventInvoked, "Update event invoked even though ID changed")
+
+	//test try to set blank URL/name
+	es.UpdateEventInvoked = false
+	r = httptest.NewRequest("PATCH", "/api/v0/events/300",
+		strings.NewReader("{\"name\":\"\", \"startDateTime\":\"2019-03-12T09:30:00Z\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.UpdateEventInvoked, "Update event invoked even though name set to blank")
+	es.UpdateEventInvoked = false
+	r = httptest.NewRequest("PATCH", "/api/v0/events/300",
+		strings.NewReader("{\"url\":\"\", \"startDateTime\":\"2019-03-12T09:30:00Z\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.UpdateEventInvoked, "Update event invoked even though url set to blank")
+
+	//test URL already in use
+	r = httptest.NewRequest("PATCH", "/api/v0/events/300",
+		strings.NewReader("{\"url\":\"/knownurl\",\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusConflict, w.Result().StatusCode)
+
+	expEvent = checkin.Event{
+		ID:        "300",
+		Name:      "MyEvent",
+		URL:       "/hello2",
+		Start:     null.Time{Time: time.Date(2019, 3, 15, 8, 20, 0, 0, time.UTC), Valid: true},
+		CreatedAt: time.Date(2019, 3, 26, 15, 35, 10, 0, time.UTC),
+		UpdatedAt: time.Date(2019, 3, 26, 15, 35, 10, 0, time.UTC),
+	}
+
+	//Test fetching original event fails
+	es.EventFn = eventGenerator(checkin.Event{}, errors.New("An error"))
+	r = httptest.NewRequest("PATCH", "/api/v0/events/300",
+		strings.NewReader("{\"name\":\"MyEvent\", \"url\":\"/hello2\", \"startDateTime\":\"2019-03-15T08:20:00Z\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	es.EventFn = eventGenerator(srcEvent, nil)
+
+	//Test invalid time format
+	r = httptest.NewRequest("PATCH", "/api/v0/events/300",
+		strings.NewReader("{\"name\":\"MyEvent\", \"url\":\"/hello2\", \"startDateTime\":\"2019-03-15T08:20Z\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	//Test error checking if new URL already taken
+	es.URLExistsFn = urlExistsGenerator("/knownurl", errors.New("An error"))
+	es.UpdateEventInvoked = false
+	r = httptest.NewRequest("PATCH", "/api/v0/events/300",
+		strings.NewReader("{\"name\":\"MyEvent\", \"url\":\"/hello2\", \"startDateTime\":\"2019-03-15T08:20:00Z\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	test.Assert(t, !es.UpdateEventInvoked, "Update event invoked even though could not determine if URL unique")
+	es.URLExistsFn = urlExistsGenerator("/knownurl", nil)
+
+	//Test error in updating event
+	es.UpdateEventFn = updateEventGenerator(expEvent, errors.New("An error"))
+	r = httptest.NewRequest("PATCH", "/api/v0/events/300",
+		strings.NewReader("{\"name\":\"MyEvent\", \"url\":\"/hello2\", \"startDateTime\":\"2019-03-15T08:20:00Z\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	es.UpdateEventFn = updateEventGenerator(expEvent, nil)
+
+	//Test usual access control
+	//Test access by another user
+	r = httptest.NewRequest("PATCH", "/api/v0/events/300",
+		strings.NewReader("{\"name\":\"MyEvent\", \"url\":\"/hello2\", \"startDateTime\":\"2019-03-15T08:20:00Z\"}"))
+	nonHostAccessTest(t, r, h, &auth, &es, "unauthorized_person")
+
+	//Test access by admin
+	r = httptest.NewRequest("PATCH", "/api/v0/events/300",
+		strings.NewReader("{\"name\":\"MyEvent\", \"url\":\"/hello2\", \"startDateTime\":\"2019-03-15T08:20:00Z\"}"))
+	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
+		test.Equals(t, http.StatusOK, r.StatusCode)
+	})
+
+	//Test invalid token
+	r = httptest.NewRequest("PATCH", "/api/v0/events/300",
+		strings.NewReader("{\"name\":\"MyEvent\", \"url\":\"/hello2\", \"startDateTime\":\"2019-03-15T08:20:00Z\"}"))
+
+	noValidTokenTest(t, r, h, &auth)
+
+	//Test invalid eventID
+	r = httptest.NewRequest("PATCH", "/api/v0/events/200",
+		strings.NewReader("{\"name\":\"MyEvent\", \"url\":\"/hello2\", \"startDateTime\":\"2019-03-15T08:20:00Z\"}"))
+	eventDoesNotExistTest(t, r, h, &es)
+
 }
 
 func TestHandleReleased(t *testing.T) {
