@@ -83,7 +83,7 @@ func urlExistsGenerator(expected string, err error) func(string) (bool, error) {
 	}
 }
 
-//Tests the checkAuth access control
+//Tests if a nonvalid token can access an endpoint (it should not be able to)
 //The request r must be made to an endpoint with said access control
 //A mock AuthenticateFn is set up to return false
 //Tests whether this results in a 401 error
@@ -102,7 +102,7 @@ func noValidTokenTest(t *testing.T, r *http.Request, h http.Handler, auth *mock.
 	auth.AuthenticateFn = original
 }
 
-//Tests one half of the isAdminOrHost access control
+//Tests if a non-host can access an endpoint, with the expectation that they cant
 //The request r must be made to an endpoint with said access control, and a username
 //must be provided that is not recognized as the username by the CheckHost function (consider deprecating
 //in future, set CheckHost within this test as well)
@@ -132,7 +132,7 @@ func nonHostAccessTest(t *testing.T, r *http.Request, h http.Handler, auth *mock
 	es.CheckHostFn = originalCheckHost
 }
 
-//Tests one half of the isAdminOrHost access control
+//Tests if admins can access an endpoint
 //The request r must be made to an endpoint with said access control
 //Sets up GetAuthInfoFn to return an admin account
 //Note that this request is supposed to succeed, so an outputTester function must be supplied
