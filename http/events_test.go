@@ -11,6 +11,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -57,6 +58,15 @@ func getAuthInfoGenerator(username string, admin bool, err error) func(r *http.R
 			Username: username,
 			IsAdmin:  admin,
 		}, nil
+	}
+}
+
+func urlExistsGenerator(expected string, err error) func(string) (bool, error) {
+	return func(url string) (bool, error) {
+		if err != nil {
+			return false, err
+		}
+		return url == expected, nil
 	}
 }
 
@@ -122,6 +132,156 @@ func eventDoesNotExistTest(t *testing.T, badRequest *http.Request, h http.Handle
 	h.ServeHTTP(w, badRequest)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
 	es.CheckIfExistsFn = original
+}
+
+func TestHandleCreateEvent(t *testing.T) {
+	var es mock.EventService
+	var auth mock.Authenticator
+	gh := myhttp.GuestHandler{}
+	h := myhttp.NewEventHandler(&es, &auth, &gh)
+
+	es.URLExistsFn = urlExistsGenerator("/hello", nil)
+	auth.AuthenticateFn = authenticateGenerator(true, nil)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
+	createEventGenerator := func(expectedEvent checkin.Event, err error) func(checkin.Event, string) error {
+		return func(event checkin.Event, hostname string) error {
+			event.ID = ""
+			if event != expectedEvent {
+				t.Fatal("Event was differented than expected. Received: ", event, " expected",
+					expectedEvent)
+			}
+			if hostname != "testing_username" {
+				t.Fatal("Host name was different than expected. Received: " + hostname + ", expected " +
+					"testing_username")
+			}
+			return err
+		}
+	}
+	expectedEvent := checkin.Event{
+		Name:    "MyEvent",
+		URL:     "/hello2",
+		Start:   null.Time{Time: time.Date(2019, 3, 15, 8, 20, 0, 0, time.UTC), Valid: true},
+		End:     null.Time{Time: time.Date(2019, 3, 15, 10, 0, 0, 0, time.UTC), Valid: true},
+		Release: null.Time{Time: time.Date(2019, 3, 15, 8, 0, 0, 0, time.UTC), Valid: true},
+		Lat:     null.FloatFrom(1.388),
+		Long:    null.FloatFrom(2),
+		Radius:  null.FloatFrom(5),
+	}
+	es.CreateEventFn = createEventGenerator(expectedEvent, nil)
+
+	//test normal functionality
+	r := httptest.NewRequest("POST", "/api/v0/events",
+		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\",\"startDateTime\":\"2019-03-15T08:20:00Z\","+
+			"\"endDateTime\":\"2019-03-15T10:00:00Z\", \"releaseDateTime\":\"2019-03-15T08:00:00Z\","+
+			"\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\"}"))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
+
+	//test supplied update or create
+	es.CreateEventInvoked = false
+	r = httptest.NewRequest("POST", "/api/v0/events",
+		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\",\"startDateTime\":\"2019-03-15T08:20:00Z\","+
+			"\"endDateTime\":\"2019-03-15T10:00:00Z\", \"releaseDateTime\":\"2019-03-15T08:00:00Z\","+
+			"\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\", \"updatedAt\":\"2019-3-12T09:30:00Z\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.CreateEventInvoked, "Create event invoked even though updatedAt or createdAt invoked")
+	es.CreateEventInvoked = false
+	r = httptest.NewRequest("POST", "/api/v0/events",
+		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\",\"startDateTime\":\"2019-03-15T08:20:00Z\","+
+			"\"endDateTime\":\"2019-03-15T10:00:00Z\", \"releaseDateTime\":\"2019-03-15T08:00:00Z\","+
+			"\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\", \"createdAt\":\"2019-3-12T16:00:30Z\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.CreateEventInvoked, "Create event invoked even though updatedAt or createdAt invoked")
+
+	//test no URL or name
+	es.CreateEventInvoked = false
+	r = httptest.NewRequest("POST", "/api/v0/events",
+		strings.NewReader("{\"url\":\"/hello2\",\"startDateTime\":\"2019-03-15T08:20:00Z\","+
+			"\"endDateTime\":\"2019-03-15T10:00:00Z\", \"releaseDateTime\":\"2019-03-15T08:00:00Z\","+
+			"\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.CreateEventInvoked, "Create event invoked even though blank URL/name")
+	es.CreateEventInvoked = false
+	r = httptest.NewRequest("POST", "/api/v0/events",
+		strings.NewReader("{\"name\":\"MyEvent\",\"startDateTime\":\"2019-03-15T08:20:00Z\","+
+			"\"endDateTime\":\"2019-03-15T10:00:00Z\", \"releaseDateTime\":\"2019-03-15T08:00:00Z\","+
+			"\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.CreateEventInvoked, "Create event invoked even though blank URL/name")
+
+	//test URL already in use
+	r = httptest.NewRequest("POST", "/api/v0/events",
+		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello\",\"startDateTime\":\"2019-03-15T08:20:00Z\","+
+			"\"endDateTime\":\"2019-03-15T10:00:00Z\", \"releaseDateTime\":\"2019-03-15T08:00:00Z\","+
+			"\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusConflict, w.Result().StatusCode)
+
+	//test minimum required fields
+	expectedEvent = checkin.Event{
+		Name: "MyEvent",
+		URL:  "/hello2",
+	}
+	es.CreateEventFn = createEventGenerator(expectedEvent, nil)
+	r = httptest.NewRequest("POST", "/api/v0/events",
+		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
+
+	//Test invalid time formats
+	r = httptest.NewRequest("POST", "/api/v0/events",
+		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\", \"startDateTime\":\"2019-03-15 08:20\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	r = httptest.NewRequest("POST", "/api/v0/events",
+		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\", \"startDateTime\":\"2019-03-15T08:20:00Z08:00\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	//Test error checking if url exists
+	es.URLExistsFn = urlExistsGenerator("/hello", errors.New("An error"))
+	r = httptest.NewRequest("POST", "/api/v0/events",
+		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	es.URLExistsFn = urlExistsGenerator("/hello", nil)
+
+	//test error getting auth info (for username for host name of event)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("", false, errors.New("An error"))
+	r = httptest.NewRequest("POST", "/api/v0/events",
+		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
+
+	//test error creating event
+	es.CreateEventFn = createEventGenerator(expectedEvent, errors.New("An error"))
+	r = httptest.NewRequest("POST", "/api/v0/events",
+		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	es.CreateEventFn = createEventGenerator(expectedEvent, nil)
+
+	//test invalid token
+	r = httptest.NewRequest("POST", "/api/v0/events",
+		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\"}"))
+	noValidTokenTest(t, r, h, &auth)
 }
 
 func TestHandleReleased(t *testing.T) {

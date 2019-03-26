@@ -150,6 +150,7 @@ func (h *EventHandler) handleCreateEvent(w http.ResponseWriter, r *http.Request)
 	if err != nil {
 		h.Logger.Println("Error fetching authorization info: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error in fetching authorization info", w)
+		return
 	}
 
 	err = h.EventService.CreateEvent(eventData, authInfo.Username)
