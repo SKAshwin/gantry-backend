@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"log"
-	"reflect"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -128,13 +127,13 @@ func (es *EventService) CreateEvent(e checkin.Event, hostUsername string) error 
 }
 
 //UpdateEvent updates a particular event given an event object encapsulating
-//the fields that need to be updated
-//Empty fields (like a "" URL) will be ignored - as no non-nullable event fields can be empty
-//For nullable values (like Start, which is null.Time), only Valid values are used to update
-//Event ID must be non-null to avoid an error
-//Returns a non-nil error if there was an error updating the event
+//ALL THE NEW FIELDS of the object
+//It will use the eventID as the key to know which row in the DB to update
+//So note that eventID cannot be mutated
+//All columns in the database will be set to the fields of the event object
+//Except for the createdAt and updatedAt fields, which are not editable
 func (es *EventService) UpdateEvent(event checkin.Event) error {
-	tx, err := es.DB.Begin()
+	tx, err := es.DB.Beginx()
 	if err != nil {
 		return errors.New("Error opening transaction:" + err.Error())
 	}
@@ -149,76 +148,11 @@ func (es *EventService) UpdateEvent(event checkin.Event) error {
 		}
 	}()
 
-	if event.Name != "" {
-		field, _ := reflect.TypeOf(event).FieldByName("Name")
-		_, err := tx.Exec("UPDATE event SET \""+string(field.Tag.Get("db"))+"\" = $1 where ID = $2", event.Name, event.ID)
-		if err != nil {
-			tx.Rollback()
-			return errors.New("Error while updating database: " + err.Error())
-		}
-	}
-	if event.Release.Valid != false {
-		field, _ := reflect.TypeOf(event).FieldByName("Release")
-		_, err := tx.Exec("UPDATE event SET \""+string(field.Tag.Get("db"))+"\" = $1 where ID = $2",
-			event.Release.Time, event.ID)
-		if err != nil {
-			tx.Rollback()
-			return errors.New("Error while updating database: " + err.Error())
-		}
-	}
-	if event.Start.Valid != false {
-		field, _ := reflect.TypeOf(event).FieldByName("Start")
-		_, err := tx.Exec("UPDATE event SET \""+string(field.Tag.Get("db"))+"\" = $1 where ID = $2",
-			event.Start.Time, event.ID)
-		if err != nil {
-			tx.Rollback()
-			return errors.New("Error while updating database: " + err.Error())
-		}
-	}
-	if event.End.Valid != false {
-		field, _ := reflect.TypeOf(event).FieldByName("End")
-		_, err := tx.Exec("UPDATE event SET \""+string(field.Tag.Get("db"))+"\" = $1 where ID = $2",
-			event.End.Time, event.ID)
-		if err != nil {
-			tx.Rollback()
-			return errors.New("Error while updating database: " + err.Error())
-		}
-	}
-	if event.Lat.Valid != false {
-		field, _ := reflect.TypeOf(event).FieldByName("Lat")
-		_, err := tx.Exec("UPDATE event SET \""+string(field.Tag.Get("db"))+"\" = $1 where ID = $2",
-			event.Lat.Float64, event.ID)
-		if err != nil {
-			tx.Rollback()
-			return errors.New("Error while updating database: " + err.Error())
-		}
-	}
-	if event.Long.Valid != false {
-		field, _ := reflect.TypeOf(event).FieldByName("Long")
-		_, err := tx.Exec("UPDATE event SET \""+string(field.Tag.Get("db"))+"\" = $1 where ID = $2",
-			event.Long.Float64, event.ID)
-		if err != nil {
-			tx.Rollback()
-			return errors.New("Error while updating database: " + err.Error())
-		}
-	}
-	if event.Radius.Valid != false {
-		field, _ := reflect.TypeOf(event).FieldByName("Radius")
-		_, err := tx.Exec("UPDATE event SET \""+string(field.Tag.Get("db"))+"\" = $1 where ID = $2",
-			event.Radius.Float64, event.ID)
-		if err != nil {
-			tx.Rollback()
-			return errors.New("Error while updating database: " + err.Error())
-		}
-	}
-	if event.URL != "" {
-		field, _ := reflect.TypeOf(event).FieldByName("URL")
-		_, err := tx.Exec("UPDATE event SET \""+string(field.Tag.Get("db"))+"\" = $1 where ID = $2",
-			event.URL, event.ID)
-		if err != nil {
-			tx.Rollback()
-			return errors.New("Error while updating database: " + err.Error())
-		}
+	_, err = tx.NamedExec("UPDATE event SET name = :name, release = :release, \"start\" = :start, "+
+		"\"end\" = :end, lat = :lat, long= :long, radius = :radius, url = :url where id = :id", &event)
+	if err != nil {
+		tx.Rollback()
+		return errors.New("Error when updating event: " + err.Error())
 	}
 
 	_, err = tx.Exec("UPDATE event SET updatedAt = NOW() where ID = $1", event.ID)

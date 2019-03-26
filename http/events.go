@@ -127,7 +127,7 @@ func (h *EventHandler) handleCreateEvent(w http.ResponseWriter, r *http.Request)
 	err := json.NewDecoder(r.Body).Decode(&eventData)
 	if err != nil {
 		h.Logger.Println("Error decoding event JSON: " + err.Error())
-		WriteMessage(http.StatusBadRequest, "Badly formatted JSON in event", w)
+		WriteMessage(http.StatusBadRequest, "Badly formatted JSON in event (Possibly invalid time format)", w)
 		return
 	}
 	if !validCreateInputs(eventData) {
@@ -170,15 +170,25 @@ func validCreateInputs(event checkin.Event) bool {
 //using the fields provided in the body of the request
 //Only need to supply the fields that need updating
 func (h *EventHandler) handleUpdateEvent(w http.ResponseWriter, r *http.Request) {
-	var event checkin.Event
-	err := json.NewDecoder(r.Body).Decode(&event)
+	//Load original event, marshal JSON into it
+	//This updates only the fields that were supplied
+	event, err := h.EventService.Event(mux.Vars(r)["eventID"])
 	if err != nil {
-		h.Logger.Println("Error when decoding update fields: " + err.Error())
-		WriteMessage(http.StatusBadRequest, "JSON could not be decoded", w)
+		h.Logger.Println("Error fetching original event: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Could not fetch original event", w)
 		return
 	}
 
-	if event.URL != "" { //if the caller is attempting to update the url
+	originalURL, originalCreatedAt, originalUpdatedAt := event.URL, event.CreatedAt, event.UpdatedAt
+
+	err = json.NewDecoder(r.Body).Decode(&event)
+	if err != nil {
+		h.Logger.Println("Error when decoding update fields: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "JSON could not be decoded (Possibly invalid time format)", w)
+		return
+	}
+
+	if event.URL != originalURL { //if the caller is attempting to update the url
 		if ok, err := h.EventService.URLExists(event.URL); err != nil {
 			h.Logger.Println("Error checking if URL taken: " + err.Error())
 			WriteMessage(http.StatusInternalServerError, "Error checking if URL already taken", w)
@@ -188,15 +198,18 @@ func (h *EventHandler) handleUpdateEvent(w http.ResponseWriter, r *http.Request)
 			return
 		}
 	}
-	if (event.ID != "") || (event.UpdatedAt != time.Time{}) || (event.CreatedAt != time.Time{}) {
-		//if caller trying to update this non-updatable fields
+
+	if (event.ID != mux.Vars(r)["eventID"]) || (event.UpdatedAt != originalUpdatedAt) ||
+		(event.CreatedAt != originalCreatedAt) {
+		//if caller trying to update these non-updatable fields
 		WriteMessage(http.StatusBadRequest, "Cannot update ID or update and create times", w)
+		return
+	} else if event.URL == "" || event.Name == "" {
+		WriteMessage(http.StatusBadRequest, "Cannot set name or URL to empty string", w)
 		return
 	}
 
-	event.ID = mux.Vars(r)["eventID"] //middleware already confirms event exists
 	err = h.EventService.UpdateEvent(event)
-
 	if err != nil {
 		h.Logger.Println("Error updating user: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error updating event", w)
