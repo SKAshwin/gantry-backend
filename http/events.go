@@ -124,10 +124,12 @@ func (h *EventHandler) handleDeleteEvent(w http.ResponseWriter, r *http.Request)
 //handleCreateEvent creates an event
 func (h *EventHandler) handleCreateEvent(w http.ResponseWriter, r *http.Request) {
 	var eventData checkin.Event
-	err := json.NewDecoder(r.Body).Decode(&eventData)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&eventData)
 	if err != nil {
 		h.Logger.Println("Error decoding event JSON: " + err.Error())
-		WriteMessage(http.StatusBadRequest, "Badly formatted JSON in event (Possibly invalid time format)", w)
+		WriteMessage(http.StatusBadRequest, "Badly formatted JSON in event (Possibly invalid time format or invalid fields)", w)
 		return
 	}
 	if !validCreateInputs(eventData) {
@@ -182,10 +184,12 @@ func (h *EventHandler) handleUpdateEvent(w http.ResponseWriter, r *http.Request)
 
 	originalURL, originalCreatedAt, originalUpdatedAt := event.URL, event.CreatedAt, event.UpdatedAt
 
-	err = json.NewDecoder(r.Body).Decode(&event)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err = dec.Decode(&event)
 	if err != nil {
 		h.Logger.Println("Error when decoding update fields: " + err.Error())
-		WriteMessage(http.StatusBadRequest, "JSON could not be decoded (Possibly invalid time format)", w)
+		WriteMessage(http.StatusBadRequest, "JSON could not be decoded (Possibly invalid time format or unknown fields)", w)
 		return
 	}
 

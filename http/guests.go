@@ -89,7 +89,9 @@ func (h *GuestHandler) handleGuests(w http.ResponseWriter, r *http.Request) {
 
 func (h *GuestHandler) handleRegisterGuest(w http.ResponseWriter, r *http.Request) {
 	var guest checkin.Guest
-	err := json.NewDecoder(r.Body).Decode(&guest)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&guest)
 	if err != nil {
 		h.Logger.Println("Error when decoding guest details: " + err.Error())
 		WriteMessage(http.StatusBadRequest, "Incorrect fields for adding new guest", w)
@@ -120,10 +122,16 @@ func (h *GuestHandler) handleRegisterGuest(w http.ResponseWriter, r *http.Reques
 func (h *GuestHandler) handleRemoveGuest(w http.ResponseWriter, r *http.Request) {
 	eventID := mux.Vars(r)["eventID"]
 	var guest checkin.Guest
-	err := json.NewDecoder(r.Body).Decode(&guest)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&guest)
 	if err != nil {
 		h.Logger.Println("Error when decoding guest NRIC: " + err.Error())
-		WriteMessage(http.StatusBadRequest, "Incorrect fields for removing guest (need NRIC as string)", w)
+		WriteMessage(http.StatusBadRequest, "Incorrect fields for removing guest (need only NRIC)", w)
+		return
+	}
+	if guest.Name != "" {
+		WriteMessage(http.StatusBadRequest, "Incorrect fields for removing guest (need only NRIC)", w)
 		return
 	}
 
@@ -150,10 +158,16 @@ func (h *GuestHandler) handleGuestsCheckedIn(w http.ResponseWriter, r *http.Requ
 
 func (h *GuestHandler) handleMarkGuestAbsent(w http.ResponseWriter, r *http.Request) {
 	var guest checkin.Guest
-	err := json.NewDecoder(r.Body).Decode(&guest)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&guest)
 	if err != nil {
 		h.Logger.Println("Error when decoding guest details: " + err.Error())
 		WriteMessage(http.StatusBadRequest, "Incorrect fields for marking guest absent", w)
+		return
+	}
+	if guest.Name != "" {
+		WriteMessage(http.StatusBadRequest, "Incorrect fields for removing guest (need only NRIC)", w)
 		return
 	}
 
@@ -179,10 +193,16 @@ func (h *GuestHandler) handleMarkGuestAbsent(w http.ResponseWriter, r *http.Requ
 
 func (h *GuestHandler) handleCheckInGuest(w http.ResponseWriter, r *http.Request) {
 	var guest checkin.Guest
-	err := json.NewDecoder(r.Body).Decode(&guest)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&guest)
 	if err != nil {
 		h.Logger.Println("Error when decoding guest details: " + err.Error())
 		WriteMessage(http.StatusBadRequest, "Incorrect fields for checking in guest", w)
+		return
+	}
+	if guest.Name != "" {
+		WriteMessage(http.StatusBadRequest, "Incorrect fields for removing guest (need only NRIC)", w)
 		return
 	}
 

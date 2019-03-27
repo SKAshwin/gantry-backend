@@ -213,6 +213,15 @@ func TestHandleCreateEvent(t *testing.T) {
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
 
+	//test additional unknown fields added
+	r = httptest.NewRequest("POST", "/api/v0/events",
+		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\",\"startDateTime\":\"2019-03-15T08:20:00Z\","+
+			"\"endDateTime\":\"2019-03-15T10:00:00Z\", \"releaseDateTime\":\"2019-03-15T08:00:00Z\","+
+			"\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\", \"host\":\"Bob\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
 	//test supplied update or create
 	es.CreateEventInvoked = false
 	r = httptest.NewRequest("POST", "/api/v0/events",
@@ -320,7 +329,6 @@ func TestHandleCreateEvent(t *testing.T) {
 }
 
 func TestHandleUpdateEvent(t *testing.T) {
-	//TODO
 	var es mock.EventService
 	var auth mock.Authenticator
 	gh := myhttp.GuestHandler{}
@@ -380,6 +388,15 @@ func TestHandleUpdateEvent(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+
+	//test unknown fields
+	r = httptest.NewRequest("PATCH", "/api/v0/events/300",
+		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\",\"startDateTime\":\"2019-03-15T08:20:00Z\","+
+			"\"endDateTime\":\"2019-03-15T10:00:00Z\", \"releaseDateTime\":\"2019-03-15T08:00:00Z\","+
+			"\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\", \"lmao\":\"12\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 
 	//test try to change update/create/ID
 	es.UpdateEventInvoked = false
