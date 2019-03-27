@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -41,11 +42,11 @@ func NewUserHandler(us checkin.UserService, auth Authenticator) *UserHandler {
 	h.Handle("/api/v0/users", Adapt(http.HandlerFunc(h.handleCreateUser),
 		tokenCheck, adminCheck)).Methods("POST")
 	h.Handle("/api/v0/users/{username}", Adapt(http.HandlerFunc(h.handleUser),
-		tokenCheck, adminOrUserCheck, existCheck)).Methods("GET")
+		tokenCheck, existCheck, adminOrUserCheck)).Methods("GET")
 	h.Handle("/api/v0/users/{username}", Adapt(http.HandlerFunc(h.handleUpdateUser),
-		tokenCheck, adminOrUserCheck, existCheck)).Methods("PATCH")
+		tokenCheck, existCheck, adminOrUserCheck)).Methods("PATCH")
 	h.Handle("/api/v0/users/{username}", Adapt(http.HandlerFunc(h.handleDeleteUser),
-		tokenCheck, adminOrUserCheck, existCheck)).Methods("DELETE")
+		tokenCheck, existCheck, adminOrUserCheck)).Methods("DELETE")
 
 	return h
 }
@@ -79,10 +80,18 @@ func (h *UserHandler) handleUser(w http.ResponseWriter, r *http.Request) {
 //body of the request
 func (h *UserHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	var user checkin.User
-	err := json.NewDecoder(r.Body).Decode(&user)
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&user)
 	if err != nil {
-		h.Logger.Println("Error when decoding name: " + err.Error())
-		WriteMessage(http.StatusBadRequest, "Incorrect fields for creating user", w)
+		h.Logger.Println("Error when decoding user creation data: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "Could not decode JSON; possibly invalid fields", w)
+		return
+	}
+
+	if !validateCreateInputs(user) {
+		WriteMessage(http.StatusBadRequest, "User creation data invalid. Cannot have blank username, name "+
+			"or password; cannot set updatedAt or createdAt fields", w)
 		return
 	}
 
@@ -103,6 +112,11 @@ func (h *UserHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 	} else {
 		WriteMessage(http.StatusCreated, "Registration successful", w)
 	}
+}
+
+func validateCreateInputs(u checkin.User) bool {
+	return u.Username != "" && u.PasswordPlaintext != "" && u.Name != "" && u.CreatedAt == time.Time{} &&
+		u.UpdatedAt == time.Time{} && u.LastLoggedIn.Valid == false
 }
 
 //handleUpdateUser Reads the JSON as a map, only attributes to be updated need
