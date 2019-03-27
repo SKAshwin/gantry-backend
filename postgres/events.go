@@ -15,18 +15,6 @@ type EventService struct {
 	DB *sqlx.DB
 }
 
-//maps from json:db
-var eventUpdateSchema = map[string]string{
-	"name":            "name",
-	"startDateTime":   "start",
-	"endDateTime":     "end",
-	"lat":             "lat",
-	"long":            "long",
-	"radius":          "radius",
-	"url":             "url",
-	"releaseDateTime": "release",
-}
-
 //Event Fetches the details of an event, given its ID
 func (es *EventService) Event(eventID string) (checkin.Event, error) {
 	var event checkin.Event
@@ -208,15 +196,6 @@ func (es *EventService) CheckHost(username string, eventID string) (bool, error)
 		return false, errors.New("Error checking if host relationship exists: " + err.Error())
 	}
 	return numHosts == 1, nil
-}
-
-func isEventUpdateRequestValid(updateFields map[string]string) bool {
-	for attribute := range updateFields {
-		if _, exist := eventUpdateSchema[attribute]; !exist {
-			return false
-		}
-	}
-	return true
 }
 
 func (es *EventService) getNumberOfEvents() (int, error) {
