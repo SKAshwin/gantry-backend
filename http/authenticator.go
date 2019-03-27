@@ -40,6 +40,7 @@ func isAdmin(au Authenticator) Adapter {
 			authDetails, err := au.GetAuthInfo(r)
 			if err != nil {
 				log.Println("Error in fetching authorization info: " + err.Error())
+				WriteMessage(http.StatusBadRequest, "Authorization could not be deciphered", w)
 			} else if authDetails.IsAdmin {
 				h.ServeHTTP(w, r)
 			} else {
@@ -85,6 +86,7 @@ func isAdminOrUser(au Authenticator, us checkin.UserService, usernameKey string)
 			authDetails, err := au.GetAuthInfo(r)
 			if err != nil {
 				log.Println("Error in fetching authorization info: " + err.Error())
+				WriteMessage(http.StatusBadRequest, "Authorization could not be deciphered", w)
 			} else if authDetails.IsAdmin || authDetails.Username == mux.Vars(r)[usernameKey] {
 				h.ServeHTTP(w, r)
 			} else {
