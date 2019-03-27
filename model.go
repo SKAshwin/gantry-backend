@@ -10,13 +10,14 @@ import (
 //check-in page.
 //This is distinguished from guests, who attend events
 type User struct {
-	Username          string    `json:"username,omitempty" db:"username"`
-	PasswordPlaintext string    `json:"password,omitempty"`
-	PasswordHash      string    `json:"-" db:"passwordHash"` //always omitted upon JSON marshalling
-	Name              string    `json:"name,omitempty" db:"name"`
-	CreatedAt         time.Time `json:"createdAt,omitempty"`
-	UpdatedAt         time.Time `json:"updatedAt,omitempty"`
-	LastLoggedIn      null.Time `json:"lastLoggedIn,omitempty"`
+	Username          string  `json:"username,omitempty" db:"username"`
+	PasswordPlaintext *string `json:"password,omitempty"` //using a string pointer so this can be nil
+	//null.String doesn't work will omitempty, but a nil string pointer will be omitted
+	PasswordHash string    `json:"-" db:"passwordHash"` //always omitted upon JSON marshalling
+	Name         string    `json:"name,omitempty" db:"name"`
+	CreatedAt    time.Time `json:"createdAt,omitempty"`
+	UpdatedAt    time.Time `json:"updatedAt,omitempty"`
+	LastLoggedIn null.Time `json:"lastLoggedIn,omitempty"`
 }
 
 //UserService An interface for functions that modify/fetch user data in the database
@@ -25,7 +26,7 @@ type UserService interface {
 	Users() ([]User, error)
 	CreateUser(u User) error
 	DeleteUser(username string) error
-	UpdateUser(username string, updateFields map[string]string) (bool, error)
+	UpdateUser(originalUsername string, newUser User) error
 	CheckIfExists(username string) (bool, error)
 	UpdateLastLoggedIn(username string) error
 }

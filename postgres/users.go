@@ -15,12 +15,6 @@ type UserService struct {
 	HM checkin.HashMethod
 }
 
-//Maps json fields to DB fields
-var userUpdateSchema = map[string]string{
-	"username": "username",
-	"password": "passwordHash",
-	"name":     "name"}
-
 //User Fetches the details of the user with that username
 func (us *UserService) User(username string) (checkin.User, error) {
 	var u checkin.User
@@ -52,7 +46,7 @@ func (us *UserService) Users() ([]checkin.User, error) {
 
 //CreateUser Adds a user with the given username, password (will hash it) and name to the records
 func (us *UserService) CreateUser(u checkin.User) error {
-	passwordHash, err := us.HM.HashAndSalt(u.PasswordPlaintext)
+	passwordHash, err := us.HM.HashAndSalt(*u.PasswordPlaintext)
 	if err != nil {
 		return errors.New("createUser: " + err.Error())
 	}
@@ -70,16 +64,10 @@ func (us *UserService) DeleteUser(username string) error {
 //UpdateUser updates a particular user given their username, and a map of attributes to new values
 //Returns a boolean flag indicating if the arguments were valid
 //Returns a non-nil error if there was an error updating the user
-func (us *UserService) UpdateUser(username string, updateFields map[string]string) (bool, error) {
-	//check if the update fields are valid
-	//this sanitizes the input for later
-	if !isUserUpdateRequestValid(updateFields) {
-		return false, nil
-	}
-
-	tx, err := us.DB.Begin()
+func (us *UserService) UpdateUser(originalUsername string, user checkin.User) error {
+	tx, err := us.DB.Beginx()
 	if err != nil {
-		return false, errors.New("Error opening transaction:" + err.Error())
+		return errors.New("Error opening transaction:" + err.Error())
 	}
 
 	defer func() {
@@ -92,35 +80,32 @@ func (us *UserService) UpdateUser(username string, updateFields map[string]strin
 		}
 	}()
 
-	for attribute, newValue := range updateFields {
-		if attribute == "password" { //password needs to be hashed for update
-			newValue, err = us.HM.HashAndSalt(newValue)
-			if err != nil {
-				return false, errors.New("Could not hash new password: " + err.Error())
-			}
-		}
-		_, err := tx.Exec("UPDATE app_user SET "+userUpdateSchema[attribute]+" = $1 where username = $2", newValue, username)
+	if user.PasswordPlaintext != nil { //if a new password plain text is set
+		user.PasswordHash, err = us.HM.HashAndSalt(*user.PasswordPlaintext)
 		if err != nil {
-			tx.Rollback()
-			return false, errors.New("Error while updating database: " + err.Error())
-		}
-		if attribute == "username" { //if primary key, username, was changed
-			username = newValue //need to know for all future changes
+			return errors.New("Error hashing new password: " + err.Error())
 		}
 	}
 
-	_, err = tx.Exec("UPDATE app_user SET updatedAt = NOW() where username = $1", username)
+	_, err = tx.Exec("UPDATE app_user SET username = $1, passwordHash = $2, "+
+		"name = $3 WHERE username = $4", user.Username, user.PasswordHash, user.Name, originalUsername)
 	if err != nil {
 		tx.Rollback()
-		return false, errors.New("Error when updating updated field in app_user: " + err.Error())
+		return errors.New("Error while updating database: " + err.Error())
+	}
+
+	_, err = tx.Exec("UPDATE app_user SET updatedAt = NOW() where username = $1", originalUsername)
+	if err != nil {
+		tx.Rollback()
+		return errors.New("Error when updating updated field in app_user: " + err.Error())
 	}
 
 	err = tx.Commit()
 	if err != nil {
-		return false, errors.New("Error committing changes to database: " + err.Error())
+		return errors.New("Error committing changes to database: " + err.Error())
 	}
 
-	return true, nil
+	return nil
 }
 
 //CheckIfExists sees if the username is already used
@@ -137,15 +122,6 @@ func (us *UserService) CheckIfExists(username string) (bool, error) {
 func (us *UserService) UpdateLastLoggedIn(username string) error {
 	_, err := us.DB.Exec("UPDATE app_user SET lastLoggedIn = NOW() where username = $1", username)
 	return err
-}
-
-func isUserUpdateRequestValid(updateFields map[string]string) bool {
-	for attribute := range updateFields {
-		if _, exist := userUpdateSchema[attribute]; !exist {
-			return false
-		}
-	}
-	return true
 }
 
 func (us *UserService) getNumberOfUsers() (int, error) {

@@ -115,23 +115,39 @@ func (h *UserHandler) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func validateCreateInputs(u checkin.User) bool {
-	return u.Username != "" && u.PasswordPlaintext != "" && u.Name != "" && u.CreatedAt == time.Time{} &&
-		u.UpdatedAt == time.Time{} && u.LastLoggedIn.Valid == false
+	return u.Username != "" && u.PasswordPlaintext != nil && *u.PasswordPlaintext != "" && u.Name != "" &&
+		u.CreatedAt == time.Time{} && u.UpdatedAt == time.Time{} && !u.LastLoggedIn.Valid
 }
 
 //handleUpdateUser Reads the JSON as a map, only attributes to be updated need
 //be supplied
 func (h *UserHandler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
-	var updatedFields map[string]string
-	err := json.NewDecoder(r.Body).Decode(&updatedFields)
+	user, err := h.UserService.User(mux.Vars(r)["username"])
+	if err != nil {
+		h.Logger.Println("Error reading existing user data: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Could not fetch original user data", w)
+		return
+	}
+	original := user
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err = dec.Decode(&user)
 	if err != nil {
 		h.Logger.Println("Error when decoding update fields: " + err.Error())
-		WriteMessage(http.StatusBadRequest, "JSON could not be decoded", w)
+		WriteMessage(http.StatusBadRequest, "JSON could not be decoded, or invalid fields supplied", w)
+		return
+	}
+	//validation
+	if (user.PasswordPlaintext != nil && *user.PasswordPlaintext == "") || user.Name == "" ||
+		user.Username == "" || user.CreatedAt != original.CreatedAt || user.UpdatedAt != original.UpdatedAt ||
+		user.LastLoggedIn != original.LastLoggedIn {
+		WriteMessage(http.StatusBadRequest, "Invalid fields supplied: cannot have empty password, name"+
+			" or username, or change createdAt, updatedAt or lastLoggedIn fields", w)
 		return
 	}
 
-	if val, ok := updatedFields["username"]; ok { //if the caller is attempting to update the username
-		if ok, err := h.UserService.CheckIfExists(val); err != nil {
+	if original.Username != user.Username { //if the caller is attempting to update the username
+		if ok, err := h.UserService.CheckIfExists(user.Username); err != nil {
 			h.Logger.Println("Error checking if username taken: " + err.Error())
 			WriteMessage(http.StatusInternalServerError, "Error checking if username already taken", w)
 			return
@@ -141,14 +157,10 @@ func (h *UserHandler) handleUpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	username := mux.Vars(r)["username"] //middleware already confirms user exists
-	validRequest, err := h.UserService.UpdateUser(username, updatedFields)
-
+	err = h.UserService.UpdateUser(original.Username, user)
 	if err != nil {
 		h.Logger.Println("Error updating user: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error updating user", w)
-	} else if !validRequest {
-		WriteMessage(http.StatusBadRequest, "Incorrect fields for user update", w)
 	} else {
 		WriteOKMessage("User updated", w)
 	}

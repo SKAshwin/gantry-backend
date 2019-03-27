@@ -18,7 +18,7 @@ type UserService struct {
 	DeleteUserFn      func(username string) error
 	DeleteUserInvoked bool
 
-	UpdateUserFn      func(username string, updateFields map[string]string) (bool, error)
+	UpdateUserFn      func(originalUsername string, user checkin.User) error
 	UpdateUserInvoked bool
 
 	CheckIfExistsFn      func(username string) (bool, error)
@@ -53,9 +53,9 @@ func (us *UserService) DeleteUser(username string) error {
 }
 
 //UpdateUser invokes the mock implementation and marks the function as invoked
-func (us *UserService) UpdateUser(username string, updateFields map[string]string) (bool, error) {
+func (us *UserService) UpdateUser(originalUsername string, user checkin.User) error {
 	us.UpdateUserInvoked = true
-	return us.UpdateUserFn(username, updateFields)
+	return us.UpdateUserFn(originalUsername, user)
 }
 
 //CheckIfExists invokes the mock implementation and marks the function as invoked
