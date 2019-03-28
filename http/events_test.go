@@ -91,14 +91,14 @@ func urlExistsGenerator(expected string, err error) func(string) (bool, error) {
 //the token was badly formed, so checks for a 400 error
 func noValidTokenTest(t *testing.T, r *http.Request, h http.Handler, auth *mock.Authenticator) {
 	original := auth.AuthenticateFn
-	auth.AuthenticateFn = authenticateGenerator(false, nil)
+	auth.AuthenticateFn = authenticateGenerator(false, errors.New("An error"))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusUnauthorized, w.Result().StatusCode)
-	auth.AuthenticateFn = authenticateGenerator(false, errors.New("An error"))
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	auth.AuthenticateFn = authenticateGenerator(false, nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Equals(t, http.StatusUnauthorized, w.Result().StatusCode)
 	auth.AuthenticateFn = original
 }
 
@@ -113,14 +113,14 @@ func nonHostAccessTest(t *testing.T, r *http.Request, h http.Handler, auth *mock
 	nonHostUsername string) {
 
 	original := auth.GetAuthInfoFn
-	auth.GetAuthInfoFn = getAuthInfoGenerator(nonHostUsername, false, nil)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("", false, errors.New("An error"))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusForbidden, w.Result().StatusCode)
-	auth.GetAuthInfoFn = getAuthInfoGenerator("", false, errors.New("An error"))
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	auth.GetAuthInfoFn = getAuthInfoGenerator(nonHostUsername, false, nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Equals(t, http.StatusForbidden, w.Result().StatusCode)
 	auth.GetAuthInfoFn = original
 
 	//also check what happens if check host fails
@@ -142,14 +142,14 @@ func adminAccessTest(t *testing.T, r *http.Request, h http.Handler, auth *mock.A
 	outputTester func(*http.Response)) {
 
 	original := auth.GetAuthInfoFn
-	auth.GetAuthInfoFn = getAuthInfoGenerator("random_admin_name", true, nil)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("", false, errors.New("An error"))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
-	outputTester(w.Result())
-	auth.GetAuthInfoFn = getAuthInfoGenerator("", false, errors.New("An error"))
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("random_admin_name", true, nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	outputTester(w.Result())
 	auth.GetAuthInfoFn = original
 }
 
