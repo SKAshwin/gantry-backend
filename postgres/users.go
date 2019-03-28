@@ -94,7 +94,7 @@ func (us *UserService) UpdateUser(originalUsername string, user checkin.User) er
 		return errors.New("Error while updating database: " + err.Error())
 	}
 
-	_, err = tx.Exec("UPDATE app_user SET updatedAt = NOW() where username = $1", originalUsername)
+	_, err = tx.Exec("UPDATE app_user SET updatedAt = NOW() where username = $1", user.Username)
 	if err != nil {
 		tx.Rollback()
 		return errors.New("Error when updating updated field in app_user: " + err.Error())
