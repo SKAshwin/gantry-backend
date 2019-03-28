@@ -9,7 +9,7 @@ Binaries are stored in cmd, and there are 2 binaries (`checkin` and `uploadguest
 
 #### checkin
 
-`checkin` is the web server, and takes no arguments to start up, but if run locally requires a .env in the cmd/checkin folder, with the keys in the .env.example file in the root directory. Make sure before building a binary that is ment to be run locally that the first line of the main function is uncommented in cmd/checkin/main.go:
+`checkin` is the web server, and takes no arguments to start up, but if run locally requires a .env in the cmd/checkin folder, with the keys in the .env.example file in the root directory. Make sure before building a binary that is meant to be run locally that the first line of the main function is uncommented in cmd/checkin/main.go:
 
 ```go
 func main() {
