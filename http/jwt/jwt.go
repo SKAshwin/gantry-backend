@@ -36,7 +36,7 @@ func (jwta Authenticator) Authenticate(r *http.Request) (bool, error) {
 	}
 
 	_, err = jwt.Parse(jwtString, jwta.keyGetter)
-	if err != nil { //err is nil if token is invalid
+	if err != nil { //err is non-nil if token is invalid
 		return false, nil
 	}
 	return true, nil
@@ -94,7 +94,7 @@ func (jwta Authenticator) createToken(au checkin.AuthorizationInfo) (string, err
 //Returns an error if not
 //Returns the signing key if it does follow the appropriate method
 func (jwta Authenticator) keyGetter(token *jwt.Token) (interface{}, error) {
-	if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+	if method, ok := token.Method.(*jwt.SigningMethodHMAC); !ok || method != jwt.SigningMethodHS256 {
 		log.Printf("Unexpected signing method: %v \n", token.Header["alg"])
 		return nil, fmt.Errorf("Unexpected signing method: %v", token.Header["alg"])
 	}
