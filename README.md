@@ -73,11 +73,37 @@ The main file, under the cmd folder, initializes the implementations to be used,
 
 ### Deployment Branches
 
-In order to make a deployment on heroku, as the Go buildpack doesn't play nice with multiple main functions in the cmd folder, first switch to a new branch. All deployment branches should start at a release of the project (see releases), and be named `heroku-deploy-v1.1` for example. In this branch, remove the exceptions in the .gitignore which prevent binaries from being uploaded to the repository, and add a file in the root directory called Procfile which contains:
+#### Quick Guide
 
 ```
-web: cmd/checkin/checkin
+git checkout tags/v1.1 -b heroku-deploy-v1.1
+git cherry-pick 5c77797f7a8f6c3f1860b1cc072d94355ce0581f
+git push -u origin heroku-deploy-v1.1
 ```
+
+Cherry-pick picks a commit which adds the procfile and comments out loadEnvironmentalVariables() in the main.
+
+#### In-Depth Guide
+
+All deployments should be off a separate branch from master, and should be tied to a specific release of the project. Start by switching to a new branch at the tag of the release you want to deploy (the example below assumes you are trying to deploy v1.1; try to follow the naming convention)
+
+```
+git checkout tags/v1.1 -b heroku-deploy-v1.1
+```
+
+You need a file called Procfile in your root directory, which tells heroku where the main function is, effectively, and what commands to run to run the go program (after the go buildpack actually compiles the program). Add the following line in the Procfile,
+
+```
+web: cd cmd/checkin && checkin
+```
+
+You can automate creating the file by just running the following command from the command line, in the root directory:
+
+```
+echo "web: cd cmd/checkin && checkin" >> Procfile
+```
+
+This Procfile tells heroku to navigate to the checkin folder, and then run the checkin executable (note that heroku runs on Ubuntu 18.04 as of the time of writing - google heroku stacks to learn more - so the executable is a linux binary). If the main function is in a file in another directory, update the cd half of the command accordingly.
 
 Go to `cmd/checkin/main.go` and comment out the first line: 
 
@@ -87,11 +113,51 @@ func main() {
   ...
 ```
 
-Compile `cmd/checkin/main.go` by running `go build .` when in that folder. Commit the new main.go, executable, new .gitignore and Procfile to the deployment branch.
+Commit the new main.go and Procfile to the deployment branch. 
 
-Any changes in the deployment branch (hotfixes during an event; by right, a version release should be tested and not require further changes once deployed) require a recompiling of the executable and committing the new executable to the deployment branch in order for changes to actually go through.
+```
+git push -u origin heroku-deploy-v1.1
+```
 
-Link heroku to auto deploy from the deployment branch. Never commit a Procfile or executable to the master branch.
+### Heroku Deployment
+
+From Scratch:
+
+1. Go to the [heroku dashboard](https://www.heroku.com), navigate to/create (via the New button >> Create New App) the mesgantry-backend app. Click on it, and then go to the Settings tab, and click "Reveal Config Vars". 
+2. Set the environmental variables, according to the keys in `env.example`.
+3. Go to the Deploy tab, and choose GitHub as the Deployment method. Under the connect to github section, type `gantry-backend`.
+3. Click connect next to the right repository.
+4. Select the branch you want to deploy from.
+5. Press 'Enable Automatic Deploys'. Now any commits to the deployment branch will automatically cause heroku to rebuild, and be deployed.
+6. The current branch has not been deployed yet, however. Go to the 'Manual Deploy' section , select the right branch, and press Deploy.
+7. Give heroku a few seconds, and it will finish building the app. Use the Heroku CLI to monitor the progress of the app
+
+#### Heroku CLI
+
+Download the Heroku CLI from https://devcenter.heroku.com/articles/heroku-cli#download-and-install
+
+Go to the command line, and type
+```
+heroku login
+```
+
+to login. You must do this before making any other heroku command.
+
+To see the logs of the gantry backend app (in particular to check if builds proceeded smoothly):
+
+```
+heroku logs --tail -a mesgantry-backend
+```
+
+The `--tail` option makes the logs appear in live time; if you just want a snapshot at a  particular time, leave it out.
+
+To make changes to the postgres database, do
+
+```
+heroku pg:psql -a mesgantry-backend
+```
+
+Now navigate the database/make changes like how you already do using psql for a local database.
 
 ### Testing
 
