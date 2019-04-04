@@ -100,7 +100,7 @@ web: cd cmd/checkin && checkin
 You can automate creating the file by just running the following command from the command line, in the root directory:
 
 ```
-echo "web: cd cmd/checkin && checkin" >> Procfile
+echo web: cd cmd/checkin ^&^& checkin >> Procfile
 ```
 
 This Procfile tells heroku to navigate to the checkin folder, and then run the checkin executable (note that heroku runs on Ubuntu 18.04 as of the time of writing - google heroku stacks to learn more - so the executable is a linux binary). If the main function is in a file in another directory, update the cd half of the command accordingly.
