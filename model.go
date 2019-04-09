@@ -13,7 +13,7 @@ type User struct {
 	Username          string  `json:"username,omitempty" db:"username"`
 	PasswordPlaintext *string `json:"password,omitempty"` //using a string pointer so this can be nil
 	//null.String doesn't work will omitempty, but a nil string pointer will be omitted
-	PasswordHash string    `json:"-" db:"passwordHash"` //always omitted upon JSON marshalling
+	PasswordHash string    `json:"-" db:"passwordhash"` //always omitted upon JSON marshalling
 	Name         string    `json:"name,omitempty" db:"name"`
 	CreatedAt    time.Time `json:"createdAt,omitempty"`
 	UpdatedAt    time.Time `json:"updatedAt,omitempty"`
