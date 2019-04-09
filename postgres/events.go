@@ -93,7 +93,7 @@ func (es *EventService) CreateEvent(e checkin.Event, hostUsername string) error 
 		}
 	}()
 
-	_, err = tx.NamedExec("INSERT INTO event(id, name, url,start, \"end\", lat, long, radius) VALUES (:id, :name, :url, :start, :end, :lat, :long, :radius)", e)
+	_, err = tx.NamedExec("INSERT INTO event(id, name, url,start, \"end\", release, lat, long, radius) VALUES (:id, :name, :url, :start, :end, :release,:lat, :long, :radius)", e)
 	if err != nil {
 		tx.Rollback()
 		return errors.New("Error inserting event data: " + err.Error())
