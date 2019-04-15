@@ -5,6 +5,7 @@ import (
 	"checkin"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -143,7 +144,7 @@ func (gs *GuestService) GuestExists(eventID string, nric string) (bool, error) {
 //RegisterGuest adds a guest with the given nric, name and event that they're attending
 //to the database, i.e. "registers" them for the event
 func (gs *GuestService) RegisterGuest(eventID string, nric string, name string) error {
-	nricHash, err := gs.HM.HashAndSalt(nric)
+	nricHash, err := gs.HM.HashAndSalt(strings.ToUpper(nric))
 	if err != nil {
 		return errors.New("Error hashing NRIC: " + err.Error())
 	}
@@ -254,7 +255,7 @@ func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.G
 	}
 
 	for _, guest := range guests {
-		if gs.HM.CompareHashAndPassword(guest.NRIC, nric) {
+		if gs.HM.CompareHashAndPassword(guest.NRIC, strings.ToUpper(nric)) {
 			return guest, nil
 		}
 	}
