@@ -14,6 +14,9 @@ type GuestMessenger interface {
 	//Sends a message to the given guest
 	Send(guestID string, msg GuestMessage) error
 
+	//HasConnection checks if there is a connection with the given guestID
+	HasConnection(guestID string) bool
+
 	//Closes a connection to a guest, preventing any further communications
 	CloseConnection(guestID string) error
 }

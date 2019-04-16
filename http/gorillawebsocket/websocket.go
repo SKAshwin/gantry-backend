@@ -61,6 +61,12 @@ func (gm *GuestMessenger) Send(guestID string, data myhttp.GuestMessage) error {
 	return errors.New("No such guest ID")
 }
 
+//HasConnection returns true if there is an active connection with the given guest ID
+func (gm *GuestMessenger) HasConnection(guestID string) bool {
+	_, ok := gm.connections[guestID]
+	return ok
+}
+
 //CloseConnection closes the websocket connection marked with the given guestID
 func (gm *GuestMessenger) CloseConnection(guestID string) error {
 	if conn, ok := gm.connections[guestID]; ok {
