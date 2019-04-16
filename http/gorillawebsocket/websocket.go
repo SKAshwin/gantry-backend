@@ -1,7 +1,7 @@
 package gorillawebsocket
 
 import (
-	"checkin"
+	myhttp "checkin/http"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -41,9 +41,9 @@ func (gm *GuestMessenger) OpenConnection(guestID string, w http.ResponseWriter, 
 	return nil
 }
 
-//NotifyCheckIn sends the provided guest data over the websocket connection marked by the given guestID
+//Send sends the provided guest data over the websocket connection marked by the given guestID
 //Must have called OpenConnection with that guestID beforehand
-func (gm *GuestMessenger) NotifyCheckIn(guestID string, data checkin.Guest) error {
+func (gm *GuestMessenger) Send(guestID string, data myhttp.GuestMessage) error {
 	msg, err := json.Marshal(data)
 	if err != nil {
 		return errors.New("Error marshalling guest data into JSON: " + err.Error())

@@ -2,6 +2,7 @@ package gorillawebsocket_test
 
 import (
 	"checkin"
+	myhttp "checkin/http"
 	mywebsocket "checkin/http/gorillawebsocket"
 	"checkin/test"
 	"net/http"
@@ -26,7 +27,8 @@ func TestGuestMessenger(t *testing.T) {
 	test.Ok(t, err)
 
 	//try notifying someone before a connection has been opened
-	err = gm.NotifyCheckIn("3000", checkin.Guest{NRIC: "3000", Name: "Tim Smith"})
+	err = gm.Send("3000",
+		myhttp.GuestMessage{Title: "Check in", Content: checkin.Guest{NRIC: "3000", Name: "Tim Smith"}})
 	test.Assert(t, err != nil, "Communicating with non-existent guest fails to throw an error")
 
 	//create the other connection
@@ -36,35 +38,41 @@ func TestGuestMessenger(t *testing.T) {
 	test.Ok(t, err)
 
 	//Try notifying one websocket connection about a check in
-	err = gm.NotifyCheckIn("1234", checkin.Guest{NRIC: "1234", Name: "Jim Bob"})
+	err = gm.Send("1234", myhttp.GuestMessage{Title: "Check in", Content: checkin.Guest{NRIC: "1234",
+		Name: "Jim Bob"}})
 	test.Ok(t, err)
 	//the guest object should have been sent to this websocket connection
-	var guest checkin.Guest
+	type msg struct {
+		Title   string        `json:"title"`
+		Content checkin.Guest `json:"content"`
+	}
+	var guest msg
 	err = ws.ReadJSON(&guest)
 	test.Ok(t, err)
-	test.Equals(t, checkin.Guest{NRIC: "1234", Name: "Jim Bob"}, guest)
+	test.Equals(t, msg{Title: "Check in", Content: checkin.Guest{NRIC: "1234", Name: "Jim Bob"}}, guest)
 
 	//try communicating after closing a connection
 	err = gm.CloseConnection("1234")
 	test.Ok(t, err)
-	err = gm.NotifyCheckIn("1234", checkin.Guest{NRIC: "1234", Name: "Jim Bob"})
+	err = gm.Send("1234", myhttp.GuestMessage{Title: "Check in", Content: checkin.Guest{NRIC: "1234", Name: "Jim Bob"}})
 	test.Assert(t, err != nil, "Communicating after closed connection fails to throw an error")
 
 	//You should be able to re-establish a connection to the same guest ID, and reuse the methods
 	ws.Close()
 	ws, _, err = websocket.DefaultDialer.Dial(url, header1)
 	test.Ok(t, err)
-	err = gm.NotifyCheckIn("1234", checkin.Guest{NRIC: "1234", Name: "Some other name"})
+	err = gm.Send("1234",
+		myhttp.GuestMessage{Title: "Check in", Content: checkin.Guest{NRIC: "1234", Name: "Some other name"}})
 	test.Ok(t, err)
 	err = ws.ReadJSON(&guest)
 	test.Ok(t, err)
-	test.Equals(t, checkin.Guest{NRIC: "1234", Name: "Some other name"}, guest)
+	test.Equals(t, msg{Title: "Check in", Content: checkin.Guest{NRIC: "1234", Name: "Some other name"}}, guest)
 
 	//Try the other connection
-	gm.NotifyCheckIn("3000", checkin.Guest{NRIC: "3000", Name: "Tim Smith"})
+	gm.Send("3000", myhttp.GuestMessage{Title: "Check in", Content: checkin.Guest{NRIC: "3000", Name: "Tim Smith"}})
 	//the guest object should have been sent to this websocket connection
 	err = ws2.ReadJSON(&guest)
 	test.Ok(t, err)
-	test.Equals(t, checkin.Guest{NRIC: "3000", Name: "Tim Smith"}, guest)
+	test.Equals(t, msg{Title: "Check in", Content: checkin.Guest{NRIC: "3000", Name: "Tim Smith"}}, guest)
 
 }

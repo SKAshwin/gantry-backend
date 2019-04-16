@@ -1,7 +1,6 @@
 package http
 
 import (
-	"checkin"
 	"net/http"
 )
 
@@ -12,10 +11,15 @@ type GuestMessenger interface {
 	//guestID must be some identifier guaranteed to be unique for every guest
 	OpenConnection(guestID string, w http.ResponseWriter, r *http.Request) error
 
-	//NotifyCheckIn notifies a given guest that they have been checked in
-	//and passes them the guest data
-	NotifyCheckIn(guestID string, data checkin.Guest) error
+	//Sends a message to the given guest
+	Send(guestID string, msg GuestMessage) error
 
 	//Closes a connection to a guest, preventing any further communications
 	CloseConnection(guestID string) error
+}
+
+//GuestMessage is a message to be sent to a guest
+type GuestMessage struct {
+	Title   string      `json:"title"`
+	Content interface{} `json:"content"`
 }
