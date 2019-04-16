@@ -17,12 +17,33 @@ import (
 	"github.com/guregu/null"
 )
 
+//Generates a HasConnection mock function (for use in mock.GuestMessenger) that returns the
+//result argument, and also checks that it is passed a guestID that matches the expected
+func hasConnectionGenerator(t *testing.T, expectedID string, result bool) func(string) bool {
+	return func(guestID string) bool {
+		test.Equals(t, expectedID, guestID)
+		return result
+	}
+}
+
+//Generates a Send mock function (for use in mock.GuestMessenger) that returns the error value
+//provided. Also tests if the guestID and message passed in matches what was expected
+func sendGenerator(t *testing.T, err error, expectedID string,
+	expectedMsg myhttp.GuestMessage) func(string, myhttp.GuestMessage) error {
+	return func(guestID string, msg myhttp.GuestMessage) error {
+		test.Equals(t, expectedID, guestID)
+		test.Equals(t, expectedMsg, msg)
+		return err
+	}
+}
+
 func TestHandleGuests(t *testing.T) {
 	// Inject our mock into our handler.
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
@@ -87,7 +108,8 @@ func TestHandleRegisterGuest(t *testing.T) {
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
@@ -193,7 +215,8 @@ func TestHandleRemoveGuest(t *testing.T) {
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
@@ -273,7 +296,8 @@ func TestHandleGuestsCheckedIn(t *testing.T) {
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
@@ -336,7 +360,8 @@ func TestHandleCheckInGuest(t *testing.T) {
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
 	//mock the required calls
@@ -360,7 +385,7 @@ func TestHandleCheckInGuest(t *testing.T) {
 
 		}
 	}
-	es.EventFn = eventFnGenerator(-1*time.Hour, true, nil)
+	es.EventFn = eventFnGenerator(-1*time.Hour, true, nil) //to meet release check
 	checkInFnGenerator := func(err error) func(string, string) (string, error) {
 		return func(eventID string, nric string) (string, error) {
 			test.Equals(t, "300", eventID)
@@ -382,6 +407,7 @@ func TestHandleCheckInGuest(t *testing.T) {
 		}
 	}
 	gs.GuestExistsFn = guestExistsFnGenerator(nil)
+	gm.HasConnectionFn = hasConnectionGenerator(t, "300 1234F", false)
 
 	//Test normal behavior
 	r := httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
@@ -391,6 +417,39 @@ func TestHandleCheckInGuest(t *testing.T) {
 	var name string
 	json.NewDecoder(w.Result().Body).Decode(&name)
 	test.Equals(t, "Jim", name)
+
+	//Test guest messenger active
+	gm.HasConnectionFn = hasConnectionGenerator(t, "300 1234F", true)
+	gm.SendFn = sendGenerator(t, nil, "300 1234F", myhttp.GuestMessage{
+		Title: "checkedin/1",
+		Content: checkin.Guest{
+			Name: "Jim",
+			NRIC: "1234F",
+		},
+	})
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&name)
+	test.Equals(t, "Jim", name)
+
+	//Test guest messenger fails to send message; execution should still complete
+	gm.SendFn = sendGenerator(t, errors.New("An error"), "300 1234F", myhttp.GuestMessage{
+		Title: "checkedin/1",
+		Content: checkin.Guest{
+			Name: "Jim",
+			NRIC: "1234F",
+		},
+	})
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&name)
+	test.Equals(t, "Jim", name)
+	gm.HasConnectionFn = hasConnectionGenerator(t, "300 1234F", false)
+	gm.SendFn = nil
 
 	//Test guest does not exist with that nric
 	gs.CheckInInvoked = false
@@ -477,7 +536,8 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
@@ -502,6 +562,7 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 		}
 	}
 	gs.GuestExistsFn = guestExistsFnGenerator(nil)
+	gm.HasConnectionFn = hasConnectionGenerator(t, "300 1234F", false)
 
 	//Test normal behavior
 	r := httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
@@ -509,6 +570,29 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+
+	//Test listener active/need to send guest message
+	gm.HasConnectionFn = hasConnectionGenerator(t, "300 1234F", true)
+	gm.SendFn = sendGenerator(t, nil, "300 1234F", myhttp.GuestMessage{
+		Title: "checkedin/0",
+	})
+	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+
+	//Test sending message to guest throws error; execution should still complete
+	gm.SendFn = sendGenerator(t, errors.New("An error"), "300 1234F", myhttp.GuestMessage{
+		Title: "checkedin/0",
+	})
+	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+	gm.HasConnectionFn = hasConnectionGenerator(t, "300 1234F", false)
+	gm.SendFn = nil
 
 	//Test guest does not exist with that nric
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
@@ -578,12 +662,119 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 	eventDoesNotExistTest(t, r, h, &es)
 }
 
+func TestHandleCreateCheckInListener(t *testing.T) {
+	// Inject our mock into our handler.
+	var gs mock.GuestService
+	var es mock.EventService
+	var auth mock.Authenticator
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+
+	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
+	openConnectionGen := func(err error) func(string, http.ResponseWriter, *http.Request) error {
+		return func(guestID string, w http.ResponseWriter, r *http.Request) error {
+			test.Equals(t, "300 1234F", guestID)
+			return err
+		}
+	}
+	gm.OpenConnectionFn = openConnectionGen(nil)
+
+	//Test normal behavior
+	r := httptest.NewRequest("POST", "/api/v1-2/events/300/guests/checkedin/listener",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+
+	//test unnecessary field supplied
+	r = httptest.NewRequest("POST", "/api/v1-2/events/300/guests/checkedin/listener",
+		strings.NewReader("{\"nric\":\"1234F\", \"ayy\":\"lmao\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	//test badly formatted JSON
+	r = httptest.NewRequest("POST", "/api/v1-2/events/300/guests/checkedin/listener",
+		strings.NewReader("{\"nric\":\"1234F\", "))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	//Test open connection fails
+	gm.OpenConnectionFn = openConnectionGen(errors.New("An error"))
+	r = httptest.NewRequest("POST", "/api/v1-2/events/300/guests/checkedin/listener",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gm.OpenConnectionFn = openConnectionGen(nil)
+
+	//Test invalid eventID
+	r = httptest.NewRequest("POST", "/api/v1-2/events/200/guests/checkedin/listener",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	eventDoesNotExistTest(t, r, h, &es)
+}
+
+func TestHandleDeleteCheckInListener(t *testing.T) {
+	// Inject our mock into our handler.
+	var gs mock.GuestService
+	var es mock.EventService
+	var auth mock.Authenticator
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+
+	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
+	closeConnectionGen := func(err error) func(guestID string) error {
+		return func(guestID string) error {
+			test.Equals(t, "300 1234F", guestID)
+			return err
+		}
+	}
+	gm.CloseConnectionFn = closeConnectionGen(nil)
+
+	//Test normal behavior
+	r := httptest.NewRequest("DELETE", "/api/v1-2/events/300/guests/checkedin/listener",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+
+	//test unnecessary field supplied
+	r = httptest.NewRequest("DELETE", "/api/v1-2/events/300/guests/checkedin/listener",
+		strings.NewReader("{\"nric\":\"1234F\", \"ayy\":\"lmao\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	//test badly formatted JSON
+	r = httptest.NewRequest("DELETE", "/api/v1-2/events/300/guests/checkedin/listener",
+		strings.NewReader("{\"nric\":\"1234F\", "))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	//Test close connection fails
+	gm.CloseConnectionFn = closeConnectionGen(errors.New("An error"))
+	r = httptest.NewRequest("DELETE", "/api/v1-2/events/300/guests/checkedin/listener",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gm.CloseConnectionFn = closeConnectionGen(nil)
+
+	//Test invalid eventID
+	r = httptest.NewRequest("DELETE", "/api/v1-2/events/200/guests/checkedin/listener",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	eventDoesNotExistTest(t, r, h, &es)
+}
+
 func TestHandleGuestsNotCheckedIn(t *testing.T) {
 	// Inject our mock into our handler.
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
@@ -647,7 +838,8 @@ func TestHandleStats(t *testing.T) {
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
@@ -714,10 +906,12 @@ func TestHandleStats(t *testing.T) {
 }
 
 func TestHandleReport(t *testing.T) {
+	// Inject our mock into our handler.
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
 	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
