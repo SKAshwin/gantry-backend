@@ -7,6 +7,7 @@ import (
 	"checkin/http/jwt"
 	"checkin/postgres"
 	"checkin/qrcode"
+	websocket "checkin/http/gorillawebsocket"
 	"fmt"
 	"log"
 	"os"
@@ -41,6 +42,7 @@ func main() {
 	jwtAuthenticator := jwt.Authenticator{SigningKey: []byte(config["AUTH_SECRET"]), ExpiryTime: time.Duration(authHours) * time.Hour}
 	bcryptHashMethod := bcrypt.HashMethod{HashCost: hashCost}
 	qrGenerator := qrcode.Generator{Level: qrcode.High}
+	guestMessenger := websocket.NewGuestMessenger(2048, 2048)
 
 	us := &postgres.UserService{DB: db, HM: bcryptHashMethod}
 	as := &postgres.AuthenticationService{DB: db, HM: bcryptHashMethod}
@@ -49,7 +51,7 @@ func main() {
 
 	authHandler := http.NewAuthHandler(as, jwtAuthenticator, us)
 	userHandler := http.NewUserHandler(us, jwtAuthenticator)
-	guestHandler := http.NewGuestHandler(gs, es, jwtAuthenticator)
+	guestHandler := http.NewGuestHandler(gs, es, guestMessenger, jwtAuthenticator)
 	eventHandler := http.NewEventHandler(es, jwtAuthenticator, guestHandler)
 	utilityHandler := http.NewUtilityHandler(qrGenerator)
 
