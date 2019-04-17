@@ -16,13 +16,21 @@ type Handler struct {
 }
 
 func (h Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if strings.HasPrefix(r.URL.Path, "/api/v0/events") {
+	urlSections := strings.Split(r.URL.Path, "/")
+	if len(urlSections) < 4 {
+		http.NotFound(w, r)
+		return
+	}
+	// URL in the form of /api/{versionNumber}/{handlerType}/....
+	// e.g. /api/v1-2/auth/failedattempts/{username}
+	//Use {handlerType} to distinguish what handler to use
+	if urlSections[3] == "events" {
 		h.EventHandler.ServeHTTP(w, r)
-	} else if strings.HasPrefix(r.URL.Path, "/api/v0/users") {
+	} else if urlSections[3] == "users" {
 		h.UserHandler.ServeHTTP(w, r)
-	} else if strings.HasPrefix(r.URL.Path, "/api/v0/auth") {
+	} else if urlSections[3] == "auth" {
 		h.AuthHandler.ServeHTTP(w, r)
-	} else if strings.HasPrefix(r.URL.Path, "/api/v0/utility") {
+	} else if urlSections[3] == "utility" {
 		h.UtilityHandler.ServeHTTP(w, r)
 	} else {
 		http.NotFound(w, r)

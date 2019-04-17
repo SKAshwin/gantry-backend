@@ -60,7 +60,7 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 	h.Handle("/api/v0/events/{eventID}/released", Adapt(http.HandlerFunc(h.handleReleased),
 		existCheck)).Methods("GET")
 	//route all guest-related requests to the guest handler
-	h.PathPrefix("/api/v0/events/{eventID}/guests").Handler(gh)
+	h.PathPrefix("/api/{versionNumber}/events/{eventID}/guests").Handler(gh)
 
 	return h
 }
