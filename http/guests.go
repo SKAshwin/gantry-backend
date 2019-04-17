@@ -55,10 +55,8 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, gm GuestM
 		existCheck, releaseCheck)).Methods("POST")
 	h.Handle("/api/v0/events/{eventID}/guests/checkedin", Adapt(http.HandlerFunc(h.handleMarkGuestAbsent),
 		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
-	h.Handle("/api/v1-2/events/{eventID}/guests/checkedin/listener",
-		Adapt(http.HandlerFunc(h.handleCreateCheckInListener), existCheck)).Methods("POST")
-	h.Handle("/api/v1-2/events/{eventID}/guests/checkedin/listener",
-		Adapt(http.HandlerFunc(h.handleDeleteCheckInListener), existCheck)).Methods("DELETE")
+	h.Handle("/api/v1-2/events/{eventID}/guests/checkedin/listener/{nric}",
+		Adapt(http.HandlerFunc(h.handleCreateCheckInListener), existCheck))
 	h.Handle("/api/v0/events/{eventID}/guests/notcheckedin", Adapt(http.HandlerFunc(h.handleGuestsNotCheckedIn),
 		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}/guests/stats", Adapt(http.HandlerFunc(h.handleStats),
@@ -252,51 +250,17 @@ func generateGuestID(eventID string, guestNRIC string) string {
 }
 
 func (h *GuestHandler) handleCreateCheckInListener(w http.ResponseWriter, r *http.Request) {
-	var guest checkin.Guest
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	err := dec.Decode(&guest)
-	if err != nil {
-		h.Logger.Println("Error when decoding guest details: " + err.Error())
-		WriteMessage(http.StatusBadRequest,
-			"Incorrect fields for listening on check in - must have {\"nric\":\"something\"}", w)
-		return
-	}
-
+	nric := mux.Vars(r)["nric"]
 	eventID := mux.Vars(r)["eventID"]
-	guestID := generateGuestID(eventID, guest.NRIC)
-	err = h.GuestMessenger.OpenConnection(guestID, w, r)
+	guestID := generateGuestID(eventID, nric)
+
+	err := h.GuestMessenger.OpenConnection(guestID, w, r)
 	if err != nil {
-		h.Logger.Println("Error when attempting to open connection with " + guest.NRIC + ": " + err.Error())
+		h.Logger.Println("Error when attempting to open guest messenger connection: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error starting listener on check in", w)
 		return
 	}
-
-	WriteOKMessage("You will now be updated when guest "+guest.NRIC+" is checked in", w)
-}
-
-func (h *GuestHandler) handleDeleteCheckInListener(w http.ResponseWriter, r *http.Request) {
-	var guest checkin.Guest
-	dec := json.NewDecoder(r.Body)
-	dec.DisallowUnknownFields()
-	err := dec.Decode(&guest)
-	if err != nil {
-		h.Logger.Println("Error when decoding guest details: " + err.Error())
-		WriteMessage(http.StatusBadRequest,
-			"Incorrect fields for stopping check in listening - must have {\"nric\":\"something\"}", w)
-		return
-	}
-
-	eventID := mux.Vars(r)["eventID"]
-	guestID := generateGuestID(eventID, guest.NRIC)
-	err = h.GuestMessenger.CloseConnection(guestID)
-	if err != nil {
-		h.Logger.Println("Error when attempting to close connection with " + guest.NRIC + ": " + err.Error())
-		WriteMessage(http.StatusInternalServerError, "Error closing listener on check in", w)
-		return
-	}
-
-	WriteOKMessage("You will no longer be updated when guest "+guest.NRIC+" is checked in", w)
+	//replying a 101 Protocol Changed is handled by the Open Connection method
 }
 
 func (h *GuestHandler) handleGuestsNotCheckedIn(w http.ResponseWriter, r *http.Request) {
