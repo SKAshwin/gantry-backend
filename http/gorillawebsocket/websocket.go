@@ -25,6 +25,10 @@ func NewGuestMessenger(readBufferSize int, writeBufferSize int) *GuestMessenger 
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  readBufferSize,
 			WriteBufferSize: writeBufferSize,
+			CheckOrigin: func(r *http.Request) bool {
+				return true //CORS handles origins for us
+				//GuestMessenger offers no guarantee on origin checking
+			},
 		},
 	}
 }
