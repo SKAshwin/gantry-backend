@@ -680,91 +680,24 @@ func TestHandleCreateCheckInListener(t *testing.T) {
 	gm.OpenConnectionFn = openConnectionGen(nil)
 
 	//Test normal behavior
-	r := httptest.NewRequest("POST", "/api/v1-2/events/300/guests/checkedin/listener",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+	r := httptest.NewRequest("GET",
+		"/api/v1-2/events/300/guests/checkedin/listener/1234F", nil)
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusOK, w.Result().StatusCode)
 
-	//test unnecessary field supplied
-	r = httptest.NewRequest("POST", "/api/v1-2/events/300/guests/checkedin/listener",
-		strings.NewReader("{\"nric\":\"1234F\", \"ayy\":\"lmao\"}"))
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
-
-	//test badly formatted JSON
-	r = httptest.NewRequest("POST", "/api/v1-2/events/300/guests/checkedin/listener",
-		strings.NewReader("{\"nric\":\"1234F\", "))
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
-
 	//Test open connection fails
 	gm.OpenConnectionFn = openConnectionGen(errors.New("An error"))
-	r = httptest.NewRequest("POST", "/api/v1-2/events/300/guests/checkedin/listener",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+	r = httptest.NewRequest("GET",
+		"/api/v1-2/events/300/guests/checkedin/listener/1234F", nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
 	gm.OpenConnectionFn = openConnectionGen(nil)
 
 	//Test invalid eventID
-	r = httptest.NewRequest("POST", "/api/v1-2/events/200/guests/checkedin/listener",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
-	eventDoesNotExistTest(t, r, h, &es)
-}
-
-func TestHandleDeleteCheckInListener(t *testing.T) {
-	// Inject our mock into our handler.
-	var gs mock.GuestService
-	var es mock.EventService
-	var auth mock.Authenticator
-	var gm mock.GuestMessenger
-	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
-
-	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
-	closeConnectionGen := func(err error) func(guestID string) error {
-		return func(guestID string) error {
-			test.Equals(t, "300 1234F", guestID)
-			return err
-		}
-	}
-	gm.CloseConnectionFn = closeConnectionGen(nil)
-
-	//Test normal behavior
-	r := httptest.NewRequest("DELETE", "/api/v1-2/events/300/guests/checkedin/listener",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
-	w := httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusOK, w.Result().StatusCode)
-
-	//test unnecessary field supplied
-	r = httptest.NewRequest("DELETE", "/api/v1-2/events/300/guests/checkedin/listener",
-		strings.NewReader("{\"nric\":\"1234F\", \"ayy\":\"lmao\"}"))
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
-
-	//test badly formatted JSON
-	r = httptest.NewRequest("DELETE", "/api/v1-2/events/300/guests/checkedin/listener",
-		strings.NewReader("{\"nric\":\"1234F\", "))
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
-
-	//Test close connection fails
-	gm.CloseConnectionFn = closeConnectionGen(errors.New("An error"))
-	r = httptest.NewRequest("DELETE", "/api/v1-2/events/300/guests/checkedin/listener",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
-	w = httptest.NewRecorder()
-	h.ServeHTTP(w, r)
-	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
-	gm.CloseConnectionFn = closeConnectionGen(nil)
-
-	//Test invalid eventID
-	r = httptest.NewRequest("DELETE", "/api/v1-2/events/200/guests/checkedin/listener",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+	r = httptest.NewRequest("GET",
+		"/api/v1-2/events/200/guests/checkedin/listener/1234F", nil)
 	eventDoesNotExistTest(t, r, h, &es)
 }
 
