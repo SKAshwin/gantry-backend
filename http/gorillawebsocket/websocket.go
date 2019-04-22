@@ -56,6 +56,9 @@ func (gm *GuestMessenger) Send(guestID string, data myhttp.GuestMessage) error {
 	if conn, ok := gm.connections[guestID]; ok {
 		err = conn.WriteMessage(websocket.TextMessage, msg)
 		if err != nil {
+			if _, ok := err.(*websocket.CloseError); ok {
+				delete(gm.connections, guestID)
+			}
 			return errors.New("Error writing message: " + err.Error())
 		}
 
@@ -67,7 +70,12 @@ func (gm *GuestMessenger) Send(guestID string, data myhttp.GuestMessage) error {
 
 //HasConnection returns true if there is an active connection with the given guest ID
 func (gm *GuestMessenger) HasConnection(guestID string) bool {
-	_, ok := gm.connections[guestID]
+	conn, ok := gm.connections[guestID]
+	_, _, err := conn.ReadMessage()
+	if _, closed := err.(*websocket.CloseError); closed {
+		delete(gm.connections, guestID)
+		return false
+	}
 	return ok
 }
 

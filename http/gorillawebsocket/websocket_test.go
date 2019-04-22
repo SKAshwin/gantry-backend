@@ -58,7 +58,6 @@ func TestGuestMessenger(t *testing.T) {
 	test.Assert(t, err != nil, "Communicating after closed connection fails to throw an error")
 
 	//You should be able to re-establish a connection to the same guest ID, and reuse the methods
-	ws.Close()
 	ws, _, err = websocket.DefaultDialer.Dial(url, header1)
 	test.Ok(t, err)
 	err = gm.Send("1234",
@@ -67,6 +66,11 @@ func TestGuestMessenger(t *testing.T) {
 	err = ws.ReadJSON(&guest)
 	test.Ok(t, err)
 	test.Equals(t, msg{Title: "Check in", Content: checkin.Guest{NRIC: "1234", Name: "Some other name"}}, guest)
+
+	//See what happens if you close the connection from the other end
+	//should not longer be listed as an active connection
+	ws.Close()
+	test.Assert(t, !gm.HasConnection("1234"), "1234 still listed as a connection even though the websocket was closed by the other end")
 
 	//Try the other connection
 	gm.Send("3000", myhttp.GuestMessage{Title: "Check in", Content: checkin.Guest{NRIC: "3000", Name: "Tim Smith"}})
