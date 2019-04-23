@@ -70,12 +70,7 @@ func (gm *GuestMessenger) Send(guestID string, data myhttp.GuestMessage) error {
 
 //HasConnection returns true if there is an active connection with the given guest ID
 func (gm *GuestMessenger) HasConnection(guestID string) bool {
-	conn, ok := gm.connections[guestID]
-	_, _, err := conn.ReadMessage()
-	if _, closed := err.(*websocket.CloseError); closed {
-		delete(gm.connections, guestID)
-		return false
-	}
+	_, ok := gm.connections[guestID]
 	return ok
 }
 
