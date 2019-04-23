@@ -1,6 +1,6 @@
 create DATABASE registrationapp;
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 \connect registrationapp
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 create table app_user(
 	username text PRIMARY KEY NOT NULL,
