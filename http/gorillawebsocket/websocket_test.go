@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"time"
 	"testing"
 
 	"github.com/gorilla/websocket"
@@ -67,9 +68,11 @@ func TestGuestMessenger(t *testing.T) {
 	test.Ok(t, err)
 	test.Equals(t, msg{Title: "Check in", Content: checkin.Guest{NRIC: "1234", Name: "Some other name"}}, guest)
 
-	//See what happens if you close the connection from the other end
+	//See what happens if you close the connection from the other end abruptly
 	//should not longer be listed as an active connection
+	//given sufficient delay first
 	ws.Close()
+	time.Sleep(25*time.Millisecond)
 	test.Assert(t, !gm.HasConnection("1234"), "1234 still listed as a connection even though the websocket was closed by the other end")
 
 	//Try the other connection
@@ -78,5 +81,10 @@ func TestGuestMessenger(t *testing.T) {
 	err = ws2.ReadJSON(&guest)
 	test.Ok(t, err)
 	test.Equals(t, msg{Title: "Check in", Content: checkin.Guest{NRIC: "3000", Name: "Tim Smith"}}, guest)
+
+	//See what happens if you close the connection from the other end gracefully
+	ws.WriteMessage(websocket.CloseMessage, []byte{})
+	time.Sleep(25*time.Millisecond)
+	test.Assert(t, !gm.HasConnection("1234"), "1234 still listed as a connection even though the websocket was closed by the other end")
 
 }

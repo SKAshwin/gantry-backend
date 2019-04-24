@@ -2,7 +2,6 @@ package gorillawebsocket
 
 import (
 	myhttp "checkin/http"
-	"encoding/json"
 	"errors"
 	"net/http"
 
@@ -12,7 +11,7 @@ import (
 //GuestMessenger is an implementation of http.GuestMessenger which uses gorilla/websocket to set up
 //a websocket connection with a guest, and allows for communication with the guest
 type GuestMessenger struct {
-	connections map[string]*websocket.Conn
+	connections map[string]*GuestClient
 	upgrader    websocket.Upgrader
 }
 
@@ -21,7 +20,7 @@ type GuestMessenger struct {
 //Set both to 1024 if you don't know what you want
 func NewGuestMessenger(readBufferSize int, writeBufferSize int) *GuestMessenger {
 	return &GuestMessenger{
-		connections: make(map[string]*websocket.Conn),
+		connections: make(map[string]*GuestClient),
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  readBufferSize,
 			WriteBufferSize: writeBufferSize,
@@ -41,24 +40,21 @@ func (gm *GuestMessenger) OpenConnection(guestID string, w http.ResponseWriter, 
 		return errors.New("Error upgrading request to websocket connection: " + err.Error())
 	}
 
-	gm.connections[guestID] = conn
+	gm.connections[guestID] = newGuestClient(conn, func(){
+		delete(gm.connections, guestID)
+	})
+	go gm.connections[guestID].writePump() //start the write pump that reads from the client's send channel
+	
 	return nil
 }
 
 //Send sends the provided guest data over the websocket connection marked by the given guestID
 //Must have called OpenConnection with that guestID beforehand
 func (gm *GuestMessenger) Send(guestID string, data myhttp.GuestMessage) error {
-	msg, err := json.Marshal(data)
-	if err != nil {
-		return errors.New("Error marshalling guest data into JSON: " + err.Error())
-	}
-
-	if conn, ok := gm.connections[guestID]; ok {
-		err = conn.WriteMessage(websocket.TextMessage, msg)
+	if client, ok := gm.connections[guestID]; ok {
+		client.send <- data
+		err := <- client.errChannel
 		if err != nil {
-			if _, ok := err.(*websocket.CloseError); ok {
-				delete(gm.connections, guestID)
-			}
 			return errors.New("Error writing message: " + err.Error())
 		}
 
@@ -76,8 +72,8 @@ func (gm *GuestMessenger) HasConnection(guestID string) bool {
 
 //CloseConnection closes the websocket connection marked with the given guestID
 func (gm *GuestMessenger) CloseConnection(guestID string) error {
-	if conn, ok := gm.connections[guestID]; ok {
-		err := conn.Close()
+	if client, ok := gm.connections[guestID]; ok {
+		err := client.close()
 		delete(gm.connections, guestID)
 		return err
 	}
