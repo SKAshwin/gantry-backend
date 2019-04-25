@@ -83,8 +83,12 @@ func TestGuestMessenger(t *testing.T) {
 	test.Equals(t, msg{Title: "Check in", Content: checkin.Guest{NRIC: "3000", Name: "Tim Smith"}}, guest)
 
 	//See what happens if you close the connection from the other end gracefully
-	ws.WriteMessage(websocket.CloseMessage, []byte{})
+	ws2.WriteMessage(websocket.CloseMessage, []byte{})
 	time.Sleep(25*time.Millisecond)
-	test.Assert(t, !gm.HasConnection("1234"), "1234 still listed as a connection even though the websocket was closed by the other end")
+	test.Assert(t, !gm.HasConnection("3000"), "1234 still listed as a connection even though the websocket was closed by the other end")
+
+	//shouldn't be able to close a connection that's already closed
+	err = gm.CloseConnection("3000")
+	test.Assert(t, err != nil, "Attempting to close already closed connection failed to throw an error")
 
 }
