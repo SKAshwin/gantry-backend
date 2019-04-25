@@ -94,6 +94,11 @@ type GuestStats struct {
 type Guest struct {
 	Name string `json:"name,omitempty"`
 	NRIC string `json:"nric,omitempty" db:"nrichash"`
+	Tags []string `json:"tags" db:"tags"`
+}
+
+func (g *Guest) IsEmpty() bool {
+	return g.Name == "" && g.NRIC == "" && g.Tags == nil
 }
 
 //GuestService is for checking in guests at a specific event

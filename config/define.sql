@@ -35,6 +35,7 @@ create table guest(
 	nricHash text NOT NULL,
 	eventID UUID NOT NULL REFERENCES event(ID) ON UPDATE CASCADE ON DELETE CASCADE,
 	name text NOT NULL,
+	tags text[],
 	checkedIn BOOLEAN NOT NULL DEFAULT FALSE,
 	checkInTime TIMESTAMP,
 	PRIMARY KEY(nricHash, eventID)

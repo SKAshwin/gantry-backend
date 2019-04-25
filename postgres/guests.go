@@ -29,7 +29,7 @@ func (gs *GuestService) CheckIn(eventID string, nric string) (string, error) {
 	if err != nil {
 		return "", errors.New("Error getting guest with that NRIC: " + err.Error())
 	}
-	if guest == (checkin.Guest{}) {
+	if guest.IsEmpty() {
 		return "", errors.New("Guest with that NRIC does not exist: " + nric)
 	}
 	nricHash := guest.NRIC
@@ -72,7 +72,7 @@ func (gs *GuestService) MarkAbsent(eventID string, nric string) error {
 	if err != nil {
 		return errors.New("Error getting guest with that NRIC: " + err.Error())
 	}
-	if guest == (checkin.Guest{}) {
+	if guest.IsEmpty() {
 		return errors.New("Guest with that NRIC does not exist: " + nric)
 	}
 	nricHash := guest.NRIC
@@ -137,7 +137,7 @@ func (gs *GuestService) GuestExists(eventID string, nric string) (bool, error) {
 	if err != nil {
 		return false, errors.New("Error getting guests: " + err.Error())
 	}
-	return (guest != checkin.Guest{}), nil
+	return !guest.IsEmpty(), nil
 }
 
 //RegisterGuest adds a guest with the given nric, name and event that they're attending
@@ -161,7 +161,7 @@ func (gs *GuestService) RemoveGuest(eventID string, nric string) error {
 	if err != nil {
 		return errors.New("Error getting guest with that NRIC: " + err.Error())
 	}
-	if guest == (checkin.Guest{}) {
+	if guest.IsEmpty() {
 		return nil
 	}
 	nricHash := guest.NRIC
