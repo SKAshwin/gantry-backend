@@ -68,7 +68,7 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, gm GuestM
 }
 
 func (h *GuestHandler) handleGuests(w http.ResponseWriter, r *http.Request) {
-	guests, err := h.GuestService.Guests(mux.Vars(r)["eventID"])
+	guests, err := h.GuestService.Guests(mux.Vars(r)["eventID"], nil)
 	if err != nil {
 		h.Logger.Println("Error in handleGuests: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching all guests for event", w)
@@ -137,7 +137,7 @@ func (h *GuestHandler) handleRemoveGuest(w http.ResponseWriter, r *http.Request)
 
 func (h *GuestHandler) handleGuestsCheckedIn(w http.ResponseWriter, r *http.Request) {
 	eventID := mux.Vars(r)["eventID"]
-	guests, err := h.GuestService.GuestsCheckedIn(eventID)
+	guests, err := h.GuestService.GuestsCheckedIn(eventID, nil)
 	if err != nil {
 		h.Logger.Println("Error in handleGuestsCheckedIn: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching checked-in guests for event", w)
@@ -265,7 +265,7 @@ func (h *GuestHandler) handleCreateCheckInListener(w http.ResponseWriter, r *htt
 
 func (h *GuestHandler) handleGuestsNotCheckedIn(w http.ResponseWriter, r *http.Request) {
 	eventID := mux.Vars(r)["eventID"]
-	guests, err := h.GuestService.GuestsNotCheckedIn(eventID)
+	guests, err := h.GuestService.GuestsNotCheckedIn(eventID, nil)
 	if err != nil {
 		h.Logger.Println("Error in handleNotGuestsCheckedIn: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching not checked-in guests for event", w)
@@ -276,7 +276,7 @@ func (h *GuestHandler) handleGuestsNotCheckedIn(w http.ResponseWriter, r *http.R
 }
 
 func (h *GuestHandler) handleStats(w http.ResponseWriter, r *http.Request) {
-	stats, err := h.GuestService.CheckInStats(mux.Vars(r)["eventID"])
+	stats, err := h.GuestService.CheckInStats(mux.Vars(r)["eventID"], nil)
 	if err != nil {
 		h.Logger.Println("Error in handleStats: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching statistics for event", w)
@@ -288,13 +288,13 @@ func (h *GuestHandler) handleStats(w http.ResponseWriter, r *http.Request) {
 
 func (h *GuestHandler) handleReport(w http.ResponseWriter, r *http.Request) {
 	eventID := mux.Vars(r)["eventID"]
-	absent, err := h.GuestService.GuestsNotCheckedIn(eventID)
+	absent, err := h.GuestService.GuestsNotCheckedIn(eventID, nil)
 	if err != nil {
 		h.Logger.Println("Error in handleReport when getting absent guests: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching absentees", w)
 		return
 	}
-	present, err := h.GuestService.GuestsCheckedIn(eventID)
+	present, err := h.GuestService.GuestsCheckedIn(eventID, nil)
 	if err != nil {
 		h.Logger.Println("Error in handleReport when getting present guests: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching those present", w)
