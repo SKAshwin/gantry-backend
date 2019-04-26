@@ -86,7 +86,10 @@ func (gs *GuestService) MarkAbsent(eventID string, nric string) error {
 //Guests returns an array of names of the guests who are registered/signed up for
 //an event given by the eventID
 func (gs *GuestService) Guests(eventID string, tags []string) ([]string, error) {
-	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and $2 <@ tags", eventID, tags)
+	if tags == nil {
+		tags = []string{}
+	}
+	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and $2 <@ tags", eventID, pq.Array(tags))
 	if err != nil {
 		return nil, errors.New("Cannot fetch guest names: " + err.Error())
 	}
@@ -102,7 +105,10 @@ func (gs *GuestService) Guests(eventID string, tags []string) ([]string, error) 
 //GuestsCheckedIn return an array of names of the guests who have checked in
 //to the event given by the eventID
 func (gs *GuestService) GuestsCheckedIn(eventID string, tags []string) ([]string, error) {
-	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and checkedIn = TRUE and $2 <@ tags", eventID, tags)
+	if tags == nil {
+		tags = []string{}
+	}
+	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and checkedIn = TRUE and $2 <@ tags", eventID, pq.Array(tags))
 	if err != nil {
 		return nil, errors.New("Cannot fetch checked in guest names: " + err.Error())
 	}
@@ -118,7 +124,10 @@ func (gs *GuestService) GuestsCheckedIn(eventID string, tags []string) ([]string
 //GuestsNotCheckedIn returns an array of guests who haven't checked into the
 //event
 func (gs *GuestService) GuestsNotCheckedIn(eventID string, tags []string) ([]string, error) {
-	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and checkedIn = FALSE and $2 <@ tags", eventID, tags)
+	if tags == nil {
+		tags = []string{}
+	}
+	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and checkedIn = FALSE and $2 <@ tags", eventID, pq.Array(tags))
 	if err != nil {
 		return nil, errors.New("Cannot fetch not checked in guest names: " + err.Error())
 	}
@@ -199,6 +208,8 @@ func (gs *GuestService) CheckInStats(eventID string, tags []string) (checkin.Gue
 }
 
 //if tags is nil OR an empty array, looks for all guests, ignoring tags
+//in general, looks for guests who have all the tags specified in tags
+//they could possibly have more
 func (gs *GuestService) getNumberOfGuests(eventID string, tags []string) (int, error) {
 	var i int
 	var err error
