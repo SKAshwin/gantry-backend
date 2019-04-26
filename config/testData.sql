@@ -10,7 +10,8 @@ INSERT into app_admin(username, passwordHash, name) VALUES
 
 INSERT into event(name, url, ID) VALUES
     ('Data Science CoP','cop2018', '2c59b54d-3422-4bdb-824c-4125775b44c8'),
-	('SDB Cohesion','sdbcohesionnovember', '3820a980-a207-4738-b82b-45808fe7aba8');
+	('SDB Cohesion','sdbcohesionnovember', '3820a980-a207-4738-b82b-45808fe7aba8'),
+	('CSSCOM Planning Seminar','csscom', '03293b3b-df83-407e-b836-fb7d4a3c4966');
 
 INSERT into event(name, url, start, "end", lat, long, radius, ID) VALUES
     ('Data Science Department Talk', 'dsdjan2019', '2019-01-10 15:00:00', '2019-01-10 18:00:00', 1.335932, 103.744708, 0.5, 'aa19239f-f9f5-4935-b1f7-0edfdceabba7');
@@ -20,3 +21,26 @@ INSERT into hosts(username, eventID) VALUES
 	('TestUser', '3820a980-a207-4738-b82b-45808fe7aba8'),
 	('TestUser', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7'),
 	('ME5Bob', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7');
+
+INSERT into guest(nricHash, eventID, name, tags, checkedIn, checkInTime) VALUES
+    ('1234A', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'A', '{}', FALSE, NULL),
+	('5678B', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'B', '{}', FALSE, NULL),
+	('2346C', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'C', '{"VIP", "ATTENDING"}', FALSE, NULL),
+    ('4916T', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'D', '{"VIP"}', FALSE, NULL),
+	('4433G', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'E', '{"ATTENDING"}', FALSE, NULL),
+    ('1234B', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'F', '{}', TRUE, NOW()),
+	('8648C', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'G', '{}', TRUE, NOW()),
+	('2146D', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'H', '{"VIP", "ATTENDING"}', TRUE, NOW()),
+    ('4215S', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'I', '{"VIP"}', TRUE, NOW()),
+	('4333Q', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'J', '{"ATTENDING"}', TRUE, NOW()),
+	('2234A', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'K', '{}', FALSE, NULL),
+	('3678B', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'L', '{}', FALSE, NULL),
+	('4346C', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'M', '{"VIP", "ATTENDING"}', FALSE, NULL),
+    ('5916T', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'N', '{"VIP"}', FALSE, NULL),
+	('6433G', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'O', '{"ATTENDING"}', FALSE, NULL),
+    ('7234B', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'P', '{}', TRUE, NOW()),
+	('9648C', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'Q', '{}', TRUE, NOW()),
+	('8146D', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'R', '{"VIP", "ATTENDING"}', TRUE, NOW()),
+    ('1215S', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'S', '{"VIP"}', TRUE, NOW()),
+	('3333Q', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'T', '{"ATTENDING"}', TRUE, NOW()),
+	('1234A', '03293b3b-df83-407e-b836-fb7d4a3c4966', 'A', '{}', FALSE, NOW());
