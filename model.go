@@ -92,11 +92,13 @@ type GuestStats struct {
 
 //Guest is all the information related to a particular guest
 type Guest struct {
-	Name string `json:"name,omitempty"`
-	NRIC string `json:"nric,omitempty" db:"nrichash"`
+	Name string   `json:"name,omitempty"`
+	NRIC string   `json:"nric,omitempty" db:"nrichash"`
 	Tags []string `json:"tags" db:"tags"`
 }
 
+//IsEmpty checks if this is an empty Guest struct
+//i.e. "" name, "" nric and nil for Tags (NOT an empty array)
 func (g *Guest) IsEmpty() bool {
 	return g.Name == "" && g.NRIC == "" && g.Tags == nil
 }
@@ -105,13 +107,13 @@ func (g *Guest) IsEmpty() bool {
 type GuestService interface {
 	CheckIn(eventID string, nric string) (string, error)
 	MarkAbsent(eventID string, nric string) error
-	Guests(eventID string) ([]string, error)
-	GuestsCheckedIn(eventID string) ([]string, error)
-	GuestsNotCheckedIn(eventID string) ([]string, error)
+	Guests(eventID string, tags []string) ([]string, error)
+	GuestsCheckedIn(eventID string, tags []string) ([]string, error)
+	GuestsNotCheckedIn(eventID string, tags []string) ([]string, error)
 	GuestExists(eventID string, nric string) (bool, error)
 	RegisterGuest(eventID string, nric string, name string) error
 	RemoveGuest(eventID string, nric string) error
-	CheckInStats(eventID string) (GuestStats, error)
+	CheckInStats(eventID string, tags []string) (GuestStats, error)
 }
 
 //AuthorizationInfo stores critical information about a particular request's authorizations

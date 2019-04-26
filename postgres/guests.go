@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
 )
 
 //GuestService an implementation of checkin.GuestService using postgres
@@ -84,13 +85,13 @@ func (gs *GuestService) MarkAbsent(eventID string, nric string) error {
 
 //Guests returns an array of names of the guests who are registered/signed up for
 //an event given by the eventID
-func (gs *GuestService) Guests(eventID string) ([]string, error) {
-	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1", eventID)
+func (gs *GuestService) Guests(eventID string, tags []string) ([]string, error) {
+	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and $2 <@ tags", eventID, tags)
 	if err != nil {
 		return nil, errors.New("Cannot fetch guest names: " + err.Error())
 	}
 	defer rows.Close() //make sure this is after checking for an error, or this will be a nil pointer dereference
-	numGuests, err := gs.getNumberOfGuests(eventID)
+	numGuests, err := gs.getNumberOfGuests(eventID, tags)
 	if err != nil {
 		return nil, errors.New("Cannot fetch number of guests: " + err.Error())
 	}
@@ -100,13 +101,13 @@ func (gs *GuestService) Guests(eventID string) ([]string, error) {
 
 //GuestsCheckedIn return an array of names of the guests who have checked in
 //to the event given by the eventID
-func (gs *GuestService) GuestsCheckedIn(eventID string) ([]string, error) {
-	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and checkedIn = TRUE", eventID)
+func (gs *GuestService) GuestsCheckedIn(eventID string, tags []string) ([]string, error) {
+	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and checkedIn = TRUE and $2 <@ tags", eventID, tags)
 	if err != nil {
 		return nil, errors.New("Cannot fetch checked in guest names: " + err.Error())
 	}
 	defer rows.Close() //make sure this is after checking for an error, or this will be a nil pointer dereference
-	numGuests, err := gs.getNumberOfGuestsCheckInStatus(eventID, true)
+	numGuests, err := gs.getNumberOfGuestsCheckInStatus(eventID, true, tags)
 	if err != nil {
 		return nil, errors.New("Cannot fetch number of guests checked in: " + err.Error())
 	}
@@ -116,13 +117,13 @@ func (gs *GuestService) GuestsCheckedIn(eventID string) ([]string, error) {
 
 //GuestsNotCheckedIn returns an array of guests who haven't checked into the
 //event
-func (gs *GuestService) GuestsNotCheckedIn(eventID string) ([]string, error) {
-	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and checkedIn = FALSE", eventID)
+func (gs *GuestService) GuestsNotCheckedIn(eventID string, tags []string) ([]string, error) {
+	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and checkedIn = FALSE and $2 <@ tags", eventID, tags)
 	if err != nil {
 		return nil, errors.New("Cannot fetch not checked in guest names: " + err.Error())
 	}
 	defer rows.Close() //make sure this is after checking for an error, or this will be a nil pointer dereference
-	numGuests, err := gs.getNumberOfGuestsCheckInStatus(eventID, false)
+	numGuests, err := gs.getNumberOfGuestsCheckInStatus(eventID, false, tags)
 	if err != nil {
 		return nil, errors.New("Cannot fetch number of guests not checked in: " + err.Error())
 	}
@@ -174,13 +175,13 @@ func (gs *GuestService) RemoveGuest(eventID string, nric string) error {
 
 //CheckInStats returns statistics relating to the attendance of the given endedvent
 //See checkin.CheckinStats for the exact information returned
-func (gs *GuestService) CheckInStats(eventID string) (checkin.GuestStats, error) {
-	total, err := gs.getNumberOfGuests(eventID)
+func (gs *GuestService) CheckInStats(eventID string, tags []string) (checkin.GuestStats, error) {
+	total, err := gs.getNumberOfGuests(eventID, tags)
 	if err != nil {
 		return checkin.GuestStats{}, errors.New("Error fetching total number of guests: " + err.Error())
 	}
 
-	checkedIn, err := gs.getNumberOfGuestsCheckInStatus(eventID, true)
+	checkedIn, err := gs.getNumberOfGuestsCheckInStatus(eventID, true, tags)
 	if err != nil {
 		return checkin.GuestStats{}, errors.New("Error fetching checked in count:" + err.Error())
 	}
@@ -197,9 +198,18 @@ func (gs *GuestService) CheckInStats(eventID string) (checkin.GuestStats, error)
 	}, nil
 }
 
-func (gs *GuestService) getNumberOfGuests(eventID string) (int, error) {
+//if tags is nil OR an empty array, looks for all guests, ignoring tags
+func (gs *GuestService) getNumberOfGuests(eventID string, tags []string) (int, error) {
 	var i int
-	err := gs.DB.QueryRow("SELECT count(*) from guest where eventID = $1", eventID).Scan(&i)
+	var err error
+	if tags != nil {
+		err = gs.DB.QueryRow("SELECT count(*) from guest where eventID = $1 and $2 <@ tags",
+			eventID, pq.Array(tags)).Scan(&i)
+	} else {
+		err = gs.DB.QueryRow("SELECT count(*) from guest where eventID = $1",
+			eventID).Scan(&i)
+	}
+
 	if err != nil {
 		return 0, errors.New("Cannot fetch guest count: " + err.Error())
 	}
@@ -207,10 +217,16 @@ func (gs *GuestService) getNumberOfGuests(eventID string) (int, error) {
 	return i, nil
 }
 
-func (gs *GuestService) getNumberOfGuestsCheckInStatus(eventID string, checkInStatus bool) (int, error) {
+func (gs *GuestService) getNumberOfGuestsCheckInStatus(eventID string, checkInStatus bool, tags []string) (int, error) {
 	var i int
-	err := gs.DB.QueryRow("SELECT count(*) from guest where eventID = $1 and checkedIn = $2",
-		eventID, checkInStatus).Scan(&i)
+	var err error
+	if tags != nil {
+		err = gs.DB.QueryRow("SELECT count(*) from guest where eventID = $1 and checkedIn = $2 and $3 <@ tags",
+			eventID, checkInStatus, pq.Array(tags)).Scan(&i)
+	} else {
+		err = gs.DB.QueryRow("SELECT count(*) from guest where eventID = $1 and checkedIn = $2",
+			eventID, checkInStatus).Scan(&i)
+	}
 	if err != nil {
 		return 0, errors.New("Cannot fetch guest count: " + err.Error())
 	}
@@ -244,7 +260,7 @@ func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.G
 		return checkin.Guest{}, errors.New("Cannot fetch all guests: " + err.Error())
 	}
 
-	numGuests, err := gs.getNumberOfGuests(eventID)
+	numGuests, err := gs.getNumberOfGuests(eventID, nil)
 	if err != nil {
 		return checkin.Guest{}, errors.New("Error fetching number of guests: " + err.Error())
 	}
