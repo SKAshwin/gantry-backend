@@ -1,5 +1,9 @@
 create DATABASE registrationapp;
 \connect registrationapp
+
+-- don't modify the test commands - used by the database access layer test suite
+
+--test
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 create table app_user(
@@ -35,7 +39,7 @@ create table guest(
 	nricHash text NOT NULL,
 	eventID UUID NOT NULL REFERENCES event(ID) ON UPDATE CASCADE ON DELETE CASCADE,
 	name text NOT NULL,
-	tags text[],
+	tags text[] DEFAULT '{}',
 	checkedIn BOOLEAN NOT NULL DEFAULT FALSE,
 	checkInTime TIMESTAMP,
 	PRIMARY KEY(nricHash, eventID)
@@ -46,6 +50,8 @@ create table hosts(
 	eventID UUID NOT NULL REFERENCES event(ID) ON UPDATE CASCADE ON DELETE CASCADE,
 	PRIMARY KEY(username, eventID)
 );
+
+--test
 
 create USER server_access with password 'LongNightShortDay';
 grant CONNECT on DATABASE registrationapp to server_access;
