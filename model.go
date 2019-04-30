@@ -94,7 +94,7 @@ type GuestStats struct {
 type Guest struct {
 	Name string   `json:"name,omitempty"`
 	NRIC string   `json:"nric,omitempty" db:"nrichash"`
-	Tags []string `json:"tags" db:"tags"`
+	Tags []string `json:"tags,omitempty" db:"tags"`
 }
 
 //IsEmpty checks if this is an empty Guest struct
@@ -111,7 +111,7 @@ type GuestService interface {
 	GuestsCheckedIn(eventID string, tags []string) ([]string, error)
 	GuestsNotCheckedIn(eventID string, tags []string) ([]string, error)
 	GuestExists(eventID string, nric string) (bool, error)
-	RegisterGuest(eventID string, nric string, name string) error
+	RegisterGuest(eventID string, guest Guest) error
 	RemoveGuest(eventID string, nric string) error
 	CheckInStats(eventID string, tags []string) (GuestStats, error)
 }
