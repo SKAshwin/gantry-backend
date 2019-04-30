@@ -50,10 +50,13 @@ func TestHandleGuests(t *testing.T) {
 	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	guestsGenerator := func(names []string, err error) func(string) ([]string, error) {
-		return func(eventID string) ([]string, error) {
+	guestsGenerator := func(names []string, err error) func(string, []string) ([]string, error) {
+		return func(eventID string, tags []string) ([]string, error) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
+			}
+			if tags != nil && len(tags) != 0 {
+				t.Fatal("Expected nil or empty tags, got ", tags)
 			}
 			if err != nil {
 				return nil, err
@@ -116,11 +119,12 @@ func TestHandleRegisterGuest(t *testing.T) {
 	es.CheckHostFn = checkHostGenerator("testing_username", "300", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	registerGuestGenerator := func(err error) func(string, string, string) error {
-		return func(eventID string, nric string, name string) error {
+	registerGuestGenerator := func(err error) func(string, checkin.Guest) error {
+		return func(eventID string, guest checkin.Guest) error {
 			test.Equals(t, "300", eventID)
-			test.Equals(t, "5678F", nric)
-			test.Equals(t, "Jim", name)
+			test.Equals(t, "5678F", guest.NRIC)
+			test.Equals(t, "Jim", guest.Name)
+			test.Equals(t, []string(nil), guest.Tags)
 			return err
 		}
 	}
@@ -304,10 +308,13 @@ func TestHandleGuestsCheckedIn(t *testing.T) {
 	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	guestsCheckedInGenerator := func(names []string, err error) func(string) ([]string, error) {
-		return func(eventID string) ([]string, error) {
+	guestsCheckedInGenerator := func(names []string, err error) func(string, []string) ([]string, error) {
+		return func(eventID string, tags []string) ([]string, error) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
+			}
+			if tags != nil && len(tags) != 0 {
+				t.Fatal("Expected nil/empty tags but got", tags)
 			}
 			return names, err
 		}
@@ -714,10 +721,13 @@ func TestHandleGuestsNotCheckedIn(t *testing.T) {
 	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	guestsNotCheckedInFnGenerator := func(names []string, err error) func(string) ([]string, error) {
-		return func(eventID string) ([]string, error) {
+	guestsNotCheckedInFnGenerator := func(names []string, err error) func(string, []string) ([]string, error) {
+		return func(eventID string, tags []string) ([]string, error) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
+			}
+			if tags != nil && len(tags) != 0 {
+				t.Fatal("Expected nil or empty tags, but got ", tags)
 			}
 			return names, err
 		}
@@ -779,10 +789,13 @@ func TestHandleStats(t *testing.T) {
 	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	checkInStatsFnGenerator := func(err error) func(string) (checkin.GuestStats, error) {
-		return func(eventID string) (checkin.GuestStats, error) {
+	checkInStatsFnGenerator := func(err error) func(string, []string) (checkin.GuestStats, error) {
+		return func(eventID string, tags []string) (checkin.GuestStats, error) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
+			}
+			if tags != nil && len(tags) != 0 {
+				t.Fatal("Expected nil or empty tags but got ", tags)
 			}
 			if err != nil {
 				return checkin.GuestStats{}, err
@@ -850,19 +863,25 @@ func TestHandleReport(t *testing.T) {
 	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	guestsCheckedInGenerator := func(names []string, err error) func(string) ([]string, error) {
-		return func(eventID string) ([]string, error) {
+	guestsCheckedInGenerator := func(names []string, err error) func(string, []string) ([]string, error) {
+		return func(eventID string, tags []string) ([]string, error) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
+			}
+			if tags != nil && len(tags) != 0 {
+				t.Fatal("Expected nil or empty tags but got ", tags)
 			}
 			return names, err
 		}
 	}
 	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, nil)
-	guestsNotCheckedInFnGenerator := func(names []string, err error) func(string) ([]string, error) {
-		return func(eventID string) ([]string, error) {
+	guestsNotCheckedInFnGenerator := func(names []string, err error) func(string, []string) ([]string, error) {
+		return func(eventID string, tags []string) ([]string, error) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
+			}
+			if tags != nil && len(tags) != 0 {
+				t.Fatal("Expected nil or empty tags but got ", tags)
 			}
 			return names, err
 		}

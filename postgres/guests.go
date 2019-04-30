@@ -8,6 +8,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
+	"strings"
 )
 
 //GuestService an implementation of checkin.GuestService using postgres
@@ -85,6 +86,8 @@ func (gs *GuestService) MarkAbsent(eventID string, nric string) error {
 
 //Guests returns an array of names of the guests who are registered/signed up for
 //an event given by the eventID
+//Can filter the list down to guests which have *all* the tags specified in tags
+//A nil tags, or empty string array, will fetch all guests
 func (gs *GuestService) Guests(eventID string, tags []string) ([]string, error) {
 	if tags == nil {
 		tags = []string{}
@@ -104,6 +107,8 @@ func (gs *GuestService) Guests(eventID string, tags []string) ([]string, error) 
 
 //GuestsCheckedIn return an array of names of the guests who have checked in
 //to the event given by the eventID
+//Can filter the list down to guests which have *all* the tags specified in tags
+//A nil tags, or empty string array, will fetch all guests
 func (gs *GuestService) GuestsCheckedIn(eventID string, tags []string) ([]string, error) {
 	if tags == nil {
 		tags = []string{}
@@ -123,6 +128,8 @@ func (gs *GuestService) GuestsCheckedIn(eventID string, tags []string) ([]string
 
 //GuestsNotCheckedIn returns an array of guests who haven't checked into the
 //event
+//Can filter the list down to guests which have *all* the tags specified in tags
+//A nil tags, or empty string array, will fetch all guests
 func (gs *GuestService) GuestsNotCheckedIn(eventID string, tags []string) ([]string, error) {
 	if tags == nil {
 		tags = []string{}
@@ -142,6 +149,7 @@ func (gs *GuestService) GuestsNotCheckedIn(eventID string, tags []string) ([]str
 
 //GuestExists returns true if a Guest with the given NRIC identifier (last 5 digits of NRIC)
 //and attending the given event exists
+//Returns an error if the event does not exist in the first place
 func (gs *GuestService) GuestExists(eventID string, nric string) (bool, error) {
 	guest, err := gs.getGuestWithNRIC(eventID, nric)
 	if err != nil {
@@ -152,15 +160,52 @@ func (gs *GuestService) GuestExists(eventID string, nric string) (bool, error) {
 
 //RegisterGuest adds a guest with the given nric, name and event that they're attending
 //to the database, i.e. "registers" them for the event
-func (gs *GuestService) RegisterGuest(eventID string, nric string, name string) error {
-	nricHash, err := gs.HM.HashAndSalt(nric)
+func (gs *GuestService) RegisterGuest(eventID string, guest checkin.Guest) error {
+	nricHash, err := gs.HM.HashAndSalt(strings.ToUpper(guest.NRIC))
+	if guest.Tags == nil {
+		guest.Tags = []string{} //no nils allowed
+	}
 	if err != nil {
 		return errors.New("Error hashing NRIC: " + err.Error())
 	}
 
-	_, err = gs.DB.Exec("INSERT into guest(nricHash,eventID,name,checkedIn) VALUES($1,$2,$3,FALSE)",
-		nricHash, eventID, name)
+	_, err = gs.DB.Exec("INSERT into guest(nricHash,eventID,name,tags,checkedIn) VALUES($1,$2,$3,$4,FALSE)",
+		nricHash, eventID, guest.Name, pq.Array(guest.Tags))
 
+	return err
+}
+
+func (gs *GuestService) Tags(eventID string, nric string) ([]string, error) {
+	guest, err := gs.getGuestWithNRIC(eventID, nric)
+	if err != nil {
+		return nil, errors.New("Error fetching guest with that NRIC")
+	}
+	if guest.IsEmpty() {
+		return nil, errors.New("Guest does not exist")
+	}
+
+	var tags []string
+	err = gs.DB.QueryRow("SELECT tags from guest where eventID = $1 and nricHash = $2", eventID, guest.NRIC).Scan(pq.Array(&tags))
+	if err != nil {
+		return nil, errors.New("Error getting tags: " + err.Error())
+	}
+
+	return tags, nil
+}
+
+func (gs *GuestService) SetTags(eventID string, nric string, tags []string) error {
+	guest, err := gs.getGuestWithNRIC(eventID, nric)
+	if err != nil {
+		return errors.New("Error fetching guest with that NRIC")
+	}
+	if guest.IsEmpty() {
+		return errors.New("Guest does not exist")
+	}
+	if tags == nil { //treat nils as empty arrays
+		tags = []string{}
+	}
+
+	_, err = gs.DB.Exec("UPDATE guest SET tags = $1 where eventID = $2 and nricHash = $3", pq.Array(tags), eventID, guest.NRIC)
 	return err
 }
 
@@ -184,6 +229,8 @@ func (gs *GuestService) RemoveGuest(eventID string, nric string) error {
 
 //CheckInStats returns statistics relating to the attendance of the given endedvent
 //See checkin.CheckinStats for the exact information returned
+//Can filter the stats down to counting only guests which have *all* the tags specified in tags
+//A nil tags, or empty string array, will use all guests
 func (gs *GuestService) CheckInStats(eventID string, tags []string) (checkin.GuestStats, error) {
 	total, err := gs.getNumberOfGuests(eventID, tags)
 	if err != nil {
@@ -281,7 +328,7 @@ func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.G
 	}
 
 	for _, guest := range guests {
-		if gs.HM.CompareHashAndPassword(guest.NRIC, nric) {
+		if gs.HM.CompareHashAndPassword(guest.NRIC, strings.ToUpper(nric)) {
 			return guest, nil
 		}
 	}
