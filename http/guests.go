@@ -101,7 +101,7 @@ func (h *GuestHandler) handleRegisterGuest(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = h.GuestService.RegisterGuest(eventID, guest.NRIC, guest.Name)
+	err = h.GuestService.RegisterGuest(eventID, guest)
 	if err != nil {
 		h.Logger.Println("Error registering guest: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Guest registration failed", w)
