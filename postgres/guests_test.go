@@ -73,6 +73,10 @@ func TestGuests(t *testing.T) {
 	expectedNames = []string{}
 	test.Equals(t, expectedNames, names)
 
+	//event does not exist
+	names, err = gs.Guests("notevenavaliduuidlol", []string{})
+	test.Assert(t, err != nil, "No error thrown when event does not exist")
+
 }
 
 func TestGuestsCheckedIn(t *testing.T) {
@@ -123,6 +127,9 @@ func TestGuestsCheckedIn(t *testing.T) {
 	expectedNames = []string{}
 	test.Equals(t, expectedNames, names)
 
+	//event does not exist
+	names, err = gs.GuestsCheckedIn("notevenavaliduuidlol", []string{})
+	test.Assert(t, err != nil, "No error thrown when event does not exist")
 }
 
 func TestGuestsNotCheckedIn(t *testing.T) {
@@ -166,6 +173,10 @@ func TestGuestsNotCheckedIn(t *testing.T) {
 	test.Ok(t, err)
 	expectedNames = []string{}
 	test.Equals(t, expectedNames, names)
+
+	//event does not exist
+	names, err = gs.GuestsNotCheckedIn("notevenavaliduuidlol", []string{})
+	test.Assert(t, err != nil, "No error thrown when event does not exist")
 }
 
 func TestCheckInStats(t *testing.T) {
