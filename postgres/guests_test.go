@@ -1,13 +1,14 @@
 package postgres_test
 
+//DONT RUN THESE TESTS IN PARALLEL
+//SOME MODIFY DATABASE STATE AND CLEAN UP BEFORE EXITING
 import (
 	"checkin"
 	"checkin/mock"
 	"checkin/postgres"
 	"checkin/test"
+	"errors"
 	"testing"
-
-	_ "github.com/lib/pq" //Loads postgres as our database of choice
 )
 
 func hashFnGenerator(err error) func(string) (string, error) {
@@ -15,16 +16,14 @@ func hashFnGenerator(err error) func(string) (string, error) {
 		if err != nil {
 			return "", err
 		}
-		return pwd, nil
+		//take last char and put it in front
+		return string(pwd[len(pwd)-1]) + pwd[:len(pwd)-1], nil
 	}
 }
 
-func compareHashAndPasswordGenerator(t *testing.T, expectedHash string, expectedPassword string) func(string, string) bool {
+func compareHashAndPasswordGenerator() func(string, string) bool {
 	return func(hash string, pwd string) bool {
-		if hash != expectedHash || pwd != expectedPassword {
-			t.Fatal("Expected hash and password of " + expectedHash + " and " + expectedPassword + " respectively, but got " + hash + " and " + pwd)
-		}
-		return hash == pwd
+		return hash == (string(pwd[len(pwd)-1]) + pwd[:len(pwd)-1])
 	}
 }
 
@@ -254,4 +253,141 @@ func TestCheckInStats(t *testing.T) {
 		PercentCheckedIn: 0,
 	}
 	test.Equals(t, expectedStats, stats)
+
+	//event does not exist
+	stats, err = gs.CheckInStats("notevenavaliduuidlol", []string{})
+	test.Assert(t, err != nil, "No error thrown when event does not exist")
+}
+
+func TestRegisterGuest(t *testing.T) {
+	var hm mock.HashMethod
+	gs := postgres.GuestService{DB: db, HM: &hm}
+
+	hm.HashAndSaltFn = hashFnGenerator(nil)
+	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
+
+	err := gs.RegisterGuest("3820a980-a207-4738-b82b-45808fe7aba8", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"NEWLYREGISTERED"}})
+	test.Ok(t, err)
+	names, err := gs.Guests("3820a980-a207-4738-b82b-45808fe7aba8", []string{"NEWLYREGISTERED"})
+	test.Ok(t, err)
+	test.Equals(t, []string{"Jim Bob"}, names)
+	err = gs.RemoveGuest("3820a980-a207-4738-b82b-45808fe7aba8", "1234A")
+	test.Ok(t, err)
+
+	//check salting fails
+	hm.HashAndSaltFn = hashFnGenerator(errors.New("An error"))
+	err = gs.RegisterGuest("3820a980-a207-4738-b82b-45808fe7aba8", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"NEWLYREGISTERED"}})
+	test.Assert(t, err != nil, "Failed hashing does not throw an error")
+	hm.HashAndSaltFn = hashFnGenerator(nil)
+
+	//check event does not even exist
+	err = gs.RegisterGuest("doesnotexist", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"NEWLYREGISTERED"}})
+	test.Assert(t, err != nil, "Registering guest for non-existent event does not throw an error")
+
+	//check nil tag and empty tag do the same thing
+	err = gs.RegisterGuest("3820a980-a207-4738-b82b-45808fe7aba8", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: nil})
+	test.Ok(t, err)
+	names, err = gs.Guests("3820a980-a207-4738-b82b-45808fe7aba8", []string{})
+	test.Ok(t, err)
+	test.Equals(t, []string{"Jim Bob"}, names)
+	err = gs.RemoveGuest("3820a980-a207-4738-b82b-45808fe7aba8", "1234A")
+	test.Ok(t, err)
+
+	err = gs.RegisterGuest("3820a980-a207-4738-b82b-45808fe7aba8", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{}})
+	test.Ok(t, err)
+	names, err = gs.Guests("3820a980-a207-4738-b82b-45808fe7aba8", []string{})
+	test.Ok(t, err)
+	test.Equals(t, []string{"Jim Bob"}, names)
+	err = gs.RemoveGuest("3820a980-a207-4738-b82b-45808fe7aba8", "1234A")
+	test.Ok(t, err)
+
+	//check case insensitivity of NRIC
+	err = gs.RegisterGuest("3820a980-a207-4738-b82b-45808fe7aba8", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{}})
+	test.Ok(t, err)
+	err = gs.RegisterGuest("3820a980-a207-4738-b82b-45808fe7aba8", checkin.Guest{NRIC: "1234a", Name: "Other name", Tags: []string{}})
+	test.Assert(t, err != nil, "Registering same guest but with different last char did not throw an error (no case insensitivity)")
+	err = gs.RemoveGuest("3820a980-a207-4738-b82b-45808fe7aba8", "1234A")
+	test.Ok(t, err)
+
+	//check that its empty now, before moving on to next test
+	names, err = gs.Guests("3820a980-a207-4738-b82b-45808fe7aba8", []string{})
+	test.Ok(t, err)
+	test.Equals(t, []string{}, names)
+}
+
+func TestTags(t *testing.T) {
+	var hm mock.HashMethod
+	gs := postgres.GuestService{DB: db, HM: &hm}
+
+	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
+
+	//normal functionality
+	tags, err := gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "2346C")
+	test.Ok(t, err)
+	test.Equals(t, []string{"VIP", "ATTENDING"}, tags)
+	test.Assert(t, hm.CompareHashAndPasswordInvoked, "No expected comparison of hashes in function call")
+
+	//guest doesn't exist
+	tags, err = gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "6433G")
+	test.Assert(t, err != nil, "No error when fetching tags of non-existent guests")
+
+	//event does not exist
+	tags, err = gs.Tags("ayyylmao", "6433G")
+	test.Assert(t, err != nil, "No error when fetching tags of guest of non-existent event")
+
+	//no tags should be empty array not nil
+	tags, err = gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "1234A")
+	test.Ok(t, err)
+	test.Equals(t, []string{}, tags)
+
+}
+
+func TestSetTags(t *testing.T) {
+	var hm mock.HashMethod
+	gs := postgres.GuestService{DB: db, HM: &hm}
+
+	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
+
+	unaffectedTags, err := gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "5678B")
+	test.Ok(t, err)
+
+	//test normal functionality
+	err = gs.SetTags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "1234A", []string{"HELLO", "WORLD"})
+	test.Ok(t, err)
+	tags, err := gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "1234A")
+	test.Ok(t, err)
+	test.Equals(t, []string{"HELLO", "WORLD"}, tags)
+
+	//test if the guest already has some tags (new tags should overwrite old)
+	err = gs.SetTags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "2346C", []string{"HELLO", "WORLD"})
+	test.Ok(t, err)
+	tags, err = gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "2346C")
+	test.Ok(t, err)
+	test.Equals(t, []string{"HELLO", "WORLD"}, tags)
+
+	//make sure unrelated guests not affected
+	newUnaffectedTags, err := gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "5678B")
+	test.Ok(t, err)
+	test.Equals(t, unaffectedTags, newUnaffectedTags)
+
+	//test nil and empty array tags
+	//nils should set tags to empty array
+	err = gs.SetTags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "2346c", nil) //also random case sensitivity check - should be case insensitive
+	test.Ok(t, err)
+	tags, err = gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "2346C")
+	test.Ok(t, err)
+	test.Equals(t, []string{}, tags)
+
+	err = gs.SetTags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "2346C", []string{})
+	test.Ok(t, err)
+	tags, err = gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "2346C")
+	test.Ok(t, err)
+	test.Equals(t, []string{}, tags)
+
+	//test guest or event does not exist
+	err = gs.SetTags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "1111B", []string{})
+	test.Assert(t, err != nil, "No error returned for nonexistent guest")
+	err = gs.SetTags("doesnotexist", "2346C", []string{})
+	test.Assert(t, err != nil, "No error returned for nonexistent event")
+
 }

@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/jmoiron/sqlx"
+	_ "github.com/lib/pq" //Loads postgres as our database of choice
 )
 
 const DEFINE_PATH = "../config/define.sql"
