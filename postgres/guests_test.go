@@ -71,11 +71,6 @@ func TestGuests(t *testing.T) {
 	test.Ok(t, err)
 	expectedNames = []string{}
 	test.Equals(t, expectedNames, names)
-
-	//event does not exist
-	names, err = gs.Guests("notevenavaliduuidlol", []string{})
-	test.Assert(t, err != nil, "No error thrown when event does not exist")
-
 }
 
 func TestGuestsCheckedIn(t *testing.T) {
@@ -125,10 +120,6 @@ func TestGuestsCheckedIn(t *testing.T) {
 	test.Ok(t, err)
 	expectedNames = []string{}
 	test.Equals(t, expectedNames, names)
-
-	//event does not exist
-	names, err = gs.GuestsCheckedIn("notevenavaliduuidlol", []string{})
-	test.Assert(t, err != nil, "No error thrown when event does not exist")
 }
 
 func TestGuestsNotCheckedIn(t *testing.T) {
@@ -172,10 +163,6 @@ func TestGuestsNotCheckedIn(t *testing.T) {
 	test.Ok(t, err)
 	expectedNames = []string{}
 	test.Equals(t, expectedNames, names)
-
-	//event does not exist
-	names, err = gs.GuestsNotCheckedIn("notevenavaliduuidlol", []string{})
-	test.Assert(t, err != nil, "No error thrown when event does not exist")
 }
 
 func TestCheckInStats(t *testing.T) {
@@ -253,10 +240,6 @@ func TestCheckInStats(t *testing.T) {
 		PercentCheckedIn: 0,
 	}
 	test.Equals(t, expectedStats, stats)
-
-	//event does not exist
-	stats, err = gs.CheckInStats("notevenavaliduuidlol", []string{})
-	test.Assert(t, err != nil, "No error thrown when event does not exist")
 }
 
 func TestRegisterGuest(t *testing.T) {
@@ -281,7 +264,7 @@ func TestRegisterGuest(t *testing.T) {
 	hm.HashAndSaltFn = hashFnGenerator(nil)
 
 	//check event does not even exist
-	err = gs.RegisterGuest("doesnotexist", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"NEWLYREGISTERED"}})
+	err = gs.RegisterGuest("a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"NEWLYREGISTERED"}})
 	test.Assert(t, err != nil, "Registering guest for non-existent event does not throw an error")
 
 	//check nil tag and empty tag do the same thing
@@ -332,8 +315,11 @@ func TestTags(t *testing.T) {
 	test.Assert(t, err != nil, "No error when fetching tags of non-existent guests")
 
 	//event does not exist
-	tags, err = gs.Tags("ayyylmao", "6433G")
+	tags, err = gs.Tags("a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8", "6433G")
 	test.Assert(t, err != nil, "No error when fetching tags of guest of non-existent event")
+
+	tags, err = gs.Tags("notevenauuid", "6433G")
+	test.Assert(t, err != nil, "No error when fetching tags of guest of non-existent event (invalid UUID)")
 
 	//no tags should be empty array not nil
 	tags, err = gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "1234A")
@@ -387,7 +373,7 @@ func TestSetTags(t *testing.T) {
 	//test guest or event does not exist
 	err = gs.SetTags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "1111B", []string{})
 	test.Assert(t, err != nil, "No error returned for nonexistent guest")
-	err = gs.SetTags("doesnotexist", "2346C", []string{})
+	err = gs.SetTags("a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8", "2346C", []string{})
 	test.Assert(t, err != nil, "No error returned for nonexistent event")
 
 }

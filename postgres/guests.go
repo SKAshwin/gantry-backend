@@ -88,6 +88,7 @@ func (gs *GuestService) MarkAbsent(eventID string, nric string) error {
 //an event given by the eventID
 //Can filter the list down to guests which have *all* the tags specified in tags
 //A nil tags, or empty string array, will fetch all guests
+//No error thrown if event does not exist - just gives empty array, so check existence before calling method
 func (gs *GuestService) Guests(eventID string, tags []string) ([]string, error) {
 	if tags == nil {
 		tags = []string{}
@@ -109,6 +110,7 @@ func (gs *GuestService) Guests(eventID string, tags []string) ([]string, error) 
 //to the event given by the eventID
 //Can filter the list down to guests which have *all* the tags specified in tags
 //A nil tags, or empty string array, will fetch all guests
+//No error thrown if event does not exist - just gives empty array, so check existence before calling method
 func (gs *GuestService) GuestsCheckedIn(eventID string, tags []string) ([]string, error) {
 	if tags == nil {
 		tags = []string{}
@@ -130,6 +132,7 @@ func (gs *GuestService) GuestsCheckedIn(eventID string, tags []string) ([]string
 //event
 //Can filter the list down to guests which have *all* the tags specified in tags
 //A nil tags, or empty string array, will fetch all guests
+//No error thrown if event does not exist - just gives empty array, so check existence before calling method
 func (gs *GuestService) GuestsNotCheckedIn(eventID string, tags []string) ([]string, error) {
 	if tags == nil {
 		tags = []string{}
@@ -231,6 +234,7 @@ func (gs *GuestService) RemoveGuest(eventID string, nric string) error {
 //See checkin.CheckinStats for the exact information returned
 //Can filter the stats down to counting only guests which have *all* the tags specified in tags
 //A nil tags, or empty string array, will use all guests
+//No error thrown if event does not exist - just gives empty stats, so check existence before calling method
 func (gs *GuestService) CheckInStats(eventID string, tags []string) (checkin.GuestStats, error) {
 	total, err := gs.getNumberOfGuests(eventID, tags)
 	if err != nil {
