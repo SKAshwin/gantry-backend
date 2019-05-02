@@ -36,10 +36,11 @@ create table event(
 );
 
 create table form (
-	name text NOT NULL DEFAULT '',
+	ID UUID NOT NULL PRIMARY KEY,
+	nric text NOT NULL DEFAULT '',
 	eventID UUID NOT NULL REFERENCES event(ID) ON UPDATE CASCADE ON DELETE CASCADE,
 	survey json NOT NULL,
-	PRIMARY KEY(name, eventID)
+	submitTime TIMESTAMP NOT NULL DEFAULT (NOW() at time zone 'utc')
 );
 
 create table guest(

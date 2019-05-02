@@ -52,11 +52,13 @@ type FeedbackFormItem struct {
 	Answer string `json:"answer"`
 }
 
-//FeedbackForm is a collection of questions (and their answers) and a name of the submitter
+//FeedbackForm is a collection of questions (and their answers) and the NRIC (either a hash or literal) of the submitter
 //which conceptually can be an empty string for anonymous submissions
 type FeedbackForm struct {
-	Name string `json:"name"`
-	Survey []FeedbackFormItem `json:"survey"`
+	ID string `json:"id" db:"id"`
+	NRIC string `json:"nric" db:"nric"`
+	Survey []FeedbackFormItem `json:"survey" db:"survey"`
+	SubmitTime time.Time `json:"submitTime" db:"submittime"`
 }
 
 //Released returns true if the current time in Singapore is beyond

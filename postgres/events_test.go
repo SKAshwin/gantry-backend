@@ -3,6 +3,7 @@ package postgres_test
 import(
 	"testing"
 	"checkin/postgres"
+	"checkin"
 	"checkin/test"
 	"time"
 	"math"
@@ -36,5 +37,66 @@ func TestUpdateEvent(t *testing.T) {
 	err = es.UpdateEvent(event)
 	test.Ok(t, err)
 
+	//test no such event with that event ID
+	event = checkin.Event{ID: "a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8"}
+	err = es.UpdateEvent(event)
+	test.Assert(t, err != nil, "No event with given UUID fails to throw error")
+
 }
 
+func TestFeedbackForms(t *testing.T) {
+	es := postgres.EventService{DB: db}
+	ff, err := es.FeedbackForms("aa19239f-f9f5-4935-b1f7-0edfdceabba7")
+	test.Ok(t, err)
+	expected := []checkin.FeedbackForm{
+		checkin.FeedbackForm{
+			ID: "ec5c5f6f-5384-4406-9beb-73b9effbdf50",
+			NRIC: "A1234",
+			Survey: []checkin.FeedbackFormItem{
+				checkin.FeedbackFormItem{
+					Question: "A",
+					Answer: "AA1",
+				},
+				checkin.FeedbackFormItem{
+					Question: "B",
+					Answer: "BB1",
+				},
+				checkin.FeedbackFormItem{
+					Question: "C",
+					Answer: "CC1",
+				},	
+			},
+			SubmitTime: time.Date(2019,time.April, 11, 8, 18, 14, 0, time.UTC),
+		},
+		checkin.FeedbackForm{
+			ID: "663fd6e1-b781-49e7-b1ed-dd0e3c6ff28e",
+			NRIC: "B5678",
+			Survey: []checkin.FeedbackFormItem{
+				checkin.FeedbackFormItem{
+					Question: "A",
+					Answer: "AA2",
+				},
+				checkin.FeedbackFormItem{
+					Question: "B",
+					Answer: "BB2",
+				},
+				checkin.FeedbackFormItem{
+					Question: "C",
+					Answer: "CC2",
+				},	
+			},
+			SubmitTime: time.Date(2019,time.April, 11, 9, 32, 4, 0, time.UTC),
+		},
+	}
+	test.Equals(t, expected, ff)
+
+	//try event does not exist
+	ff, err = es.FeedbackForms("663fd6e1-b781-49e7-b1ed-dd0e3c6ff28e")
+	test.Assert(t, err != nil, "Failed to throw error when non-existent event accessed")
+	ff, err = es.FeedbackForms("fdfdsfdsf")
+	test.Assert(t, err != nil, "Failed to throw error when non-existent event accessed (invalid UUID")
+
+	//try event has no feedback forms
+	ff, err = es.FeedbackForms("03293b3b-df83-407e-b836-fb7d4a3c4966")
+	test.Equals(t, []checkin.FeedbackForm{}, ff)
+}
