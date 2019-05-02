@@ -13,8 +13,8 @@ INSERT into event(name, url, ID) VALUES
 	('SDB Cohesion','sdbcohesionnovember', '3820a980-a207-4738-b82b-45808fe7aba8'),
 	('CSSCOM Planning Seminar','csscom', '03293b3b-df83-407e-b836-fb7d4a3c4966');
 
-INSERT into event(name, url, start, "end", lat, long, radius, ID) VALUES
-    ('Data Science Department Talk', 'dsdjan2019', '2019-01-10 15:00:00', '2019-01-10 18:00:00', 1.335932, 103.744708, 0.5, 'aa19239f-f9f5-4935-b1f7-0edfdceabba7');
+INSERT into event(name, url, start, "end", lat, long, radius, ID, createdAt, updatedAt) VALUES
+    ('Data Science Department Talk', 'dsdjan2019', '2019-01-10 15:00:00', '2019-01-10 18:00:00', 1.335932, 103.744708, 0.5, 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', '2019-04-01 04:05:36', '2019-04-10 03:02:11');
 
 INSERT into hosts(username, eventID) VALUES
     ('ME5Bob', '2c59b54d-3422-4bdb-824c-4125775b44c8'),

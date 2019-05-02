@@ -121,37 +121,10 @@ func (es *EventService) CreateEvent(e checkin.Event, hostUsername string) error 
 //All columns in the database will be set to the fields of the event object
 //Except for the createdAt and updatedAt fields, which are not editable
 func (es *EventService) UpdateEvent(event checkin.Event) error {
-	tx, err := es.DB.Beginx()
+	_, err := es.DB.NamedExec("UPDATE event SET name = :name, release = :release, \"start\" = :start, "+
+		"\"end\" = :end, lat = :lat, long= :long, radius = :radius, url = :url, updatedAt = (NOW() at time zone 'utc') where id = :id", &event)
 	if err != nil {
-		return errors.New("Error opening transaction:" + err.Error())
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			log.Println("UpdateEvent entered panic, recovered to rollback, with error: ", r)
-			if rollBackErr := tx.Rollback(); rollBackErr != nil {
-				log.Println("Could not rollback: " + rollBackErr.Error())
-			}
-			panic("UpdateEvent panicked")
-		}
-	}()
-
-	_, err = tx.NamedExec("UPDATE event SET name = :name, release = :release, \"start\" = :start, "+
-		"\"end\" = :end, lat = :lat, long= :long, radius = :radius, url = :url where id = :id", &event)
-	if err != nil {
-		tx.Rollback()
 		return errors.New("Error when updating event: " + err.Error())
-	}
-
-	_, err = tx.Exec("UPDATE event SET updatedAt = NOW() where ID = $1", event.ID)
-	if err != nil {
-		tx.Rollback()
-		return errors.New("Error when updating updated field in event: " + err.Error())
-	}
-
-	err = tx.Commit()
-	if err != nil {
-		return errors.New("Error committing changes to database: " + err.Error())
 	}
 
 	return nil
