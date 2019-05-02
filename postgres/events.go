@@ -179,6 +179,19 @@ func (es *EventService) CheckHost(username string, eventID string) (bool, error)
 }
 
 func (es *EventService) SubmitFeedback(eventID string, ff checkin.FeedbackForm) error {
+	if ff.Survey == nil || len(ff.Survey) == 0 {
+		return errors.New("Cannot submit nil or empty survey")
+	}
+	
+	j, err := json.Marshal(ff.Survey)
+	if err != nil {
+		return errors.New("Error marshalling form items into JSON: " + err.Error())
+	}
+
+	_, err = es.DB.Exec("INSERT INTO form(nric, survey, eventID) VALUES($1, $2, $3)", ff.NRIC, j, eventID)
+	if err != nil {
+		return errors.New("Error inserting new form: " + err.Error())
+	}
 	return nil
 }
 
@@ -192,6 +205,7 @@ func (es *EventService) FeedbackForms(eventID string) ([]checkin.FeedbackForm, e
 	} else if err != nil {
 		return nil, errors.New("Error checking if event exists: " + err.Error())
 	}
+
 	rows, err := es.DB.Queryx("SELECT ID, nric, survey, submitTime from form where eventID = $1", eventID)
 	if err != nil {
 		return nil, errors.New("Error fetching all forms for event: " + err.Error())
@@ -222,7 +236,8 @@ func (es *EventService) scanRowsIntoForms(rows *sqlx.Rows, numRows int) ([]check
 		}
 		err = json.Unmarshal(surveyJSON, &form.Survey)
 		if err != nil {
-			return nil, errors.New("Could not unmarshal form item data from JSON")
+			log.Println(string(surveyJSON))
+			return nil, errors.New("Could not unmarshal form item data from JSON: " + err.Error())
 		}
 		form.SubmitTime = form.SubmitTime.UTC() //make sure all times are in UTC (postgres has them in a +0:00 timezone)
 		forms[index] = form

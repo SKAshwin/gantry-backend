@@ -100,3 +100,69 @@ func TestFeedbackForms(t *testing.T) {
 	ff, err = es.FeedbackForms("03293b3b-df83-407e-b836-fb7d4a3c4966")
 	test.Equals(t, []checkin.FeedbackForm{}, ff)
 }
+
+func TestSubmitFeedback(t *testing.T) {
+	es := postgres.EventService{DB: db}
+	
+	ff := checkin.FeedbackForm{
+		ID: "3c7381e2-2459-401e-9b0d-763a2d9cd93d",
+		NRIC: "S4215",
+		Survey: []checkin.FeedbackFormItem{
+			checkin.FeedbackFormItem{
+				Question:"A",
+				Answer:"A",
+			},
+			checkin.FeedbackFormItem{
+				Question:"B",
+				Answer:"B",
+			},
+		},
+		SubmitTime: time.Date(2019,time.April, 11, 8, 18, 14, 0, time.UTC), //this should be ignored
+	}
+
+	//test submitting to an event with no existing forms
+	err := es.SubmitFeedback("03293b3b-df83-407e-b836-fb7d4a3c4966", ff)
+	test.Ok(t, err)
+	readFF, err := es.FeedbackForms("03293b3b-df83-407e-b836-fb7d4a3c4966")
+	test.Ok(t, err)
+	test.Assert(t, len(readFF)==1, "Event has more than one feedback form, which is not expected")
+	test.Assert(t, readFF[0].ID != "", "No UUID was generated for submitted feedback form ID")
+	test.Assert(t, readFF[0].ID != ff.ID, "Provided UUID was used; all UUIDs should be generated in database, not provided externally")
+	test.Equals(t, ff.NRIC, readFF[0].NRIC)
+	test.Equals(t, ff.Survey, readFF[0].Survey)
+	test.Assert(t, math.Abs(readFF[0].SubmitTime.Sub(time.Now().UTC()).Seconds())<2, 
+		"Form not submitted within 2 seconds of now; i.e. submit time set incorrectly") //possibly because submit time was not ignored
+		//in implementation
+
+
+	//test submitting to an event with an existing form
+	err = es.SubmitFeedback("2c59b54d-3422-4bdb-824c-4125775b44c8", ff)
+	test.Ok(t, err)
+	readFF, err = es.FeedbackForms("2c59b54d-3422-4bdb-824c-4125775b44c8")
+	var insertedFF checkin.FeedbackForm
+	for _, form := range readFF {
+		if form.ID !=  "a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8" {//the only form before we inserted this one
+			insertedFF = form
+		}
+	}
+	test.Assert(t, insertedFF.ID != "", "Submitted feedback form could not be found")
+	test.Equals(t, ff.NRIC, insertedFF.NRIC)
+	test.Equals(t, ff.Survey, insertedFF.Survey)
+	test.Assert(t, math.Abs(insertedFF.SubmitTime.Sub(time.Now().UTC()).Seconds())<2, 
+		"Form not submitted within 2 seconds of now; i.e. submit time set incorrectly")
+
+	//test event does not exist
+	err = es.SubmitFeedback("1440a8c0-2212-430c-bb71-4d7bf3a42862", ff)
+	test.Assert(t, err != nil, "Failed to throw error when submitting feedback to non-existent event")
+
+	//test survey is nil - should throw an error
+	ff.Survey = nil
+	err = es.SubmitFeedback("03293b3b-df83-407e-b836-fb7d4a3c4966", ff)
+	test.Assert(t, err != nil, "Nil survey does not throw an error")
+
+	//test empty survey - should be rejected, almost definitely never intended behavior
+	ff.Survey = []checkin.FeedbackFormItem{}
+	err = es.SubmitFeedback("03293b3b-df83-407e-b836-fb7d4a3c4966", ff)
+	test.Assert(t, err != nil, "Empty survey does not throw an error")
+
+}
