@@ -35,6 +35,13 @@ create table event(
 	updatedAt TIMESTAMP NOT NULL DEFAULT (NOW() at time zone 'utc')
 );
 
+create table form (
+	name text NOT NULL DEFAULT '',
+	eventID UUID NOT NULL REFERENCES event(ID) ON UPDATE CASCADE ON DELETE CASCADE,
+	survey json NOT NULL,
+	PRIMARY KEY(name, eventID)
+);
+
 create table guest(
 	nricHash text NOT NULL,
 	eventID UUID NOT NULL REFERENCES event(ID) ON UPDATE CASCADE ON DELETE CASCADE,

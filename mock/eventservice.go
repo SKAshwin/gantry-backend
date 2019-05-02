@@ -35,6 +35,12 @@ type EventService struct {
 
 	CheckHostFn      func(username string, eventID string) (bool, error)
 	CheckHostInvoked bool
+
+	FeedbackFormsFn func(ID string) ([]checkin.FeedbackForm, error)
+	FeedbackFormsInvoked bool
+
+	SubmitFeedbackFn func(ID string, ff checkin.FeedbackForm) error
+	SubmitFeedbackInvoked bool
 }
 
 //Event invokes the mock implementation and marks the function as invoked
@@ -95,4 +101,14 @@ func (es *EventService) AddHost(eventID string, username string) error {
 func (es *EventService) CheckHost(username string, eventID string) (bool, error) {
 	es.CheckHostInvoked = true
 	return es.CheckHostFn(username, eventID)
+}
+
+func (es *EventService) FeedbackForms(ID string) ([]checkin.FeedbackForm, error) {
+	es.FeedbackFormsInvoked = true
+	return es.FeedbackFormsFn(ID)
+}
+
+func (es *EventService) SubmitFeedback(ID string, ff checkin.FeedbackForm) error {
+	es.SubmitFeedbackInvoked = true
+	return es.SubmitFeedbackFn(ID, ff)
 }

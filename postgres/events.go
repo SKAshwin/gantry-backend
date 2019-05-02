@@ -193,6 +193,14 @@ func (es *EventService) getNumberOfEventsBy(username string) (int, error) {
 	return numEvents, nil
 }
 
+func (es *EventService) SubmitFeedback(eventID string, ff checkin.FeedbackForm) error {
+	return nil
+}
+
+func (es *EventService) FeedbackForms(eventID string) ([]checkin.FeedbackForm, error) {
+	return nil, nil
+}
+
 func (es *EventService) scanRowsIntoEvents(rows *sqlx.Rows, numRows int) ([]checkin.Event, error) {
 	events := make([]checkin.Event, numRows)
 

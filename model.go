@@ -46,6 +46,19 @@ type Event struct {
 	CreatedAt time.Time  `json:"createdAt" db:"createdat"`
 }
 
+//FeedbackFormItem represents a question/answer pair in a feedback form
+type FeedbackFormItem struct {
+	Question string `json:"question"`
+	Answer string `json:"answer"`
+}
+
+//FeedbackForm is a collection of questions (and their answers) and a name of the submitter
+//which conceptually can be an empty string for anonymous submissions
+type FeedbackForm struct {
+	Name string `json:"name"`
+	Survey []FeedbackFormItem `json:"survey"`
+}
+
 //Released returns true if the current time in Singapore is beyond
 //the release time in UTC
 func (event *Event) Released() bool {
@@ -70,6 +83,8 @@ type EventService interface {
 	CheckIfExists(id string) (bool, error)
 	AddHost(eventID string, username string) error
 	CheckHost(username string, eventID string) (bool, error)
+	FeedbackForms(ID string) ([]FeedbackForm, error)
+	SubmitFeedback(ID string, ff FeedbackForm) error
 }
 
 //HashMethod An interface allowing you to hash a string, and confirm if a string matches a given hash
