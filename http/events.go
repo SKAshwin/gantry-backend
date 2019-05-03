@@ -59,10 +59,39 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
 	h.Handle("/api/v0/events/{eventID}/released", Adapt(http.HandlerFunc(h.handleReleased),
 		existCheck)).Methods("GET")
+	h.Handle("/api/v1-2/events/{eventID}/feedback", Adapt(http.HandlerFunc(h.handleSubmitForm),
+		existCheck)).Methods("POST")
 	//route all guest-related requests to the guest handler
 	h.PathPrefix("/api/{versionNumber}/events/{eventID}/guests").Handler(gh)
 
 	return h
+}
+
+//Takes a feedback form encoded in JSON, anonymous or otherwise, and writes it into the
+//permanent storage
+func (h *EventHandler) handleSubmitForm(w http.ResponseWriter, r *http.Request) {
+	var ff checkin.FeedbackForm
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&ff)
+	if err != nil {
+		h.Logger.Println("Error parsing JSON body in SubmitForm: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "JSON could not be decoded: must be in the format {name, survey:[{question, answer},...]}", w)
+		return
+	}
+
+	if ff.Survey == nil || len(ff.Survey) == 0 {
+		WriteMessage(http.StatusBadRequest, "Feedback form cannot have null or empty survey", w)
+		return
+	}
+
+	err = h.EventService.SubmitFeedback(mux.Vars(r)["eventID"], ff)
+	if err != nil {
+		h.Logger.Println("Error submitting feedback: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error writing feedback form into database", w)
+	} else {
+		WriteOKMessage("Form submitted successfully", w)
+	}
 }
 
 func (h *EventHandler) handleReleased(w http.ResponseWriter, r *http.Request) {
@@ -70,6 +99,7 @@ func (h *EventHandler) handleReleased(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.Logger.Println("Error fetching event info: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error in fetching event info", w)
+		return
 	}
 
 	reply, _ := json.Marshal(event.Released())

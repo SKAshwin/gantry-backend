@@ -785,3 +785,130 @@ func TestHandleURLTaken(t *testing.T) {
 	r = httptest.NewRequest("GET", "/api/v0/events", nil)
 	noValidTokenTest(t, r, h, &auth)
 }
+
+func TestSubmitForm(t *testing.T) {
+	var es mock.EventService
+	var auth mock.Authenticator
+	gh := myhttp.GuestHandler{}
+	h := myhttp.NewEventHandler(&es, &auth, &gh)
+
+	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
+	submitFeedbackFnGenerator := func(err error, expected *checkin.FeedbackForm) func(string, checkin.FeedbackForm) error {
+		return func(eventID string, ff checkin.FeedbackForm) error {
+			test.Equals(t, "300", eventID)
+			test.Equals(t, *expected, ff)
+			return err
+		}
+	}
+	expectedForm := checkin.FeedbackForm{
+		Name: "Jimothy Bob",
+		Survey: []checkin.FeedbackFormItem{
+			checkin.FeedbackFormItem{
+				Question: "A",
+				Answer:   "AA",
+			},
+			checkin.FeedbackFormItem{
+				Question: "B",
+				Answer:   "BB",
+			},
+		},
+	}
+	es.SubmitFeedbackFn = submitFeedbackFnGenerator(nil, &expectedForm)
+
+	//test normal functionality
+	r := httptest.NewRequest("POST", "/api/v1-2/events/300/feedback",
+		strings.NewReader(`{"name":"Jimothy Bob","survey":[{"question":"A","answer":"AA"},{"question":"B","answer":"BB"}]}`))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+
+	//test blank name (should work fine; for anonymous submissions)
+	expectedForm.Name = ""
+	r = httptest.NewRequest("POST", "/api/v1-2/events/300/feedback",
+		strings.NewReader(`{"name":"","survey":[{"question":"A","answer":"AA"},{"question":"B","answer":"BB"}]}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+
+	//same as above, but name just omitted, should work fine
+	r = httptest.NewRequest("POST", "/api/v1-2/events/300/feedback",
+		strings.NewReader(`{"survey":[{"question":"A","answer":"AA"},{"question":"B","answer":"BB"}]}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+
+	//test just one question (should work fine)
+	expectedForm.Name = "Jim"
+	expectedForm.Survey = []checkin.FeedbackFormItem{
+		checkin.FeedbackFormItem{
+			Question: "A",
+			Answer:   "AA",
+		},
+	}
+	r = httptest.NewRequest("POST", "/api/v1-2/events/300/feedback",
+		strings.NewReader(`{"name":"Jim","survey":[{"question":"A","answer":"AA"}]}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+
+	//test empty survey array (should be rejected, 400)
+	es.SubmitFeedbackInvoked = false
+	r = httptest.NewRequest("POST", "/api/v1-2/events/300/feedback",
+		strings.NewReader(`{"name":"Jim","survey":[]}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.SubmitFeedbackInvoked, "Submit feedback invoked even though no questions in survey")
+
+	//test null survey array (should be rejected, 400)
+	es.SubmitFeedbackInvoked = false
+	r = httptest.NewRequest("POST", "/api/v1-2/events/300/feedback",
+		strings.NewReader(`{"name":"Jim","survey":null}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.SubmitFeedbackInvoked, "Submit feedback invoked even though null survey")
+
+	//test null name (should be read as empty string, allowed through)
+	expectedForm.Name = ""
+	es.SubmitFeedbackInvoked = false
+	r = httptest.NewRequest("POST", "/api/v1-2/events/300/feedback",
+		strings.NewReader(`{"name":null,"survey":[{"question":"A","answer":"AA"}]}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+
+	//test event does not exist (404, or 500 if checkIfExists fails)
+	expectedForm.Name = "Jim"
+	es.SubmitFeedbackInvoked = false
+	r = httptest.NewRequest("POST", "/api/v1-2/events/100/feedback",
+		strings.NewReader(`{"name":"Jim","survey":[{"question":"A","answer":"AA"}]}`))
+	eventDoesNotExistTest(t, r, h, &es)
+	test.Assert(t, !es.SubmitFeedbackInvoked, "Submit feedback invoked even though event does not exist")
+
+	//test extra field supplied (400), NRIC in particular
+	es.SubmitFeedbackInvoked = false
+	r = httptest.NewRequest("POST", "/api/v1-2/events/300/feedback",
+		strings.NewReader(`{"name":"Jim","nric":"1234A","survey":[{"question":"A","answer":"AA"}]}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.SubmitFeedbackInvoked, "Submit feedback invoked even though extra fields supplied")
+
+	//test badly formatted JSON (only survey supplied, instead of empty string name, 400)
+	es.SubmitFeedbackInvoked = false
+	r = httptest.NewRequest("POST", "/api/v1-2/events/300/feedback",
+		strings.NewReader(`[{"question":"A","answer":"AA"}]`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.SubmitFeedbackInvoked, "Submit feedback invoked even though extra fields supplied")
+
+	//test error submitting form (500)
+	es.SubmitFeedbackFn = submitFeedbackFnGenerator(errors.New("An error"), &expectedForm)
+	r = httptest.NewRequest("POST", "/api/v1-2/events/300/feedback",
+		strings.NewReader(`{"name":"Jim","survey":[{"question":"A","answer":"AA"}]}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+}
