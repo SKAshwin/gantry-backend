@@ -119,16 +119,16 @@ func TestHandleRegisterGuest(t *testing.T) {
 	es.CheckHostFn = checkHostGenerator("testing_username", "300", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	registerGuestGenerator := func(err error) func(string, checkin.Guest) error {
+	registerGuestGenerator := func(err error, expectedTags []string) func(string, checkin.Guest) error {
 		return func(eventID string, guest checkin.Guest) error {
 			test.Equals(t, "300", eventID)
 			test.Equals(t, "5678F", guest.NRIC)
 			test.Equals(t, "Jim", guest.Name)
-			test.Equals(t, []string(nil), guest.Tags)
+			test.Equals(t, expectedTags, guest.Tags)
 			return err
 		}
 	}
-	gs.RegisterGuestFn = registerGuestGenerator(nil)
+	gs.RegisterGuestFn = registerGuestGenerator(nil, nil)
 	guestExistsGenerator := func(err error) func(string, string) (bool, error) {
 		return func(eventID string, nric string) (bool, error) {
 			test.Equals(t, "300", eventID)
@@ -144,6 +144,40 @@ func TestHandleRegisterGuest(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/v0/events/300/guests",
 		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
 	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
+
+	//Test tags supplied with request
+
+	//test one tag
+	gs.RegisterGuestFn = registerGuestGenerator(nil, []string{"VIP"})
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
+		strings.NewReader(`{"name":"Jim", "nric":"5678F", "tags":["VIP"]}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
+
+	//test two tags
+	gs.RegisterGuestFn = registerGuestGenerator(nil, []string{"ATTENDING", "VIP"})
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
+		strings.NewReader(`{"name":"Jim", "nric":"5678F", "tags":["ATTENDING","VIP"]}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
+
+	//test empty array tags (should work)
+	gs.RegisterGuestFn = registerGuestGenerator(nil, []string{})
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
+		strings.NewReader(`{"name":"Jim", "nric":"5678F", "tags":[]}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
+
+	//test nil tags (should work)
+	gs.RegisterGuestFn = registerGuestGenerator(nil, nil)
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
+		strings.NewReader(`{"name":"Jim", "nric":"5678F", "tags":null}`))
+	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
 
@@ -168,13 +202,13 @@ func TestHandleRegisterGuest(t *testing.T) {
 	gs.GuestExistsFn = guestExistsGenerator(nil)
 
 	//Test error registering guest
-	gs.RegisterGuestFn = registerGuestGenerator(errors.New("An error"))
+	gs.RegisterGuestFn = registerGuestGenerator(errors.New("An error"), nil)
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
 		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
-	gs.RegisterGuestFn = registerGuestGenerator(nil)
+	gs.RegisterGuestFn = registerGuestGenerator(nil, nil)
 
 	//Test invalid JSON
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",

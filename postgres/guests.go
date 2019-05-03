@@ -6,9 +6,10 @@ import (
 	"database/sql"
 	"errors"
 
+	"strings"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
-	"strings"
 )
 
 //GuestService an implementation of checkin.GuestService using postgres
@@ -178,6 +179,9 @@ func (gs *GuestService) RegisterGuest(eventID string, guest checkin.Guest) error
 	return err
 }
 
+//Tags returns the tags of a given guest
+//Returns an empty array for no tags
+//Returns nil if guest does not exist, or there was an error fetching it
 func (gs *GuestService) Tags(eventID string, nric string) ([]string, error) {
 	guest, err := gs.getGuestWithNRIC(eventID, nric)
 	if err != nil {
@@ -196,10 +200,13 @@ func (gs *GuestService) Tags(eventID string, nric string) ([]string, error) {
 	return tags, nil
 }
 
+//SetTags sets the tags of a given guest; it overwrites all previous tags on that guest
+//nil tags treated as empty array tags
+//Error if guest does not exist or error updating/fetching the guest
 func (gs *GuestService) SetTags(eventID string, nric string, tags []string) error {
 	guest, err := gs.getGuestWithNRIC(eventID, nric)
 	if err != nil {
-		return errors.New("Error fetching guest with that NRIC")
+		return errors.New("Error fetching guest with that NRIC: " + err.Error())
 	}
 	if guest.IsEmpty() {
 		return errors.New("Guest does not exist")
