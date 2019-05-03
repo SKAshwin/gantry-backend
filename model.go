@@ -49,16 +49,16 @@ type Event struct {
 //FeedbackFormItem represents a question/answer pair in a feedback form
 type FeedbackFormItem struct {
 	Question string `json:"question"`
-	Answer string `json:"answer"`
+	Answer   string `json:"answer"`
 }
 
 //FeedbackForm is a collection of questions (and their answers) and the NRIC (either a hash or literal) of the submitter
 //which conceptually can be an empty string for anonymous submissions
 type FeedbackForm struct {
-	ID string `json:"id" db:"id"`
-	NRIC string `json:"nric" db:"nric"`
-	Survey []FeedbackFormItem `json:"survey" db:"survey"`
-	SubmitTime time.Time `json:"submitTime" db:"submittime"`
+	ID         string             `json:"id" db:"id"`
+	Name       string             `json:"name" db:"name"`
+	Survey     []FeedbackFormItem `json:"survey" db:"survey"`
+	SubmitTime time.Time          `json:"submitTime" db:"submittime"`
 }
 
 //Released returns true if the current time in Singapore is beyond

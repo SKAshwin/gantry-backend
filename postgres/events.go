@@ -3,9 +3,9 @@ package postgres
 import (
 	"checkin"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"log"
-	"encoding/json"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -178,23 +178,24 @@ func (es *EventService) CheckHost(username string, eventID string) (bool, error)
 	return numHosts == 1, nil
 }
 
+//SubmitFeedback adds a feedback form to the database
+//Returns error if the feedback form has a nil or empty survey (no questions in it)
 func (es *EventService) SubmitFeedback(eventID string, ff checkin.FeedbackForm) error {
 	if ff.Survey == nil || len(ff.Survey) == 0 {
 		return errors.New("Cannot submit nil or empty survey")
 	}
-	
+
 	j, err := json.Marshal(ff.Survey)
 	if err != nil {
 		return errors.New("Error marshalling form items into JSON: " + err.Error())
 	}
 
-	_, err = es.DB.Exec("INSERT INTO form(nric, survey, eventID) VALUES($1, $2, $3)", ff.NRIC, j, eventID)
+	_, err = es.DB.Exec("INSERT INTO form(name, survey, eventID) VALUES($1, $2, $3)", ff.Name, j, eventID)
 	if err != nil {
 		return errors.New("Error inserting new form: " + err.Error())
 	}
 	return nil
 }
-
 
 //FeedbackForms return an array of forms that have been submitted for a particular event
 //Returns an error if the event does not exist (or if checking existence caused failure)
@@ -206,7 +207,7 @@ func (es *EventService) FeedbackForms(eventID string) ([]checkin.FeedbackForm, e
 		return nil, errors.New("Error checking if event exists: " + err.Error())
 	}
 
-	rows, err := es.DB.Queryx("SELECT ID, nric, survey, submitTime from form where eventID = $1", eventID)
+	rows, err := es.DB.Queryx("SELECT ID, name, survey, submitTime from form where eventID = $1", eventID)
 	if err != nil {
 		return nil, errors.New("Error fetching all forms for event: " + err.Error())
 	}
@@ -225,12 +226,12 @@ func (es *EventService) FeedbackForms(eventID string) ([]checkin.FeedbackForm, e
 
 func (es *EventService) scanRowsIntoForms(rows *sqlx.Rows, numRows int) ([]checkin.FeedbackForm, error) {
 	forms := make([]checkin.FeedbackForm, numRows)
-	
+
 	index := 0
 	for thereAreMore := rows.Next(); thereAreMore; thereAreMore = rows.Next() {
 		var form checkin.FeedbackForm
 		var surveyJSON []byte
-		err := rows.Scan(&form.ID, &form.NRIC, &surveyJSON, &form.SubmitTime)
+		err := rows.Scan(&form.ID, &form.Name, &surveyJSON, &form.SubmitTime)
 		if err != nil {
 			return nil, errors.New("Could not extract form: " + err.Error())
 		}
@@ -296,4 +297,3 @@ func (es *EventService) getNumberOfEventsBy(username string) (int, error) {
 
 	return numEvents, nil
 }
-

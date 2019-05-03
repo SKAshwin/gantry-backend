@@ -37,7 +37,7 @@ create table event(
 
 create table form (
 	ID UUID NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
-	nric text NOT NULL DEFAULT '',
+	name text NOT NULL DEFAULT '',
 	eventID UUID NOT NULL REFERENCES event(ID) ON UPDATE CASCADE ON DELETE CASCADE,
 	survey json NOT NULL,
 	submitTime TIMESTAMP NOT NULL DEFAULT (NOW() at time zone 'utc')

@@ -1,12 +1,12 @@
 package postgres_test
 
-import(
-	"testing"
-	"checkin/postgres"
+import (
 	"checkin"
+	"checkin/postgres"
 	"checkin/test"
-	"time"
 	"math"
+	"testing"
+	"time"
 )
 
 func TestUpdateEvent(t *testing.T) {
@@ -16,9 +16,9 @@ func TestUpdateEvent(t *testing.T) {
 
 	event, err := es.Event("aa19239f-f9f5-4935-b1f7-0edfdceabba7")
 	test.Ok(t, err)
-	test.Assert(t, math.Abs(event.Radius.Float64-5)>0.0001, "Event radius was already at updated value")
+	test.Assert(t, math.Abs(event.Radius.Float64-5) > 0.0001, "Event radius was already at updated value")
 	originalRadius := event.Radius
-	test.Assert(t, math.Abs(event.UpdatedAt.Sub(time.Now().UTC()).Seconds())>2, "Event last updated time already close to current time")
+	test.Assert(t, math.Abs(event.UpdatedAt.Sub(time.Now().UTC()).Seconds()) > 2, "Event last updated time already close to current time")
 	originalCreatedAt := event.CreatedAt
 
 	event.Radius.Float64 = 5
@@ -28,12 +28,12 @@ func TestUpdateEvent(t *testing.T) {
 
 	event, err = es.Event("aa19239f-f9f5-4935-b1f7-0edfdceabba7")
 	test.Ok(t, err)
-	test.Assert(t, math.Abs(5 - event.Radius.Float64)<0.0001, "Radius was not successfully updated")
-	test.Assert(t, math.Abs(event.UpdatedAt.Sub(time.Now().UTC()).Seconds())<2, "Event last updated not within 2 seconds of now; i.e. not updated")
+	test.Assert(t, math.Abs(5-event.Radius.Float64) < 0.0001, "Radius was not successfully updated")
+	test.Assert(t, math.Abs(event.UpdatedAt.Sub(time.Now().UTC()).Seconds()) < 2, "Event last updated not within 2 seconds of now; i.e. not updated")
 	test.Assert(t, event.CreatedAt == originalCreatedAt, "Event created at time was modified; this should not be allowed")
 
 	event.Radius = originalRadius
-	
+
 	err = es.UpdateEvent(event)
 	test.Ok(t, err)
 
@@ -50,42 +50,42 @@ func TestFeedbackForms(t *testing.T) {
 	test.Ok(t, err)
 	expected := []checkin.FeedbackForm{
 		checkin.FeedbackForm{
-			ID: "ec5c5f6f-5384-4406-9beb-73b9effbdf50",
-			NRIC: "A1234",
+			ID:   "ec5c5f6f-5384-4406-9beb-73b9effbdf50",
+			Name: "Alice",
 			Survey: []checkin.FeedbackFormItem{
 				checkin.FeedbackFormItem{
 					Question: "A",
-					Answer: "AA1",
+					Answer:   "AA1",
 				},
 				checkin.FeedbackFormItem{
 					Question: "B",
-					Answer: "BB1",
+					Answer:   "BB1",
 				},
 				checkin.FeedbackFormItem{
 					Question: "C",
-					Answer: "CC1",
-				},	
+					Answer:   "CC1",
+				},
 			},
-			SubmitTime: time.Date(2019,time.April, 11, 8, 18, 14, 0, time.UTC),
+			SubmitTime: time.Date(2019, time.April, 11, 8, 18, 14, 0, time.UTC),
 		},
 		checkin.FeedbackForm{
-			ID: "663fd6e1-b781-49e7-b1ed-dd0e3c6ff28e",
-			NRIC: "B5678",
+			ID:   "663fd6e1-b781-49e7-b1ed-dd0e3c6ff28e",
+			Name: "Bob",
 			Survey: []checkin.FeedbackFormItem{
 				checkin.FeedbackFormItem{
 					Question: "A",
-					Answer: "AA2",
+					Answer:   "AA2",
 				},
 				checkin.FeedbackFormItem{
 					Question: "B",
-					Answer: "BB2",
+					Answer:   "BB2",
 				},
 				checkin.FeedbackFormItem{
 					Question: "C",
-					Answer: "CC2",
-				},	
+					Answer:   "CC2",
+				},
 			},
-			SubmitTime: time.Date(2019,time.April, 11, 9, 32, 4, 0, time.UTC),
+			SubmitTime: time.Date(2019, time.April, 11, 9, 32, 4, 0, time.UTC),
 		},
 	}
 	test.Equals(t, expected, ff)
@@ -103,21 +103,21 @@ func TestFeedbackForms(t *testing.T) {
 
 func TestSubmitFeedback(t *testing.T) {
 	es := postgres.EventService{DB: db}
-	
+
 	ff := checkin.FeedbackForm{
-		ID: "3c7381e2-2459-401e-9b0d-763a2d9cd93d",
-		NRIC: "S4215",
+		ID:   "3c7381e2-2459-401e-9b0d-763a2d9cd93d",
+		Name: "Caleb",
 		Survey: []checkin.FeedbackFormItem{
 			checkin.FeedbackFormItem{
-				Question:"A",
-				Answer:"A",
+				Question: "A",
+				Answer:   "A",
 			},
 			checkin.FeedbackFormItem{
-				Question:"B",
-				Answer:"B",
+				Question: "B",
+				Answer:   "B",
 			},
 		},
-		SubmitTime: time.Date(2019,time.April, 11, 8, 18, 14, 0, time.UTC), //this should be ignored
+		SubmitTime: time.Date(2019, time.April, 11, 8, 18, 14, 0, time.UTC), //this should be ignored
 	}
 
 	//test submitting to an event with no existing forms
@@ -125,15 +125,14 @@ func TestSubmitFeedback(t *testing.T) {
 	test.Ok(t, err)
 	readFF, err := es.FeedbackForms("03293b3b-df83-407e-b836-fb7d4a3c4966")
 	test.Ok(t, err)
-	test.Assert(t, len(readFF)==1, "Event has more than one feedback form, which is not expected")
+	test.Assert(t, len(readFF) == 1, "Event has more than one feedback form, which is not expected")
 	test.Assert(t, readFF[0].ID != "", "No UUID was generated for submitted feedback form ID")
 	test.Assert(t, readFF[0].ID != ff.ID, "Provided UUID was used; all UUIDs should be generated in database, not provided externally")
-	test.Equals(t, ff.NRIC, readFF[0].NRIC)
+	test.Equals(t, ff.Name, readFF[0].Name)
 	test.Equals(t, ff.Survey, readFF[0].Survey)
-	test.Assert(t, math.Abs(readFF[0].SubmitTime.Sub(time.Now().UTC()).Seconds())<2, 
+	test.Assert(t, math.Abs(readFF[0].SubmitTime.Sub(time.Now().UTC()).Seconds()) < 2,
 		"Form not submitted within 2 seconds of now; i.e. submit time set incorrectly") //possibly because submit time was not ignored
-		//in implementation
-
+	//in implementation
 
 	//test submitting to an event with an existing form
 	err = es.SubmitFeedback("2c59b54d-3422-4bdb-824c-4125775b44c8", ff)
@@ -141,14 +140,14 @@ func TestSubmitFeedback(t *testing.T) {
 	readFF, err = es.FeedbackForms("2c59b54d-3422-4bdb-824c-4125775b44c8")
 	var insertedFF checkin.FeedbackForm
 	for _, form := range readFF {
-		if form.ID !=  "a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8" {//the only form before we inserted this one
+		if form.ID != "a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8" { //the only form before we inserted this one
 			insertedFF = form
 		}
 	}
 	test.Assert(t, insertedFF.ID != "", "Submitted feedback form could not be found")
-	test.Equals(t, ff.NRIC, insertedFF.NRIC)
+	test.Equals(t, ff.Name, insertedFF.Name)
 	test.Equals(t, ff.Survey, insertedFF.Survey)
-	test.Assert(t, math.Abs(insertedFF.SubmitTime.Sub(time.Now().UTC()).Seconds())<2, 
+	test.Assert(t, math.Abs(insertedFF.SubmitTime.Sub(time.Now().UTC()).Seconds()) < 2,
 		"Form not submitted within 2 seconds of now; i.e. submit time set incorrectly")
 
 	//test event does not exist
