@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gorilla/mux"
 )
@@ -68,7 +69,26 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, gm GuestM
 }
 
 func (h *GuestHandler) handleGuests(w http.ResponseWriter, r *http.Request) {
-	guests, err := h.GuestService.Guests(mux.Vars(r)["eventID"], nil)
+	err := r.ParseForm()
+	if err != nil {
+		h.Logger.Println("Error parsing form queries: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "Could not parse query string", w)
+		return
+	}
+	var guestsFunction func(string, []string) ([]string, error)
+	if val, ok := r.Form["checkedin"]; !ok {
+		//no checkedin=true or checkedin=false is set, so get all guests
+		guestsFunction = h.GuestService.Guests
+	} else if strings.ToLower(val[0]) == "true" {
+		guestsFunction = h.GuestService.GuestsCheckedIn
+	} else if strings.ToLower(val[0]) == "false" {
+		guestsFunction = h.GuestService.GuestsNotCheckedIn
+	} else {
+		WriteMessage(http.StatusBadRequest, "Form value 'checkedin' must be either true or false (non-case sensitive)", w)
+		return
+	}
+
+	guests, err := guestsFunction(mux.Vars(r)["eventID"], r.Form["tag"])
 	if err != nil {
 		h.Logger.Println("Error in handleGuests: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching all guests for event", w)

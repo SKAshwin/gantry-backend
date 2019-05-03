@@ -10,6 +10,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -55,16 +56,48 @@ func TestHandleGuests(t *testing.T) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
 			}
-			if tags != nil && len(tags) != 0 {
-				t.Fatal("Expected nil or empty tags, got ", tags)
-			}
 			if err != nil {
 				return nil, err
 			}
-			return names, nil
+			if tags == nil {
+				return names, nil
+			} else if reflect.DeepEqual(tags, []string{"VIP"}) {
+				return []string{"VIP1", "VIP2"}, nil
+			} else if reflect.DeepEqual(tags, []string{"VIP", "ATTENDANCE"}) {
+				return []string{"AVIP1"}, nil
+			}
+
+			t.Fatalf("Unexpected branch of guests")
+			return nil, nil
 		}
 	}
 	gs.GuestsFn = guestsGenerator([]string{"Bob", "Jim", "Jacob"}, nil)
+	gs.GuestsCheckedInFn = func(eventID string, tags []string) ([]string, error) {
+		if eventID != "100" {
+			t.Fatalf("unexpected id: %s", eventID)
+		}
+
+		if reflect.DeepEqual(tags, []string{"VIP", "COLONEL"}) {
+			return []string{}, nil
+		} else if reflect.DeepEqual(tags, []string{"VIP"}) {
+			return []string{"LOL"}, nil
+		}
+
+		t.Fatal("Unexpected branch of guests checked in")
+		return nil, nil
+	}
+	gs.GuestsNotCheckedInFn = func(eventID string, tags []string) ([]string, error) {
+		if eventID != "100" {
+			t.Fatalf("unexpected id: %s", eventID)
+		}
+
+		if tags == nil {
+			return []string{}, nil
+		}
+
+		t.Fatal("Unexpected branch of guests checked in")
+		return nil, nil
+	}
 
 	//Test normal behavior
 	r := httptest.NewRequest("GET", "/api/v0/events/100/guests", nil)
@@ -80,6 +113,61 @@ func TestHandleGuests(t *testing.T) {
 	h.ServeHTTP(w, r)
 	json.NewDecoder(w.Result().Body).Decode(&guests)
 	test.Equals(t, []string{}, guests)
+
+	//Test one tag
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests?tag=VIP", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&guests)
+	test.Equals(t, []string{"VIP1", "VIP2"}, guests)
+
+	//Test two tags
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests?tag=VIP&tag=ATTENDANCE", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&guests)
+	test.Equals(t, []string{"AVIP1"}, guests)
+
+	//Test checked in
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests?tag=VIP&tag=COLONEL&checkedin=true", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&guests)
+	test.Equals(t, []string{}, guests)
+
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests?tag=VIP&checkedin=true", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&guests)
+	test.Equals(t, []string{"LOL"}, guests)
+
+	//Test not checked in
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests?checkedin=false", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&guests)
+	test.Equals(t, []string{}, guests)
+
+	//Test that checked in argument is not uppercase
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests?checkedin=False", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&guests)
+	test.Equals(t, []string{}, guests)
+
+	//Test checkedin set to invalid values
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests?checkedin=somethingelse", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	//check invalid form syntax
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests?checkedin=false=", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests", nil)
 
 	//Test error getting guests
 	gs.GuestsFn = guestsGenerator(nil, errors.New("An error"))
