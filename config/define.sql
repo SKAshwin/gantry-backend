@@ -68,3 +68,4 @@ grant SELECT, INSERT, UPDATE on app_admin to server_access;
 grant SELECT, INSERT, UPDATE, DELETE on event to server_access;
 grant SELECT, INSERT, UPDATE, DELETE on hosts to server_access;
 grant SELECT, INSERT, UPDATE, DELETE on guest to server_access;
+grant SELECT, INSERT, UPDATE, DELETE on form to server_access;

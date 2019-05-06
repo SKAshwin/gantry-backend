@@ -7,6 +7,7 @@ import (
 	myhttp "checkin/http"
 	"checkin/mock"
 	"checkin/test"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -911,4 +912,118 @@ func TestSubmitForm(t *testing.T) {
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+}
+
+func TestHandleFeedbackReport(t *testing.T) {
+	// Inject our mock into our handler.
+	var es mock.EventService
+	var auth mock.Authenticator
+	gh := myhttp.GuestHandler{}
+	h := myhttp.NewEventHandler(&es, &auth, &gh)
+
+	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
+	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
+	auth.AuthenticateFn = authenticateGenerator(true, nil)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
+	ff := []checkin.FeedbackForm{
+		checkin.FeedbackForm{
+			Name: "Hello",
+			Survey: []checkin.FeedbackFormItem{
+				checkin.FeedbackFormItem{
+					Question: "A",
+					Answer:   "AA",
+				},
+				checkin.FeedbackFormItem{
+					Question: "B",
+					Answer:   "BB",
+				},
+			},
+		},
+		checkin.FeedbackForm{
+			Name: "",
+			Survey: []checkin.FeedbackFormItem{
+				checkin.FeedbackFormItem{
+					Question: "A",
+					Answer:   "AA2",
+				},
+			},
+		},
+		checkin.FeedbackForm{
+			Name: "Sam",
+			Survey: []checkin.FeedbackFormItem{
+				checkin.FeedbackFormItem{
+					Question: "C",
+					Answer:   "CC",
+				},
+			},
+		},
+	}
+	feedbackFormFnGenerator := func(ff []checkin.FeedbackForm, err error) func(string) ([]checkin.FeedbackForm, error) {
+		return func(eventID string) ([]checkin.FeedbackForm, error) {
+			test.Equals(t, eventID, "100")
+			if err != nil {
+				return nil, err
+			}
+			return ff, nil
+		}
+	}
+	es.FeedbackFormsFn = feedbackFormFnGenerator(ff, nil)
+
+	//test normal functionality
+	//in particular, non-homogenous questions
+	//and anonymous submissions
+	r := httptest.NewRequest("GET", "/api/v1-2/events/100/feedback/report", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	reader := csv.NewReader(w.Result().Body)
+	data, err := reader.ReadAll()
+	test.Ok(t, err)
+	test.Equals(t, [][]string{
+		[]string{"Name", "A", "B", "C"},
+		[]string{"Hello", "AA", "BB", ""},
+		[]string{"", "AA2", "", ""},
+		[]string{"Sam", "", "", "CC"},
+	}, data)
+
+	//test empty (no feedback forms)
+	es.FeedbackFormsFn = feedbackFormFnGenerator([]checkin.FeedbackForm{}, nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	reader = csv.NewReader(w.Result().Body)
+	data, err = reader.ReadAll()
+	test.Ok(t, err)
+	test.Equals(t, [][]string(nil), data)
+
+	//test error on feedback form generation
+	es.FeedbackFormsFn = feedbackFormFnGenerator(ff, errors.New("An error"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	es.FeedbackFormsFn = feedbackFormFnGenerator(ff, nil)
+
+	//Test access restrictions
+
+	//Test access by another user
+	nonHostAccessTest(t, r, h, &auth, &es, "unauthorized_person")
+
+	//Test access by admin
+	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
+		reader := csv.NewReader(r.Body)
+		data, err := reader.ReadAll()
+		test.Ok(t, err)
+		test.Equals(t, [][]string{
+			[]string{"Name", "A", "B", "C"},
+			[]string{"Hello", "AA", "BB", ""},
+			[]string{"", "AA2", "", ""},
+			[]string{"Sam", "", "", "CC"},
+		}, data)
+
+	})
+
+	//Test invalid token
+	noValidTokenTest(t, r, h, &auth)
+
+	//Test invalid eventID
+	r = httptest.NewRequest("GET", "/api/v1-2/events/200/feedback/report", nil)
+	eventDoesNotExistTest(t, r, h, &es)
 }
