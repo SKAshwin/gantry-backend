@@ -4,6 +4,7 @@ import (
 	myhttp "checkin/http"
 	"errors"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/websocket"
 )
@@ -13,6 +14,7 @@ import (
 type GuestMessenger struct {
 	connections map[string]*GuestConnection
 	upgrader    websocket.Upgrader
+	lock        sync.RWMutex
 }
 
 //NewGuestMessenger creates a GuestMessenger with a given read/write buffer size
@@ -29,6 +31,7 @@ func NewGuestMessenger(readBufferSize int, writeBufferSize int) *GuestMessenger 
 				//GuestMessenger offers no guarantee on origin checking
 			},
 		},
+		lock: sync.RWMutex{},
 	}
 }
 
@@ -40,20 +43,26 @@ func (gm *GuestMessenger) OpenConnection(guestID string, w http.ResponseWriter, 
 		return errors.New("Error upgrading request to websocket connection: " + err.Error())
 	}
 
-	gm.connections[guestID] = newGuestConnection(conn, func(){
+	gm.lock.Lock()
+	defer gm.lock.Unlock()
+	gm.connections[guestID] = newGuestConnection(conn, func() {
+		gm.lock.Lock()
+		defer gm.lock.Unlock()
 		delete(gm.connections, guestID)
 	})
-	
+
 	return nil
 }
 
 //Send sends the provided guest data over the websocket connection marked by the given guestID
 //Must have called OpenConnection with that guestID beforehand
 func (gm *GuestMessenger) Send(guestID string, data myhttp.GuestMessage) error {
+	gm.lock.RLock()
+	defer gm.lock.RUnlock()
 	if client, ok := gm.connections[guestID]; ok {
 		response := make(chan error)
-		client.send <- SendTask{message:data, response: response}
-		err := <- response
+		client.send <- SendTask{message: data, response: response}
+		err := <-response
 		if err != nil {
 			return errors.New("Error writing message: " + err.Error())
 		}
@@ -66,6 +75,8 @@ func (gm *GuestMessenger) Send(guestID string, data myhttp.GuestMessage) error {
 
 //HasConnection returns true if there is an active connection with the given guest ID
 func (gm *GuestMessenger) HasConnection(guestID string) bool {
+	gm.lock.RLock()
+	defer gm.lock.RUnlock()
 	_, ok := gm.connections[guestID]
 	return ok
 }
@@ -74,6 +85,8 @@ func (gm *GuestMessenger) HasConnection(guestID string) bool {
 func (gm *GuestMessenger) CloseConnection(guestID string) error {
 	if client, ok := gm.connections[guestID]; ok {
 		client.close()
+		gm.lock.Lock()
+		defer gm.lock.Unlock()
 		delete(gm.connections, guestID)
 		return nil
 	}
