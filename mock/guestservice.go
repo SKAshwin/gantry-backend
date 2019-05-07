@@ -12,26 +12,32 @@ type GuestService struct {
 	MarkAbsentFn      func(eventID string, nric string) error
 	MarkAbsentInvoked bool
 
-	GuestsFn      func(eventID string) ([]string, error)
+	GuestsFn      func(eventID string, tags []string) ([]string, error)
 	GuestsInvoked bool
 
-	GuestsCheckedInFn      func(eventID string) ([]string, error)
+	GuestsCheckedInFn      func(eventID string, tags []string) ([]string, error)
 	GuestsCheckedInInvoked bool
 
-	GuestsNotCheckedInFn      func(eventID string) ([]string, error)
+	GuestsNotCheckedInFn      func(eventID string, tags []string) ([]string, error)
 	GuestsNotCheckedInInvoked bool
 
 	GuestExistsFn      func(eventID string, nric string) (bool, error)
 	GuestExistsInvoked bool
 
-	RegisterGuestFn      func(eventID string, nric string, name string) error
+	RegisterGuestFn      func(eventID string, guest checkin.Guest) error
 	RegisterGuestInvoked bool
 
 	RemoveGuestFn      func(eventID string, nric string) error
 	RemoveGuestInvoked bool
 
-	CheckInStatsFn      func(eventID string) (checkin.GuestStats, error)
+	CheckInStatsFn      func(eventID string, tags []string) (checkin.GuestStats, error)
 	CheckInStatsInvoked bool
+
+	TagsFn      func(eventID string, nric string) ([]string, error)
+	TagsInvoked bool
+
+	SetTagsFn      func(eventID string, nric string, tags []string) error
+	SetTagsInvoked bool
 }
 
 //CheckIn invokes the mock implementation and marks the function as invoked
@@ -47,21 +53,21 @@ func (as *GuestService) MarkAbsent(eventID string, nric string) error {
 }
 
 //Guests invokes the mock implementation and marks the function as invoked
-func (as *GuestService) Guests(eventID string) ([]string, error) {
+func (as *GuestService) Guests(eventID string, tags []string) ([]string, error) {
 	as.GuestsInvoked = true
-	return as.GuestsFn(eventID)
+	return as.GuestsFn(eventID, tags)
 }
 
 //GuestsCheckedIn invokes the mock implementation and marks the function as invoked
-func (as *GuestService) GuestsCheckedIn(eventID string) ([]string, error) {
+func (as *GuestService) GuestsCheckedIn(eventID string, tags []string) ([]string, error) {
 	as.GuestsCheckedInInvoked = true
-	return as.GuestsCheckedInFn(eventID)
+	return as.GuestsCheckedInFn(eventID, tags)
 }
 
 //GuestsNotCheckedIn invokes the mock implementation and marks the function as invoked
-func (as *GuestService) GuestsNotCheckedIn(eventID string) ([]string, error) {
+func (as *GuestService) GuestsNotCheckedIn(eventID string, tags []string) ([]string, error) {
 	as.GuestsNotCheckedInInvoked = true
-	return as.GuestsNotCheckedInFn(eventID)
+	return as.GuestsNotCheckedInFn(eventID, tags)
 }
 
 //GuestExists invokes the mock implementation and marks the function as invoked
@@ -71,9 +77,9 @@ func (as *GuestService) GuestExists(eventID string, nric string) (bool, error) {
 }
 
 //RegisterGuest invokes the mock implementation and marks the function as invoked
-func (as *GuestService) RegisterGuest(eventID string, nric string, name string) error {
+func (as *GuestService) RegisterGuest(eventID string, guest checkin.Guest) error {
 	as.RegisterGuestInvoked = true
-	return as.RegisterGuestFn(eventID, nric, name)
+	return as.RegisterGuestFn(eventID, guest)
 }
 
 //RemoveGuest invokes the mock implementation and marks the function as invoked
@@ -83,7 +89,19 @@ func (as *GuestService) RemoveGuest(eventID string, nric string) error {
 }
 
 //CheckInStats invokes the mock implementation and marks the function as invoked
-func (as *GuestService) CheckInStats(eventID string) (checkin.GuestStats, error) {
+func (as *GuestService) CheckInStats(eventID string, tags []string) (checkin.GuestStats, error) {
 	as.CheckInInvoked = true
-	return as.CheckInStatsFn(eventID)
+	return as.CheckInStatsFn(eventID, tags)
+}
+
+//Tags invokes the mock implementation and marks the function as invoked
+func (as *GuestService) Tags(eventID string, nric string) ([]string, error) {
+	as.TagsInvoked = true
+	return as.TagsFn(eventID, nric)
+}
+
+//SetTags invokes the mock implementation and marks the function as invoked
+func (as *GuestService) SetTags(eventID string, nric string, tags []string) error {
+	as.SetTagsInvoked = true
+	return as.SetTagsFn(eventID, nric, tags)
 }

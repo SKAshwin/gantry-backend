@@ -13,7 +13,7 @@ type User struct {
 	Username          string  `json:"username,omitempty" db:"username"`
 	PasswordPlaintext *string `json:"password,omitempty"` //using a string pointer so this can be nil
 	//null.String doesn't work will omitempty, but a nil string pointer will be omitted
-	PasswordHash string    `json:"-" db:"passwordHash"` //always omitted upon JSON marshalling
+	PasswordHash string    `json:"-" db:"passwordhash"` //always omitted upon JSON marshalling
 	Name         string    `json:"name,omitempty" db:"name"`
 	CreatedAt    time.Time `json:"createdAt,omitempty"`
 	UpdatedAt    time.Time `json:"updatedAt,omitempty"`
@@ -46,6 +46,21 @@ type Event struct {
 	CreatedAt time.Time  `json:"createdAt" db:"createdat"`
 }
 
+//FeedbackFormItem represents a question/answer pair in a feedback form
+type FeedbackFormItem struct {
+	Question string `json:"question"`
+	Answer   string `json:"answer"`
+}
+
+//FeedbackForm is a collection of questions (and their answers) and the NRIC (either a hash or literal) of the submitter
+//which conceptually can be an empty string for anonymous submissions
+type FeedbackForm struct {
+	ID         string             `json:"id" db:"id"`
+	Name       string             `json:"name" db:"name"`
+	Survey     []FeedbackFormItem `json:"survey" db:"survey"`
+	SubmitTime time.Time          `json:"submitTime" db:"submittime"`
+}
+
 //Released returns true if the current time in Singapore is beyond
 //the release time in UTC
 func (event *Event) Released() bool {
@@ -70,6 +85,8 @@ type EventService interface {
 	CheckIfExists(id string) (bool, error)
 	AddHost(eventID string, username string) error
 	CheckHost(username string, eventID string) (bool, error)
+	FeedbackForms(ID string) ([]FeedbackForm, error)
+	SubmitFeedback(ID string, ff FeedbackForm) error
 }
 
 //HashMethod An interface allowing you to hash a string, and confirm if a string matches a given hash
@@ -92,21 +109,30 @@ type GuestStats struct {
 
 //Guest is all the information related to a particular guest
 type Guest struct {
-	Name string `json:"name,omitempty"`
-	NRIC string `json:"nric,omitempty" db:"nrichash"`
+	Name string   `json:"name,omitempty"`
+	NRIC string   `json:"nric,omitempty" db:"nrichash"`
+	Tags []string `json:"tags,omitempty" db:"tags"`
+}
+
+//IsEmpty checks if this is an empty Guest struct
+//i.e. "" name, "" nric and nil for Tags (NOT an empty array)
+func (g *Guest) IsEmpty() bool {
+	return g.Name == "" && g.NRIC == "" && g.Tags == nil
 }
 
 //GuestService is for checking in guests at a specific event
 type GuestService interface {
 	CheckIn(eventID string, nric string) (string, error)
 	MarkAbsent(eventID string, nric string) error
-	Guests(eventID string) ([]string, error)
-	GuestsCheckedIn(eventID string) ([]string, error)
-	GuestsNotCheckedIn(eventID string) ([]string, error)
+	Guests(eventID string, tags []string) ([]string, error)
+	GuestsCheckedIn(eventID string, tags []string) ([]string, error)
+	GuestsNotCheckedIn(eventID string, tags []string) ([]string, error)
 	GuestExists(eventID string, nric string) (bool, error)
-	RegisterGuest(eventID string, nric string, name string) error
+	RegisterGuest(eventID string, guest Guest) error
+	Tags(eventID string, nric string) ([]string, error)
+	SetTags(eventID string, nric string, tags []string) error
 	RemoveGuest(eventID string, nric string) error
-	CheckInStats(eventID string) (GuestStats, error)
+	CheckInStats(eventID string, tags []string) (GuestStats, error)
 }
 
 //AuthorizationInfo stores critical information about a particular request's authorizations

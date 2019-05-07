@@ -66,4 +66,9 @@ func TestServeHTTP(t *testing.T) {
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+
+	r = httptest.NewRequest("GET", "/notevenapi", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
 }

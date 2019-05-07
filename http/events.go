@@ -1,7 +1,9 @@
 package http
 
 import (
+	"bytes"
 	"checkin"
+	"encoding/csv"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -59,10 +61,107 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
 	h.Handle("/api/v0/events/{eventID}/released", Adapt(http.HandlerFunc(h.handleReleased),
 		existCheck)).Methods("GET")
+	h.Handle("/api/v1-2/events/{eventID}/feedback", Adapt(http.HandlerFunc(h.handleSubmitForm),
+		existCheck)).Methods("POST")
+	h.Handle("/api/v1-2/events/{eventID}/feedback/report", Adapt(http.HandlerFunc(h.handleFeedbackReport),
+		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 	//route all guest-related requests to the guest handler
-	h.PathPrefix("/api/v0/events/{eventID}/guests").Handler(gh)
+	h.PathPrefix("/api/{versionNumber}/events/{eventID}/guests").Handler(gh)
 
 	return h
+}
+
+//Takes a feedback form encoded in JSON, anonymous or otherwise, and writes it into the
+//permanent storage
+func (h *EventHandler) handleSubmitForm(w http.ResponseWriter, r *http.Request) {
+	var ff checkin.FeedbackForm
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&ff)
+	if err != nil {
+		h.Logger.Println("Error parsing JSON body in SubmitForm: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "JSON could not be decoded: must be in the format {name, survey:[{question, answer},...]}", w)
+		return
+	}
+
+	if ff.Survey == nil || len(ff.Survey) == 0 {
+		WriteMessage(http.StatusBadRequest, "Feedback form cannot have null or empty survey", w)
+		return
+	}
+
+	err = h.EventService.SubmitFeedback(mux.Vars(r)["eventID"], ff)
+	if err != nil {
+		h.Logger.Println("Error submitting feedback: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error writing feedback form into database", w)
+	} else {
+		WriteOKMessage("Form submitted successfully", w)
+	}
+}
+
+func (h *EventHandler) handleFeedbackReport(w http.ResponseWriter, r *http.Request) {
+	forms, err := h.EventService.FeedbackForms(mux.Vars(r)["eventID"])
+	if err != nil {
+		h.Logger.Println("Error fetching feedback forms: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error fetching feedback forms", w)
+		return
+	}
+
+	b := &bytes.Buffer{}
+	wr := csv.NewWriter(b)
+	if len(forms) != 0 {
+		//get all the unique questions (different forms might have different questions in the same event)
+		//for this event
+		questions := h.uniqueQuestions(forms)
+		wr.Write(append([]string{"Name"}, questions...))
+		for _, form := range forms {
+			row := make([]string, len(questions)+1)
+			row[0] = form.Name
+			//for every question in each form
+			//check the current question headers
+			//see if that question was asked in this form
+			//if not, answer for this form should be ""
+			//if it was, put that answer in the csv cell
+			for i, question := range questions {
+				formHasQuestion := false
+				for _, formItem := range form.Survey {
+					if formItem.Question == question {
+						row[i+1] = formItem.Answer
+						formHasQuestion = true
+					}
+				}
+				if !formHasQuestion {
+					row[i+1] = ""
+				}
+			}
+			wr.Write(row)
+
+		}
+	}
+	wr.Flush()
+
+	w.Header().Set("Content-Type", "text/csv")
+	//set the file name here
+	w.Header().Set("Content-Disposition", "attachment;filename=Feedback.csv")
+	w.Write(b.Bytes())
+}
+
+func (h *EventHandler) uniqueQuestions(forms []checkin.FeedbackForm) []string {
+	questions := make([]string, 0, 20)
+	for _, form := range forms {
+		for _, formItem := range form.Survey {
+			unique := true
+			for _, question := range questions {
+				if question == formItem.Question {
+					unique = false
+				}
+			}
+			if unique == true {
+				questions = append(questions, formItem.Question)
+			}
+		}
+	}
+
+	return questions
 }
 
 func (h *EventHandler) handleReleased(w http.ResponseWriter, r *http.Request) {
@@ -70,6 +169,7 @@ func (h *EventHandler) handleReleased(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.Logger.Println("Error fetching event info: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error in fetching event info", w)
+		return
 	}
 
 	reply, _ := json.Marshal(event.Released())

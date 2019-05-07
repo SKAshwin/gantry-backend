@@ -1,6 +1,10 @@
 create DATABASE registrationapp;
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 \connect registrationapp
+
+-- don't modify the test commands - used by the database access layer test suite
+
+--test
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 create table app_user(
 	username text PRIMARY KEY NOT NULL,
@@ -27,14 +31,23 @@ create table event(
 	lat float8,
 	long float8,
 	radius float8, --in km
-	createdAt TIMESTAMP NOT NULL DEFAULT NOW(),
-	updatedAt TIMESTAMP NOT NULL DEFAULT NOW()
+	createdAt TIMESTAMP NOT NULL DEFAULT (NOW() at time zone 'utc'),
+	updatedAt TIMESTAMP NOT NULL DEFAULT (NOW() at time zone 'utc')
+);
+
+create table form (
+	ID UUID NOT NULL PRIMARY KEY DEFAULT uuid_generate_v4(),
+	name text NOT NULL DEFAULT '',
+	eventID UUID NOT NULL REFERENCES event(ID) ON UPDATE CASCADE ON DELETE CASCADE,
+	survey json NOT NULL,
+	submitTime TIMESTAMP NOT NULL DEFAULT (NOW() at time zone 'utc')
 );
 
 create table guest(
 	nricHash text NOT NULL,
 	eventID UUID NOT NULL REFERENCES event(ID) ON UPDATE CASCADE ON DELETE CASCADE,
 	name text NOT NULL,
+	tags text[] NOT NULL DEFAULT '{}',
 	checkedIn BOOLEAN NOT NULL DEFAULT FALSE,
 	checkInTime TIMESTAMP,
 	PRIMARY KEY(nricHash, eventID)
@@ -46,6 +59,8 @@ create table hosts(
 	PRIMARY KEY(username, eventID)
 );
 
+--test
+
 create USER server_access with password 'LongNightShortDay';
 grant CONNECT on DATABASE registrationapp to server_access;
 grant SELECT, INSERT, UPDATE, DELETE on app_user to server_access;
@@ -53,3 +68,4 @@ grant SELECT, INSERT, UPDATE on app_admin to server_access;
 grant SELECT, INSERT, UPDATE, DELETE on event to server_access;
 grant SELECT, INSERT, UPDATE, DELETE on hosts to server_access;
 grant SELECT, INSERT, UPDATE, DELETE on guest to server_access;
+grant SELECT, INSERT, UPDATE, DELETE on form to server_access;

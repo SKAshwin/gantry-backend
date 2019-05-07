@@ -17,6 +17,9 @@
 #test coverage
 fmt
 
+#ignore vscode settings info
+.vscode
+
 #to ignore binary on linux
 checkin
 uploadguests

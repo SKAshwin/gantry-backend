@@ -26,3 +26,11 @@ func TestReleased(t *testing.T) {
 	}
 	test.Equals(t, false, event.Released())
 }
+
+func TestIsEmpty(t *testing.T) {
+	var guest checkin.Guest
+	test.Equals(t, true, guest.IsEmpty())
+
+	guest.Tags = make([]string, 0)
+	test.Equals(t, false, guest.IsEmpty())
+}

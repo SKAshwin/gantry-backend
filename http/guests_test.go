@@ -10,6 +10,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -17,30 +18,86 @@ import (
 	"github.com/guregu/null"
 )
 
+//Generates a HasConnection mock function (for use in mock.GuestMessenger) that returns the
+//result argument, and also checks that it is passed a guestID that matches the expected
+func hasConnectionGenerator(t *testing.T, expectedID string, result bool) func(string) bool {
+	return func(guestID string) bool {
+		test.Equals(t, expectedID, guestID)
+		return result
+	}
+}
+
+//Generates a Send mock function (for use in mock.GuestMessenger) that returns the error value
+//provided. Also tests if the guestID and message passed in matches what was expected
+func sendGenerator(t *testing.T, err error, expectedID string,
+	expectedMsg myhttp.GuestMessage) func(string, myhttp.GuestMessage) error {
+	return func(guestID string, msg myhttp.GuestMessage) error {
+		test.Equals(t, expectedID, guestID)
+		test.Equals(t, expectedMsg, msg)
+		return err
+	}
+}
+
 func TestHandleGuests(t *testing.T) {
 	// Inject our mock into our handler.
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
 	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	guestsGenerator := func(names []string, err error) func(string) ([]string, error) {
-		return func(eventID string) ([]string, error) {
+	guestsGenerator := func(names []string, err error) func(string, []string) ([]string, error) {
+		return func(eventID string, tags []string) ([]string, error) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
 			}
 			if err != nil {
 				return nil, err
 			}
-			return names, nil
+			if tags == nil {
+				return names, nil
+			} else if reflect.DeepEqual(tags, []string{"VIP"}) {
+				return []string{"VIP1", "VIP2"}, nil
+			} else if reflect.DeepEqual(tags, []string{"VIP", "ATTENDANCE"}) {
+				return []string{"AVIP1"}, nil
+			}
+
+			t.Fatalf("Unexpected branch of guests")
+			return nil, nil
 		}
 	}
 	gs.GuestsFn = guestsGenerator([]string{"Bob", "Jim", "Jacob"}, nil)
+	gs.GuestsCheckedInFn = func(eventID string, tags []string) ([]string, error) {
+		if eventID != "100" {
+			t.Fatalf("unexpected id: %s", eventID)
+		}
+
+		if reflect.DeepEqual(tags, []string{"VIP", "COLONEL"}) {
+			return []string{}, nil
+		} else if reflect.DeepEqual(tags, []string{"VIP"}) {
+			return []string{"LOL"}, nil
+		}
+
+		t.Fatal("Unexpected branch of guests checked in")
+		return nil, nil
+	}
+	gs.GuestsNotCheckedInFn = func(eventID string, tags []string) ([]string, error) {
+		if eventID != "100" {
+			t.Fatalf("unexpected id: %s", eventID)
+		}
+
+		if tags == nil {
+			return []string{}, nil
+		}
+
+		t.Fatal("Unexpected branch of guests checked in")
+		return nil, nil
+	}
 
 	//Test normal behavior
 	r := httptest.NewRequest("GET", "/api/v0/events/100/guests", nil)
@@ -56,6 +113,61 @@ func TestHandleGuests(t *testing.T) {
 	h.ServeHTTP(w, r)
 	json.NewDecoder(w.Result().Body).Decode(&guests)
 	test.Equals(t, []string{}, guests)
+
+	//Test one tag
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests?tag=VIP", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&guests)
+	test.Equals(t, []string{"VIP1", "VIP2"}, guests)
+
+	//Test two tags
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests?tag=VIP&tag=ATTENDANCE", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&guests)
+	test.Equals(t, []string{"AVIP1"}, guests)
+
+	//Test checked in
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests?tag=VIP&tag=COLONEL&checkedin=true", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&guests)
+	test.Equals(t, []string{}, guests)
+
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests?tag=VIP&checkedin=true", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&guests)
+	test.Equals(t, []string{"LOL"}, guests)
+
+	//Test not checked in
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests?checkedin=false", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&guests)
+	test.Equals(t, []string{}, guests)
+
+	//Test that checked in argument is not uppercase
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests?checkedin=False", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&guests)
+	test.Equals(t, []string{}, guests)
+
+	//Test checkedin set to invalid values
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests?checkedin=somethingelse", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	//check invalid form syntax
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests?checkedin=false=", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests", nil)
 
 	//Test error getting guests
 	gs.GuestsFn = guestsGenerator(nil, errors.New("An error"))
@@ -87,22 +199,24 @@ func TestHandleRegisterGuest(t *testing.T) {
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
 	es.CheckHostFn = checkHostGenerator("testing_username", "300", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	registerGuestGenerator := func(err error) func(string, string, string) error {
-		return func(eventID string, nric string, name string) error {
+	registerGuestGenerator := func(err error, expectedTags []string) func(string, checkin.Guest) error {
+		return func(eventID string, guest checkin.Guest) error {
 			test.Equals(t, "300", eventID)
-			test.Equals(t, "5678F", nric)
-			test.Equals(t, "Jim", name)
+			test.Equals(t, "5678F", guest.NRIC)
+			test.Equals(t, "Jim", guest.Name)
+			test.Equals(t, expectedTags, guest.Tags)
 			return err
 		}
 	}
-	gs.RegisterGuestFn = registerGuestGenerator(nil)
+	gs.RegisterGuestFn = registerGuestGenerator(nil, nil)
 	guestExistsGenerator := func(err error) func(string, string) (bool, error) {
 		return func(eventID string, nric string) (bool, error) {
 			test.Equals(t, "300", eventID)
@@ -118,6 +232,40 @@ func TestHandleRegisterGuest(t *testing.T) {
 	r := httptest.NewRequest("POST", "/api/v0/events/300/guests",
 		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
 	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
+
+	//Test tags supplied with request
+
+	//test one tag
+	gs.RegisterGuestFn = registerGuestGenerator(nil, []string{"VIP"})
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
+		strings.NewReader(`{"name":"Jim", "nric":"5678F", "tags":["VIP"]}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
+
+	//test two tags
+	gs.RegisterGuestFn = registerGuestGenerator(nil, []string{"ATTENDING", "VIP"})
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
+		strings.NewReader(`{"name":"Jim", "nric":"5678F", "tags":["ATTENDING","VIP"]}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
+
+	//test empty array tags (should work)
+	gs.RegisterGuestFn = registerGuestGenerator(nil, []string{})
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
+		strings.NewReader(`{"name":"Jim", "nric":"5678F", "tags":[]}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
+
+	//test nil tags (should work)
+	gs.RegisterGuestFn = registerGuestGenerator(nil, nil)
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
+		strings.NewReader(`{"name":"Jim", "nric":"5678F", "tags":null}`))
+	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
 
@@ -142,13 +290,13 @@ func TestHandleRegisterGuest(t *testing.T) {
 	gs.GuestExistsFn = guestExistsGenerator(nil)
 
 	//Test error registering guest
-	gs.RegisterGuestFn = registerGuestGenerator(errors.New("An error"))
+	gs.RegisterGuestFn = registerGuestGenerator(errors.New("An error"), nil)
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
 		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
-	gs.RegisterGuestFn = registerGuestGenerator(nil)
+	gs.RegisterGuestFn = registerGuestGenerator(nil, nil)
 
 	//Test invalid JSON
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
@@ -193,7 +341,8 @@ func TestHandleRemoveGuest(t *testing.T) {
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
@@ -273,17 +422,21 @@ func TestHandleGuestsCheckedIn(t *testing.T) {
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
 	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	guestsCheckedInGenerator := func(names []string, err error) func(string) ([]string, error) {
-		return func(eventID string) ([]string, error) {
+	guestsCheckedInGenerator := func(names []string, err error) func(string, []string) ([]string, error) {
+		return func(eventID string, tags []string) ([]string, error) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
+			}
+			if tags != nil && len(tags) != 0 {
+				t.Fatal("Expected nil/empty tags but got", tags)
 			}
 			return names, err
 		}
@@ -336,7 +489,8 @@ func TestHandleCheckInGuest(t *testing.T) {
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
 	//mock the required calls
@@ -360,7 +514,7 @@ func TestHandleCheckInGuest(t *testing.T) {
 
 		}
 	}
-	es.EventFn = eventFnGenerator(-1*time.Hour, true, nil)
+	es.EventFn = eventFnGenerator(-1*time.Hour, true, nil) //to meet release check
 	checkInFnGenerator := func(err error) func(string, string) (string, error) {
 		return func(eventID string, nric string) (string, error) {
 			test.Equals(t, "300", eventID)
@@ -382,6 +536,7 @@ func TestHandleCheckInGuest(t *testing.T) {
 		}
 	}
 	gs.GuestExistsFn = guestExistsFnGenerator(nil)
+	gm.HasConnectionFn = hasConnectionGenerator(t, "300 1234F", false)
 
 	//Test normal behavior
 	r := httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
@@ -391,6 +546,39 @@ func TestHandleCheckInGuest(t *testing.T) {
 	var name string
 	json.NewDecoder(w.Result().Body).Decode(&name)
 	test.Equals(t, "Jim", name)
+
+	//Test guest messenger active
+	gm.HasConnectionFn = hasConnectionGenerator(t, "300 1234F", true)
+	gm.SendFn = sendGenerator(t, nil, "300 1234F", myhttp.GuestMessage{
+		Title: "checkedin/1",
+		Content: checkin.Guest{
+			Name: "Jim",
+			NRIC: "1234F",
+		},
+	})
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&name)
+	test.Equals(t, "Jim", name)
+
+	//Test guest messenger fails to send message; execution should still complete
+	gm.SendFn = sendGenerator(t, errors.New("An error"), "300 1234F", myhttp.GuestMessage{
+		Title: "checkedin/1",
+		Content: checkin.Guest{
+			Name: "Jim",
+			NRIC: "1234F",
+		},
+	})
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&name)
+	test.Equals(t, "Jim", name)
+	gm.HasConnectionFn = hasConnectionGenerator(t, "300 1234F", false)
+	gm.SendFn = nil
 
 	//Test guest does not exist with that nric
 	gs.CheckInInvoked = false
@@ -477,7 +665,8 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
@@ -502,6 +691,7 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 		}
 	}
 	gs.GuestExistsFn = guestExistsFnGenerator(nil)
+	gm.HasConnectionFn = hasConnectionGenerator(t, "300 1234F", false)
 
 	//Test normal behavior
 	r := httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
@@ -509,6 +699,29 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+
+	//Test listener active/need to send guest message
+	gm.HasConnectionFn = hasConnectionGenerator(t, "300 1234F", true)
+	gm.SendFn = sendGenerator(t, nil, "300 1234F", myhttp.GuestMessage{
+		Title: "checkedin/0",
+	})
+	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+
+	//Test sending message to guest throws error; execution should still complete
+	gm.SendFn = sendGenerator(t, errors.New("An error"), "300 1234F", myhttp.GuestMessage{
+		Title: "checkedin/0",
+	})
+	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
+		strings.NewReader("{\"nric\":\"1234F\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+	gm.HasConnectionFn = hasConnectionGenerator(t, "300 1234F", false)
+	gm.SendFn = nil
 
 	//Test guest does not exist with that nric
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
@@ -578,22 +791,65 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 	eventDoesNotExistTest(t, r, h, &es)
 }
 
+func TestHandleCreateCheckInListener(t *testing.T) {
+	// Inject our mock into our handler.
+	var gs mock.GuestService
+	var es mock.EventService
+	var auth mock.Authenticator
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+
+	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
+	openConnectionGen := func(err error) func(string, http.ResponseWriter, *http.Request) error {
+		return func(guestID string, w http.ResponseWriter, r *http.Request) error {
+			test.Equals(t, "300 1234F", guestID)
+			return err
+		}
+	}
+	gm.OpenConnectionFn = openConnectionGen(nil)
+
+	//Test normal behavior
+	r := httptest.NewRequest("GET",
+		"/api/v1-2/events/300/guests/checkedin/listener/1234F", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+
+	//Test open connection fails
+	gm.OpenConnectionFn = openConnectionGen(errors.New("An error"))
+	r = httptest.NewRequest("GET",
+		"/api/v1-2/events/300/guests/checkedin/listener/1234F", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gm.OpenConnectionFn = openConnectionGen(nil)
+
+	//Test invalid eventID
+	r = httptest.NewRequest("GET",
+		"/api/v1-2/events/200/guests/checkedin/listener/1234F", nil)
+	eventDoesNotExistTest(t, r, h, &es)
+}
+
 func TestHandleGuestsNotCheckedIn(t *testing.T) {
 	// Inject our mock into our handler.
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
 	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	guestsNotCheckedInFnGenerator := func(names []string, err error) func(string) ([]string, error) {
-		return func(eventID string) ([]string, error) {
+	guestsNotCheckedInFnGenerator := func(names []string, err error) func(string, []string) ([]string, error) {
+		return func(eventID string, tags []string) ([]string, error) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
+			}
+			if tags != nil && len(tags) != 0 {
+				t.Fatal("Expected nil or empty tags, but got ", tags)
 			}
 			return names, err
 		}
@@ -647,17 +903,21 @@ func TestHandleStats(t *testing.T) {
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
 	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	checkInStatsFnGenerator := func(err error) func(string) (checkin.GuestStats, error) {
-		return func(eventID string) (checkin.GuestStats, error) {
+	checkInStatsFnGenerator := func(err error) func(string, []string) (checkin.GuestStats, error) {
+		return func(eventID string, tags []string) (checkin.GuestStats, error) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
+			}
+			if tags != nil && len(tags) != 0 {
+				t.Fatal("Expected nil or empty tags but got ", tags)
 			}
 			if err != nil {
 				return checkin.GuestStats{}, err
@@ -714,28 +974,36 @@ func TestHandleStats(t *testing.T) {
 }
 
 func TestHandleReport(t *testing.T) {
+	// Inject our mock into our handler.
 	var gs mock.GuestService
 	var es mock.EventService
 	var auth mock.Authenticator
-	h := myhttp.NewGuestHandler(&gs, &es, &auth)
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
 
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
 	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	guestsCheckedInGenerator := func(names []string, err error) func(string) ([]string, error) {
-		return func(eventID string) ([]string, error) {
+	guestsCheckedInGenerator := func(names []string, err error) func(string, []string) ([]string, error) {
+		return func(eventID string, tags []string) ([]string, error) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
+			}
+			if tags != nil && len(tags) != 0 {
+				t.Fatal("Expected nil or empty tags but got ", tags)
 			}
 			return names, err
 		}
 	}
 	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, nil)
-	guestsNotCheckedInFnGenerator := func(names []string, err error) func(string) ([]string, error) {
-		return func(eventID string) ([]string, error) {
+	guestsNotCheckedInFnGenerator := func(names []string, err error) func(string, []string) ([]string, error) {
+		return func(eventID string, tags []string) ([]string, error) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
+			}
+			if tags != nil && len(tags) != 0 {
+				t.Fatal("Expected nil or empty tags but got ", tags)
 			}
 			return names, err
 		}

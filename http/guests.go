@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gorilla/mux"
 )
@@ -17,21 +18,24 @@ import (
 // and an Authenticator to grant access
 type GuestHandler struct {
 	*mux.Router
-	GuestService  checkin.GuestService
-	EventService  checkin.EventService
-	Logger        *log.Logger
-	Authenticator Authenticator
+	GuestService   checkin.GuestService
+	EventService   checkin.EventService
+	GuestMessenger GuestMessenger
+	Logger         *log.Logger
+	Authenticator  Authenticator
 }
 
 //NewGuestHandler creates a new GuestHandler, using the default logger, with the
 //pre-defined routing
-func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, auth Authenticator) *GuestHandler {
+func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, gm GuestMessenger,
+	auth Authenticator) *GuestHandler {
 	h := &GuestHandler{
-		Router:        mux.NewRouter(),
-		Logger:        log.New(os.Stderr, "", log.LstdFlags),
-		GuestService:  gs,
-		EventService:  es,
-		Authenticator: auth,
+		Router:         mux.NewRouter(),
+		Logger:         log.New(os.Stderr, "", log.LstdFlags),
+		GuestService:   gs,
+		EventService:   es,
+		GuestMessenger: gm,
+		Authenticator:  auth,
 	}
 
 	//Adapters to check if handler should serve the request
@@ -52,6 +56,8 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, auth Auth
 		existCheck, releaseCheck)).Methods("POST")
 	h.Handle("/api/v0/events/{eventID}/guests/checkedin", Adapt(http.HandlerFunc(h.handleMarkGuestAbsent),
 		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
+	h.Handle("/api/v1-2/events/{eventID}/guests/checkedin/listener/{nric}",
+		Adapt(http.HandlerFunc(h.handleCreateCheckInListener), existCheck))
 	h.Handle("/api/v0/events/{eventID}/guests/notcheckedin", Adapt(http.HandlerFunc(h.handleGuestsNotCheckedIn),
 		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}/guests/stats", Adapt(http.HandlerFunc(h.handleStats),
@@ -59,25 +65,30 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, auth Auth
 	h.Handle("/api/v0/events/{eventID}/guests/report", Adapt(http.HandlerFunc(h.handleReport),
 		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 
-	//GET /api/events/{eventID}/guests should return all Guests, requires a host token or admin token
-	//POST /api/events/{eventID}/guests with a JSON argument {name:"Hello",nric:"5678F"} should register
-	//a new guest, requires host token or admin token
-	//DELETE /api/events/{eventID}/guests with a JSON argument {nric:"5678F"} should remove a guest
-	//from the registered list, requires host or admin
-	//GET /api/events/{eventID}/guests/checkedin should return Guests who have checked in, requires host
-	//or admin
-	//POST /api/events/{eventID}/guests/checkedin with JSON argument {nric:"5678F"} should check in a
-	//guest that is already registered, no permissions (except CORS)
-	//GET /api/events/{eventID}/guests/notcheckedin should return Guests who haven't checked in,
-	//requires host or admin
-	//GET /api/events/{eventID}/guests/stats should return the summary statistics, requires host or
-	//admin
-
 	return h
 }
 
 func (h *GuestHandler) handleGuests(w http.ResponseWriter, r *http.Request) {
-	guests, err := h.GuestService.Guests(mux.Vars(r)["eventID"])
+	err := r.ParseForm()
+	if err != nil {
+		h.Logger.Println("Error parsing form queries: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "Could not parse query string", w)
+		return
+	}
+	var guestsFunction func(string, []string) ([]string, error)
+	if val, ok := r.Form["checkedin"]; !ok {
+		//no checkedin=true or checkedin=false is set, so get all guests
+		guestsFunction = h.GuestService.Guests
+	} else if strings.ToLower(val[0]) == "true" {
+		guestsFunction = h.GuestService.GuestsCheckedIn
+	} else if strings.ToLower(val[0]) == "false" {
+		guestsFunction = h.GuestService.GuestsNotCheckedIn
+	} else {
+		WriteMessage(http.StatusBadRequest, "Form value 'checkedin' must be either true or false (non-case sensitive)", w)
+		return
+	}
+
+	guests, err := guestsFunction(mux.Vars(r)["eventID"], r.Form["tag"])
 	if err != nil {
 		h.Logger.Println("Error in handleGuests: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching all guests for event", w)
@@ -110,7 +121,7 @@ func (h *GuestHandler) handleRegisterGuest(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err = h.GuestService.RegisterGuest(eventID, guest.NRIC, guest.Name)
+	err = h.GuestService.RegisterGuest(eventID, guest)
 	if err != nil {
 		h.Logger.Println("Error registering guest: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Guest registration failed", w)
@@ -146,7 +157,7 @@ func (h *GuestHandler) handleRemoveGuest(w http.ResponseWriter, r *http.Request)
 
 func (h *GuestHandler) handleGuestsCheckedIn(w http.ResponseWriter, r *http.Request) {
 	eventID := mux.Vars(r)["eventID"]
-	guests, err := h.GuestService.GuestsCheckedIn(eventID)
+	guests, err := h.GuestService.GuestsCheckedIn(eventID, nil)
 	if err != nil {
 		h.Logger.Println("Error in handleGuestsCheckedIn: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching checked-in guests for event", w)
@@ -186,9 +197,21 @@ func (h *GuestHandler) handleMarkGuestAbsent(w http.ResponseWriter, r *http.Requ
 	if err != nil {
 		h.Logger.Println("Error check guest in: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Guest check-in failed", w)
-	} else {
-		WriteOKMessage("Successfully marked guest as absent", w)
 	}
+
+	//if anyone subscribed to a check in listener on this guest, update them
+	if h.GuestMessenger.HasConnection(generateGuestID(eventID, guest.NRIC)) {
+		err = h.GuestMessenger.Send(generateGuestID(eventID, guest.NRIC), GuestMessage{
+			Title: "checkedin/0",
+		})
+		if err != nil {
+			h.Logger.Println("Error sending check in update to guest, but guest successfully checked in: " +
+				guest.NRIC + ", due to error: " + err.Error())
+			//do not stop execution, this is a non-fatal bug
+		}
+	}
+
+	WriteOKMessage("Successfully marked guest as absent", w)
 }
 
 func (h *GuestHandler) handleCheckInGuest(w http.ResponseWriter, r *http.Request) {
@@ -224,13 +247,45 @@ func (h *GuestHandler) handleCheckInGuest(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	//if anyone subscribed to a check in listener on this guest, update them
+	if h.GuestMessenger.HasConnection(generateGuestID(eventID, guest.NRIC)) {
+		err = h.GuestMessenger.Send(generateGuestID(eventID, guest.NRIC), GuestMessage{
+			Title:   "checkedin/1",
+			Content: checkin.Guest{Name: name, NRIC: guest.NRIC},
+		})
+		if err != nil {
+			h.Logger.Println("Error sending check in message to guest, but guest successfully checked in: " +
+				guest.NRIC + ", due to error: " + err.Error())
+		}
+	}
+
 	reply, _ := json.Marshal(name)
 	w.Write(reply)
 }
 
+//Generates the guest ID to be used for the GuestMessenger
+//using NRIC alone would be insufficient as one guest could go to multiple events
+func generateGuestID(eventID string, guestNRIC string) string {
+	return eventID + " " + guestNRIC
+}
+
+func (h *GuestHandler) handleCreateCheckInListener(w http.ResponseWriter, r *http.Request) {
+	nric := mux.Vars(r)["nric"]
+	eventID := mux.Vars(r)["eventID"]
+	guestID := generateGuestID(eventID, nric)
+
+	err := h.GuestMessenger.OpenConnection(guestID, w, r)
+	if err != nil {
+		h.Logger.Println("Error when attempting to open guest messenger connection: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error starting listener on check in", w)
+		return
+	}
+	//replying a 101 Protocol Changed is handled by the Open Connection method
+}
+
 func (h *GuestHandler) handleGuestsNotCheckedIn(w http.ResponseWriter, r *http.Request) {
 	eventID := mux.Vars(r)["eventID"]
-	guests, err := h.GuestService.GuestsNotCheckedIn(eventID)
+	guests, err := h.GuestService.GuestsNotCheckedIn(eventID, nil)
 	if err != nil {
 		h.Logger.Println("Error in handleNotGuestsCheckedIn: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching not checked-in guests for event", w)
@@ -241,7 +296,7 @@ func (h *GuestHandler) handleGuestsNotCheckedIn(w http.ResponseWriter, r *http.R
 }
 
 func (h *GuestHandler) handleStats(w http.ResponseWriter, r *http.Request) {
-	stats, err := h.GuestService.CheckInStats(mux.Vars(r)["eventID"])
+	stats, err := h.GuestService.CheckInStats(mux.Vars(r)["eventID"], nil)
 	if err != nil {
 		h.Logger.Println("Error in handleStats: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching statistics for event", w)
@@ -253,13 +308,13 @@ func (h *GuestHandler) handleStats(w http.ResponseWriter, r *http.Request) {
 
 func (h *GuestHandler) handleReport(w http.ResponseWriter, r *http.Request) {
 	eventID := mux.Vars(r)["eventID"]
-	absent, err := h.GuestService.GuestsNotCheckedIn(eventID)
+	absent, err := h.GuestService.GuestsNotCheckedIn(eventID, nil)
 	if err != nil {
 		h.Logger.Println("Error in handleReport when getting absent guests: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching absentees", w)
 		return
 	}
-	present, err := h.GuestService.GuestsCheckedIn(eventID)
+	present, err := h.GuestService.GuestsCheckedIn(eventID, nil)
 	if err != nil {
 		h.Logger.Println("Error in handleReport when getting present guests: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching those present", w)

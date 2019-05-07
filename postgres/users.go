@@ -19,7 +19,7 @@ type UserService struct {
 func (us *UserService) User(username string) (checkin.User, error) {
 	var u checkin.User
 	err := us.DB.QueryRowx(
-		"SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user where username = $1",
+		"SELECT username, name, passwordHash, createdAt, updatedAt, lastLoggedIn from app_user where username = $1",
 		username).StructScan(&u)
 
 	if err != nil {
@@ -31,7 +31,7 @@ func (us *UserService) User(username string) (checkin.User, error) {
 
 //Users Returns the details of all users
 func (us *UserService) Users() ([]checkin.User, error) {
-	rows, err := us.DB.Queryx("SELECT username, name, createdAt, updatedAt, lastLoggedIn from app_user")
+	rows, err := us.DB.Queryx("SELECT username, name, passwordHash, createdAt, updatedAt, lastLoggedIn from app_user")
 	if err != nil {
 		return nil, errors.New("Cannot fetch user details: " + err.Error())
 	}
