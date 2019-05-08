@@ -30,6 +30,7 @@ func (as *AuthenticationService) Authenticate(username string, pwdPlaintext stri
 	if err != nil {
 		return false, errors.New("Statement preparation in authentication failed: " + err.Error())
 	}
+	defer stmt.Close()
 	var passwordHash string
 	err = stmt.QueryRow(username).Scan(&passwordHash)
 	if err == sql.ErrNoRows {
