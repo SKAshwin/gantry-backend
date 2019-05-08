@@ -33,6 +33,7 @@ func main() {
 		"Where the output of the program will be dumped. Optional, if not specified output"+
 			"dumped to standard output/the console")
 	tags := flag.Bool("tags", false, "Use -tags if the CSV file is in a (nric,name,tags) format; tags should be comma separated, case insensitive. E.g. vip,confirmed will add the VIP and CONFIRMED tags to the guest in that row")
+	numThreads := flag.Int64("threads", 1, "The number of guests to simultaneously register; limited to 20 max")
 
 	flag.Parse()
 
@@ -41,6 +42,9 @@ func main() {
 	}
 	if *token == "" && *username == "" {
 		log.Fatal("Need authentication token or username. See -h for help")
+	}
+	if *numThreads > 20 {
+		log.Fatal("Number of threads cannot be over 20. See -h for help")
 	}
 	if *loggerOutput != "" {
 		out, err := os.Create(*loggerOutput)
@@ -106,13 +110,15 @@ func main() {
 	}
 
 	tr := &http.Transport{
-		MaxIdleConns:        2000,
-		MaxIdleConnsPerHost: 2000,
+		MaxIdleConns:        20,
+		MaxIdleConnsPerHost: 20,
 	}
 	client := &http.Client{Transport: tr}
 
 	wg := sync.WaitGroup{}
-	for i := 0; i < len(lines); i += 10 {
+	guestsPerRoutine := max(20, int(int64(len(lines)) / *numThreads))
+	log.Println("Running", guestsPerRoutine, "guests per routine")
+	for i := 0; i < len(lines); i += guestsPerRoutine {
 		wg.Add(1)
 		go func(start int, end int) {
 			defer wg.Done()
@@ -163,7 +169,7 @@ func main() {
 
 				log.Println("Response to registering (" + guest.NRIC + ", " + guest.Name + ", {" + strings.Join(guest.Tags, ",") + "}):" + reply.Message)
 			}
-		}(i, i+10)
+		}(i, i+guestsPerRoutine)
 	}
 
 	wg.Wait()
@@ -184,6 +190,13 @@ func extractTags(tags string) []string {
 
 func min(a, b int) int {
 	if a < b {
+		return a
+	}
+	return b
+}
+
+func max(a, b int) int {
+	if a > b {
 		return a
 	}
 	return b
