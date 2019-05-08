@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"syscall"
 
 	"golang.org/x/crypto/ssh/terminal"
@@ -104,53 +105,69 @@ func main() {
 		log.Fatal("Error reading CSV: " + err.Error())
 	}
 
-	for i := 0; i < len(lines); i++ {
-		guest := checkin.Guest{
-			Name: lines[i][1],
-			NRIC: lines[i][0],
-		}
-		if *tags {
-			guest.Tags = extractTags(lines[i][2])
-		}
-		guestJSON, err := json.Marshal(guest)
-		if err != nil {
-			log.Fatal("Error marshalling CSV into JSON for " + guest.NRIC + ", " + guest.Name + " : " +
-				err.Error())
-		}
-		log.Println("POST (" + guest.NRIC + ", " + guest.Name + ")")
-
-		req, err := http.NewRequest("POST", url, bytes.NewReader(guestJSON))
-		if err != nil {
-			log.Fatal("Error creating request to " + url + " :" + err.Error())
-		}
-		req.Header.Add("Authorization", "Bearer "+*token)
-
-		resp, err := http.DefaultClient.Do(req)
-		if err != nil {
-			log.Fatal("Error posting to " + url + " :" + err.Error())
-		}
-		defer resp.Body.Close()
-
-		reply := struct {
-			Message string `json:"message"`
-		}{}
-		err = json.NewDecoder(resp.Body).Decode(&reply)
-		if err != nil {
-			body, err2 := ioutil.ReadAll(resp.Body)
-			if err2 != nil {
-				log.Fatal("wtf: " + err2.Error())
-			}
-			log.Println(string(body))
-			log.Fatal("Error reading response: " + err.Error())
-		}
-
-		if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized {
-			//stop for loop, all further requests will fail
-			log.Fatal("Response to registering (" + guest.NRIC + ", " + guest.Name + ", {" + strings.Join(guest.Tags, ",") + "}):" + reply.Message)
-		}
-
-		log.Println("Response to registering (" + guest.NRIC + ", " + guest.Name + ", {" + strings.Join(guest.Tags, ",") + "}):" + reply.Message)
+	tr := &http.Transport{
+		MaxIdleConns:        2000,
+		MaxIdleConnsPerHost: 2000,
 	}
+	client := &http.Client{Transport: tr}
+
+	wg := sync.WaitGroup{}
+	for i := 0; i < len(lines); i += 10 {
+		wg.Add(1)
+		go func(start int, end int) {
+			defer wg.Done()
+			for j := start; j < min(len(lines), end); j++ {
+				guest := checkin.Guest{
+					Name: lines[j][1],
+					NRIC: lines[j][0],
+				}
+				if *tags {
+					guest.Tags = extractTags(lines[j][2])
+				}
+				guestJSON, err := json.Marshal(guest)
+				if err != nil {
+					log.Fatal("Error marshalling CSV into JSON for " + guest.NRIC + ", " + guest.Name + " : " +
+						err.Error())
+				}
+				log.Println("POST (" + guest.NRIC + ", " + guest.Name + ")")
+
+				req, err := http.NewRequest("POST", url, bytes.NewReader(guestJSON))
+				if err != nil {
+					log.Fatal("Error creating request to " + url + " :" + err.Error())
+				}
+				req.Header.Add("Authorization", "Bearer "+*token)
+
+				resp, err := client.Do(req)
+				if err != nil {
+					log.Fatal("Error posting to " + url + " :" + err.Error())
+				}
+				defer resp.Body.Close()
+
+				reply := struct {
+					Message string `json:"message"`
+				}{}
+				err = json.NewDecoder(resp.Body).Decode(&reply)
+				if err != nil {
+					body, err2 := ioutil.ReadAll(resp.Body)
+					if err2 != nil {
+						log.Fatal("wtf: " + err2.Error())
+					}
+					log.Println(string(body))
+					log.Fatal("Error reading response: " + err.Error())
+				}
+
+				if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized {
+					//stop for loop, all further requests will fail
+					log.Fatal("Response to registering (" + guest.NRIC + ", " + guest.Name + ", {" + strings.Join(guest.Tags, ",") + "}):" + reply.Message)
+				}
+
+				log.Println("Response to registering (" + guest.NRIC + ", " + guest.Name + ", {" + strings.Join(guest.Tags, ",") + "}):" + reply.Message)
+			}
+		}(i, i+10)
+	}
+
+	wg.Wait()
+	log.Println("Finished uploading all guests")
 }
 
 func extractTags(tags string) []string {
@@ -163,4 +180,11 @@ func extractTags(tags string) []string {
 	}
 
 	return tagArray
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
