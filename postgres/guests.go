@@ -328,6 +328,7 @@ func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.G
 	if err != nil {
 		return checkin.Guest{}, errors.New("Cannot fetch all guests: " + err.Error())
 	}
+	defer rows.Close()
 
 	numGuests, err := gs.getNumberOfGuests(eventID, nil)
 	if err != nil {

@@ -39,6 +39,7 @@ func (es *EventService) Events() ([]checkin.Event, error) {
 	if err != nil {
 		return nil, errors.New("Error fetching number of events:" + err.Error())
 	}
+	defer rows.Close()
 
 	events, err := es.scanRowsIntoEvents(rows, numEvents)
 	if err == sql.ErrNoRows {
@@ -64,6 +65,7 @@ func (es *EventService) EventsBy(username string) ([]checkin.Event, error) {
 	if err != nil {
 		return nil, errors.New("Error fetching number of events for user:" + err.Error())
 	}
+	defer rows.Close()
 
 	events, err := es.scanRowsIntoEvents(rows, numEvents)
 	if err == sql.ErrNoRows {
@@ -211,6 +213,7 @@ func (es *EventService) FeedbackForms(eventID string) ([]checkin.FeedbackForm, e
 	if err != nil {
 		return nil, errors.New("Error fetching all forms for event: " + err.Error())
 	}
+	defer rows.Close()
 	numForms, err := es.getNumberOfFeedbackForms(eventID)
 	if err != nil {
 		return nil, errors.New("Error fetching number of forms for event:" + err.Error())
