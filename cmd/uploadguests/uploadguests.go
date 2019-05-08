@@ -24,13 +24,14 @@ func main() {
 	serverAddress := flag.String("addr", "http://localhost:3000", "The address of the server")
 	eventID := flag.String("event", "", "The eventID of the event")
 	filePath := flag.String("src", "guests.csv",
-		"The CSV file with guest names, in a (nric,name) format")
+		"The CSV file with guest names, in a (nric,name) format, or (nric,name,tags) if -tags is supplied")
 	token := flag.String("auth", "",
 		"An authentication token with the rights to register new guests for the given event")
 	username := flag.String("u", "", "Username for log in (needed if no authentication token)")
 	loggerOutput := flag.String("out", "",
 		"Where the output of the program will be dumped. Optional, if not specified output"+
 			"dumped to standard output/the console")
+	tags := flag.Bool("tags", false, "Use -tags if the CSV file is in a (nric,name,tags) format; tags should be comma separated, case insensitive. E.g. vip,confirmed will add the VIP and CONFIRMED tags to the guest in that row")
 
 	flag.Parse()
 
@@ -108,6 +109,9 @@ func main() {
 			Name: lines[i][1],
 			NRIC: lines[i][0],
 		}
+		if *tags {
+			guest.Tags = extractTags(lines[i][2])
+		}
 		guestJSON, err := json.Marshal(guest)
 		if err != nil {
 			log.Fatal("Error marshalling CSV into JSON for " + guest.NRIC + ", " + guest.Name + " : " +
@@ -142,9 +146,21 @@ func main() {
 
 		if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized {
 			//stop for loop, all further requests will fail
-			log.Fatal("Response to registering (" + guest.NRIC + ", " + guest.Name + "):" + reply.Message)
+			log.Fatal("Response to registering (" + guest.NRIC + ", " + guest.Name + ", {" + strings.Join(guest.Tags, ",") + "}):" + reply.Message)
 		}
 
-		log.Println("Response to registering (" + guest.NRIC + ", " + guest.Name + "):" + reply.Message)
+		log.Println("Response to registering (" + guest.NRIC + ", " + guest.Name + ", {" + strings.Join(guest.Tags, ",") + "}):" + reply.Message)
 	}
+}
+
+func extractTags(tags string) []string {
+	if tags == "" {
+		return []string{}
+	}
+	tagArray := strings.Split(strings.ToUpper(tags), ",")
+	for i, tag := range tagArray {
+		tagArray[i] = strings.TrimSpace(tag)
+	}
+
+	return tagArray
 }
