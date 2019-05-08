@@ -35,11 +35,11 @@ func (es *EventService) Events() ([]checkin.Event, error) {
 	if err != nil {
 		return nil, errors.New("Error fetching all events: " + err.Error())
 	}
+	defer rows.Close()
 	numEvents, err := es.getNumberOfEvents()
 	if err != nil {
 		return nil, errors.New("Error fetching number of events:" + err.Error())
 	}
-	defer rows.Close()
 
 	events, err := es.scanRowsIntoEvents(rows, numEvents)
 	if err == sql.ErrNoRows {
@@ -61,11 +61,11 @@ func (es *EventService) EventsBy(username string) ([]checkin.Event, error) {
 	if err != nil {
 		return nil, errors.New("Error fetching all events for user: " + err.Error())
 	}
+	defer rows.Close()
 	numEvents, err := es.getNumberOfEventsBy(username)
 	if err != nil {
 		return nil, errors.New("Error fetching number of events for user:" + err.Error())
 	}
-	defer rows.Close()
 
 	events, err := es.scanRowsIntoEvents(rows, numEvents)
 	if err == sql.ErrNoRows {
