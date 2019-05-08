@@ -23,6 +23,9 @@ func hashFnGenerator(err error) func(string) (string, error) {
 
 func compareHashAndPasswordGenerator() func(string, string) bool {
 	return func(hash string, pwd string) bool {
+		if len(pwd) <= 1 {
+			return hash == pwd
+		}
 		return hash == (string(pwd[len(pwd)-1]) + pwd[:len(pwd)-1])
 	}
 }
@@ -376,4 +379,50 @@ func TestSetTags(t *testing.T) {
 	err = gs.SetTags("a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8", "2346C", []string{})
 	test.Assert(t, err != nil, "No error returned for nonexistent event")
 
+}
+
+func TestGuestExists(t *testing.T) {
+	var hm mock.HashMethod
+	gs := postgres.GuestService{DB: db, HM: &hm}
+	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
+
+	//event exists, guest does
+	exists, err := gs.GuestExists("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "5678B")
+	test.Ok(t, err)
+	test.Equals(t, true, exists)
+
+	//event exists, guest does not
+	exists, err = gs.GuestExists("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "4384S")
+	test.Ok(t, err)
+	test.Equals(t, false, exists)
+
+	//guest with that NRIC exists, but for another event
+	exists, err = gs.GuestExists("2c59b54d-3422-4bdb-824c-4125775b44c8", "5678B")
+	test.Ok(t, err)
+	test.Equals(t, false, exists)
+
+	//guest with that nric exists for both this event and another
+	exists, err = gs.GuestExists("03293b3b-df83-407e-b836-fb7d4a3c4966", "1234A")
+	test.Ok(t, err)
+	test.Equals(t, true, exists)
+
+	//event does not exist
+	exists, err = gs.GuestExists("f64c91f8-f46a-4ef8-a4a6-cfbc4093e21c", "1234A")
+	test.Ok(t, err)
+	test.Equals(t, false, exists)
+
+	//invalid UUID
+	exists, err = gs.GuestExists("hello!", "1234A")
+	test.Ok(t, err)
+	test.Equals(t, false, exists)
+
+	//empty string NRIC
+	exists, err = gs.GuestExists("03293b3b-df83-407e-b836-fb7d4a3c4966", "")
+	test.Ok(t, err)
+	test.Equals(t, false, exists)
+
+	//empty string UUID
+	exists, err = gs.GuestExists("", "1234A")
+	test.Ok(t, err)
+	test.Equals(t, false, exists)
 }

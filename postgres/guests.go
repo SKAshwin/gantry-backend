@@ -6,6 +6,8 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/google/uuid"
+
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -153,7 +155,9 @@ func (gs *GuestService) GuestsNotCheckedIn(eventID string, tags []string) ([]str
 
 //GuestExists returns true if a Guest with the given NRIC identifier (last 5 digits of NRIC)
 //and attending the given event exists
-//Returns an error if the event does not exist in the first place
+//Returns false if the event does not exist in the first place (NOT an error), so check for event existence
+//separately
+//Returns an error only if there is an error *checking* if the guest exists (e.g. database connection error)
 func (gs *GuestService) GuestExists(eventID string, nric string) (bool, error) {
 	guest, err := gs.getGuestWithNRIC(eventID, nric)
 	if err != nil {
@@ -320,10 +324,15 @@ func (gs *GuestService) scanRowsIntoNames(rows *sql.Rows, rowCount int) ([]strin
 	return names, nil
 }
 
-//Returns a guest and true if one could be found with that nric
+//Returns a guest and true if one could be found with that nric and eventID
 //Returns an empty guest object (and no error) if the guest could not be found
 //Returns an error if there is an error getting a guest
 func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.Guest, error) {
+	if _, err := uuid.Parse(eventID); err != nil {
+		//attempting to search for a guest associated with an event with an invalid UUID will throw an error
+		//since a guest with an invalid UUID will definitely not exist, return an empty guest object
+		return checkin.Guest{}, nil
+	}
 	rows, err := gs.DB.Queryx("SELECT name, nricHash from guest where eventID = $1", eventID)
 	if err != nil {
 		return checkin.Guest{}, errors.New("Cannot fetch all guests: " + err.Error())

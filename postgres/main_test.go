@@ -35,6 +35,7 @@ func databaseDefinition() string {
 
 func initDB() *sqlx.DB {
 	db, err := postgres.Open("postgres://regapp_test:henry@localhost/registrationapp_test")
+	tearDownDB(db) //tear down any remnants of the DB in case last test was not cleaned up properly
 	if err != nil {
 		log.Fatal("Error opening database: " + err.Error())
 	}
@@ -85,6 +86,14 @@ func tearDownDB(db *sqlx.DB) {
 
 func TestMain(m *testing.M) {
 	db = initDB()
+	defer func() {
+		//if a panic occurs, make sure to tear down the DB
+		if r := recover(); r != nil {
+			tearDownDB(db)
+			log.Println("Recovered from panic to tear down database, resuming panic")
+			panic(r)
+		}
+	}()
 	err := loadTestData(db)
 	if err != nil {
 		log.Println("Error loading test data: " + err.Error())
