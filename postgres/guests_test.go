@@ -426,3 +426,40 @@ func TestGuestExists(t *testing.T) {
 	test.Ok(t, err)
 	test.Equals(t, false, exists)
 }
+
+func TestCheckIn(t *testing.T) {
+	var hm mock.HashMethod
+	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
+	gs := postgres.GuestService{HM: &hm, DB: db}
+
+	//test normal functionality
+	name, err := gs.CheckIn("03293b3b-df83-407e-b836-fb7d4a3c4966", "1234A")
+	test.Ok(t, err)
+	test.Equals(t, "A", name)
+	names, err := gs.GuestsCheckedIn("03293b3b-df83-407e-b836-fb7d4a3c4966", nil)
+	test.Ok(t, err)
+	test.Equals(t, []string{"A"}, names)
+
+	//test guest already checked in (should work fine)
+	name, err = gs.CheckIn("03293b3b-df83-407e-b836-fb7d4a3c4966", "1234A")
+	test.Ok(t, err)
+	test.Equals(t, "A", name)
+	names, err = gs.GuestsCheckedIn("03293b3b-df83-407e-b836-fb7d4a3c4966", nil)
+	test.Ok(t, err)
+	test.Equals(t, []string{"A"}, names)
+
+	err = gs.MarkAbsent("03293b3b-df83-407e-b836-fb7d4a3c4966", "1234A")
+	test.Ok(t, err)
+
+	//test guest does not exist (eventID for different event) (should throw error)
+	name, err = gs.CheckIn("2c59b54d-3422-4bdb-824c-4125775b44c8", "1234A")
+	test.Assert(t, err != nil, "No error thrown when check in called with non-existent guest")
+
+	//test guest does not exist (NRIC wrong) (should throw error)
+	name, err = gs.CheckIn("03293b3b-df83-407e-b836-fb7d4a3c4966", "3118B")
+	test.Assert(t, err != nil, "No error thrown when check in called with non-existent guest")
+
+	//test invalid UUID eventID (should throw error)
+	name, err = gs.CheckIn("1312312312", "3118B")
+	test.Assert(t, err != nil, "No error thrown when check in called with non-existent guest (invalid UUID)")
+}
