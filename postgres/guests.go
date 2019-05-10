@@ -183,6 +183,52 @@ func (gs *GuestService) RegisterGuest(eventID string, guest checkin.Guest) error
 	return err
 }
 
+//RegisterGuests does the same as RegisterGuest, but registers multiple guests, and if there's a failure on
+//any one of them no guest will be added (for example, if one of them has already been registered)
+//An empty or nil guest array will return an error, as this is presumably not expected input
+//if the event provided does not exist, will return an error
+func (gs *GuestService) RegisterGuests(eventID string, guests []checkin.Guest) error {
+	if guests == nil || len(guests) == 0 {
+		return errors.New("Cannot register nil or empty slice of guests")
+	}
+
+	tx, err := gs.DB.Beginx()
+	if err != nil {
+		return errors.New("Error opening transaction: " + err.Error())
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+			panic(r)
+		}
+	}()
+
+	for _, guest := range guests {
+		nricHash, err := gs.HM.HashAndSalt(strings.ToUpper(guest.NRIC))
+		if guest.Tags == nil {
+			guest.Tags = []string{} //no nils allowed
+		}
+		if err != nil {
+			tx.Rollback()
+			return errors.New("Error hashing NRIC: " + err.Error())
+		}
+
+		_, err = gs.DB.Exec("INSERT into guest(nricHash,eventID,name,tags,checkedIn) VALUES($1,$2,$3,$4,FALSE)",
+			nricHash, eventID, guest.Name, pq.Array(guest.Tags))
+		if err != nil {
+			tx.Rollback()
+			return errors.New("Error inserting one of the guests: " + err.Error())
+		}
+	}
+
+	err = tx.Commit()
+	if err != nil {
+		tx.Rollback()
+		return errors.New("Error committing changes to database: " + err.Error())
+	}
+	return nil
+}
+
 //Tags returns the tags of a given guest
 //Returns an empty array for no tags
 //Returns nil if guest does not exist, or there was an error fetching it

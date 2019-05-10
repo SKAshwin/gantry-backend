@@ -8,6 +8,7 @@ import (
 	"checkin/postgres"
 	"checkin/test"
 	"errors"
+	"sort"
 	"testing"
 )
 
@@ -299,6 +300,66 @@ func TestRegisterGuest(t *testing.T) {
 	names, err = gs.Guests("3820a980-a207-4738-b82b-45808fe7aba8", []string{})
 	test.Ok(t, err)
 	test.Equals(t, []string{}, names)
+}
+
+func TestRegisterGuests(t *testing.T) {
+	var hm mock.HashMethod
+	gs := postgres.GuestService{DB: db, HM: &hm}
+
+	hm.HashAndSaltFn = hashFnGenerator(nil)
+	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
+
+	//tests all kinds of valid inputs
+	guests := []checkin.Guest{
+		checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"NEWLYREGISTERED"}},
+		checkin.Guest{NRIC: "1234B", Name: "Mayank", Tags: nil},
+		checkin.Guest{NRIC: "1234C", Name: "Eugene", Tags: []string{}},
+		checkin.Guest{NRIC: "1234D", Name: "Ya wei", Tags: []string{"SOME", "THING"}},
+	}
+
+	//test normal functionality
+	err := gs.RegisterGuests("3820a980-a207-4738-b82b-45808fe7aba8", guests)
+	test.Ok(t, err)
+	names, err := gs.Guests("3820a980-a207-4738-b82b-45808fe7aba8", nil)
+	sort.Strings(names)
+	test.Equals(t, []string{"Eugene", "Jim Bob", "Mayank", "Ya wei"}, names)
+	for _, guest := range guests {
+		err := gs.RemoveGuest("3820a980-a207-4738-b82b-45808fe7aba8", guest.NRIC)
+		test.Ok(t, err)
+	}
+
+	//check salting fails
+	hm.HashAndSaltFn = hashFnGenerator(errors.New("An error"))
+	err = gs.RegisterGuests("3820a980-a207-4738-b82b-45808fe7aba8", guests)
+	test.Assert(t, err != nil, "Failed hashing does not throw an error")
+	hm.HashAndSaltFn = hashFnGenerator(nil)
+
+	//check empty or nil slice of guests - should fail
+	err = gs.RegisterGuests("3820a980-a207-4738-b82b-45808fe7aba8", []checkin.Guest{})
+	test.Assert(t, err != nil, "No error thrown when attempting to register empty slice of guests")
+	err = gs.RegisterGuests("3820a980-a207-4738-b82b-45808fe7aba8", nil)
+	test.Assert(t, err != nil, "No error thrown when attempting to register nil guest slice")
+
+	//check event does not even exist
+	err = gs.RegisterGuests("a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8", guests)
+	test.Assert(t, err != nil, "Registering guests for non-existent event does not throw an error")
+
+	//check case insensitivity of NRIC
+	guests = []checkin.Guest{
+		checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"NEWLYREGISTERED"}},
+		checkin.Guest{NRIC: "1234a", Name: "Mayank", Tags: nil},
+	}
+	err = gs.RegisterGuests("a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8", guests)
+	test.Assert(t, err != nil, "Registering two identical guests (with only NRIC case differing) for non-existent event does not throw an error")
+	names, err = gs.Guests("a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8", nil)
+	test.Ok(t, err)
+	test.Equals(t, []string{}, names) //test that an error in registering one guest, for example 1234a, means neither are registered
+
+	//check that its empty now, before moving on to next test
+	names, err = gs.Guests("3820a980-a207-4738-b82b-45808fe7aba8", []string{})
+	test.Ok(t, err)
+	test.Equals(t, []string{}, names)
+
 }
 
 func TestTags(t *testing.T) {
