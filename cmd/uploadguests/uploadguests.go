@@ -118,6 +118,7 @@ func main() {
 	wg := sync.WaitGroup{}
 	guestsPerRoutine := max(20, int(int64(len(lines)) / *numThreads))
 	log.Println("Running", guestsPerRoutine, "guests per routine")
+	fmt.Println("Running", guestsPerRoutine, "guests per routine, with", *numThreads, "goroutines")
 	for i := 0; i < len(lines); i += guestsPerRoutine {
 		wg.Add(1)
 		go func(start int, end int) {
