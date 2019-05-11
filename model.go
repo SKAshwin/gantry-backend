@@ -133,6 +133,20 @@ type GuestService interface {
 	SetTags(eventID string, nric string, tags []string) error
 	RemoveGuest(eventID string, nric string) error
 	CheckInStats(eventID string, tags []string) (GuestStats, error)
+	Begin() (GuestTransactionService, error)
+}
+
+//GuestTransactionService is a GuestService who's changes to the permanent data storage
+//are not stored until End() is called
+//This allows for several GuestService methods to be invoked, and only succeed if *all* methods
+//succeed (for example, registering multiple guests)
+//All implementations of GuestTransactionService must also automatically roll back changes if any method
+//fails, but a manual rollback method is also available
+//All users of GuestTransactionService must either call End() or Rollback() after they finish using it
+type GuestTransactionService interface {
+	GuestService
+	End() error
+	Rollback() error
 }
 
 //AuthorizationInfo stores critical information about a particular request's authorizations
