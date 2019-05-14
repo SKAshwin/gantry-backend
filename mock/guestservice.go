@@ -121,5 +121,5 @@ func (as *GuestService) SetTags(eventID string, nric string, tags []string) erro
 //AllTags invokes the mock implementation and marks the function as invoked
 func (as *GuestService) AllTags(eventID string) ([]string, error) {
 	as.AllTagsInvoked = true
-	return as.AllTags(eventID)
+	return as.AllTagsFn(eventID)
 }

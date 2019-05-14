@@ -194,6 +194,70 @@ func TestHandleGuests(t *testing.T) {
 	eventDoesNotExistTest(t, r, h, &es)
 }
 
+func TestHandleTags(t *testing.T) {
+	// Inject our mock into our handler.
+	var gs mock.GuestService
+	var es mock.EventService
+	var auth mock.Authenticator
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+
+	//mock the required calls
+	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
+	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
+	auth.AuthenticateFn = authenticateGenerator(true, nil)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
+	allTagsGenerator := func(err error, output []string) func(string) ([]string, error) {
+		return func(eventID string) ([]string, error) {
+			test.Equals(t, "100", eventID)
+
+			return output, err
+		}
+	}
+	gs.AllTagsFn = allTagsGenerator(nil, []string{"AYY", "LMAO"})
+
+	//test normal functionality
+	r := httptest.NewRequest("GET", "/api/v1-3/events/100/guests/tags", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	var guests []string
+	json.NewDecoder(w.Result().Body).Decode(&guests)
+	test.Equals(t, []string{"AYY", "LMAO"}, guests)
+
+	//test normal functionality if no tags returned
+	gs.AllTagsFn = allTagsGenerator(nil, []string{})
+	r = httptest.NewRequest("GET", "/api/v1-3/events/100/guests/tags", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&guests)
+	test.Equals(t, []string{}, guests)
+
+	//test error getting tags
+	gs.AllTagsFn = allTagsGenerator(errors.New("An error"), []string{})
+	r = httptest.NewRequest("GET", "/api/v1-3/events/100/guests/tags", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gs.AllTagsFn = allTagsGenerator(nil, []string{"AYY", "LMAO"})
+
+	//access restriction tests
+	//Test access by another user
+	nonHostAccessTest(t, r, h, &auth, &es, "unauthorized_person")
+
+	//Test access by admin
+	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
+		json.NewDecoder(r.Body).Decode(&guests)
+		test.Equals(t, []string{"AYY", "LMAO"}, guests)
+	})
+
+	//Test invalid token
+	noValidTokenTest(t, r, h, &auth)
+
+	//Test invalid eventID
+	r = httptest.NewRequest("GET", "/api/v1-3/events/200/guests/tags", nil)
+	eventDoesNotExistTest(t, r, h, &es)
+}
+
 func TestHandleRegisterGuests(t *testing.T) {
 	// Inject our mock into our handler.
 	var gs mock.GuestService
