@@ -194,6 +194,272 @@ func TestHandleGuests(t *testing.T) {
 	eventDoesNotExistTest(t, r, h, &es)
 }
 
+func TestHandleTags(t *testing.T) {
+	// Inject our mock into our handler.
+	var gs mock.GuestService
+	var es mock.EventService
+	var auth mock.Authenticator
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+
+	//mock the required calls
+	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
+	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
+	auth.AuthenticateFn = authenticateGenerator(true, nil)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
+	allTagsGenerator := func(err error, output []string) func(string) ([]string, error) {
+		return func(eventID string) ([]string, error) {
+			test.Equals(t, "100", eventID)
+
+			return output, err
+		}
+	}
+	gs.AllTagsFn = allTagsGenerator(nil, []string{"AYY", "LMAO"})
+
+	//test normal functionality
+	r := httptest.NewRequest("GET", "/api/v1-3/events/100/guests/tags", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	var guests []string
+	json.NewDecoder(w.Result().Body).Decode(&guests)
+	test.Equals(t, []string{"AYY", "LMAO"}, guests)
+
+	//test normal functionality if no tags returned
+	gs.AllTagsFn = allTagsGenerator(nil, []string{})
+	r = httptest.NewRequest("GET", "/api/v1-3/events/100/guests/tags", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&guests)
+	test.Equals(t, []string{}, guests)
+
+	//test error getting tags
+	gs.AllTagsFn = allTagsGenerator(errors.New("An error"), []string{})
+	r = httptest.NewRequest("GET", "/api/v1-3/events/100/guests/tags", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gs.AllTagsFn = allTagsGenerator(nil, []string{"AYY", "LMAO"})
+
+	//access restriction tests
+	//Test access by another user
+	nonHostAccessTest(t, r, h, &auth, &es, "unauthorized_person")
+
+	//Test access by admin
+	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
+		json.NewDecoder(r.Body).Decode(&guests)
+		test.Equals(t, []string{"AYY", "LMAO"}, guests)
+	})
+
+	//Test invalid token
+	noValidTokenTest(t, r, h, &auth)
+
+	//Test invalid eventID
+	r = httptest.NewRequest("GET", "/api/v1-3/events/200/guests/tags", nil)
+	eventDoesNotExistTest(t, r, h, &es)
+}
+
+func TestHandleRegisterGuests(t *testing.T) {
+	// Inject our mock into our handler.
+	var gs mock.GuestService
+	var es mock.EventService
+	var auth mock.Authenticator
+	var gm mock.GuestMessenger
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+
+	//mock the required calls
+	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
+	es.CheckHostFn = checkHostGenerator("testing_username", "300", nil)
+	auth.AuthenticateFn = authenticateGenerator(true, nil)
+	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
+	registerGuestsGenerator := func(err error, expectedGuests []checkin.Guest) func(string, []checkin.Guest) error {
+		return func(eventID string, guests []checkin.Guest) error {
+			test.Equals(t, expectedGuests, guests)
+			return err
+		}
+	}
+	gs.RegisterGuestsFn = registerGuestsGenerator(nil, []checkin.Guest{
+		checkin.Guest{
+			NRIC: "1234A",
+			Name: "A",
+			Tags: []string{},
+		},
+		checkin.Guest{
+			NRIC: "1234B",
+			Name: "B",
+			Tags: nil,
+		},
+		checkin.Guest{
+			NRIC: "1234C",
+			Name: "C",
+			Tags: []string{"VIP", "CONFIRMED"},
+		},
+		checkin.Guest{
+			NRIC: "2234D",
+			Name: "D",
+			Tags: []string{"CONFIRMED"},
+		},
+	})
+	guestExistsGenerator := func(err error) func(string, string) (bool, error) {
+		return func(eventID string, nric string) (bool, error) {
+			test.Equals(t, "300", eventID)
+			if err != nil {
+				return false, err
+			}
+			return nric == "1234F" || nric == "4321Z", nil
+		}
+	}
+	gs.GuestExistsFn = guestExistsGenerator(nil)
+
+	//test normal functionality
+	r := httptest.NewRequest("POST", "/api/v1-3/events/300/guests",
+		strings.NewReader(`[{"name":"A", "nric":"1234A", "tags":[]},{"name":"B", "nric":"1234B", "tags":null},
+		{"name":"C", "nric":"1234C", "tags":["VIP","CONFIRMED"]}, {"name":"D", "nric":"2234D", "tags":["CONFIRMED"]}]`))
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
+
+	//test registering one guest
+	gs.RegisterGuestsFn = registerGuestsGenerator(nil, []checkin.Guest{
+		checkin.Guest{
+			NRIC: "3893A",
+			Name: "A",
+			Tags: []string{"CONFIRMED"},
+		},
+	})
+	r = httptest.NewRequest("POST", "/api/v1-3/events/300/guests",
+		strings.NewReader(`[{"nric":"3893A","name":"A","tags":["CONFIRMED"]}]`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
+
+	//test attempting to register empty array or null, should throw a bad request
+	r = httptest.NewRequest("POST", "/api/v1-3/events/300/guests",
+		strings.NewReader(`[]`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	r = httptest.NewRequest("POST", "/api/v1-3/events/300/guests",
+		strings.NewReader(`null`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	//test one guest exists in array
+	gs.RegisterGuestsInvoked = false
+	r = httptest.NewRequest("POST", "/api/v1-3/events/300/guests",
+		strings.NewReader(`[{"name":"A", "nric":"1234A", "tags":[]},{"name":"B", "nric":"1234B", "tags":null},
+		{"name":"C", "nric":"1234F", "tags":["VIP","CONFIRMED"]}, {"name":"D", "nric":"2234D", "tags":["CONFIRMED"]}]`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusConflict, w.Result().StatusCode)
+	test.Assert(t, !gs.RegisterGuestsInvoked, "Register guests invoked even though there is a duplicate guest")
+
+	//test error in checking if guests exist
+	gs.GuestExistsFn = guestExistsGenerator(errors.New("An error"))
+	r = httptest.NewRequest("POST", "/api/v1-3/events/300/guests",
+		strings.NewReader(`[{"name":"A", "nric":"1234A", "tags":[]},{"name":"B", "nric":"1234B", "tags":null},
+		{"name":"C", "nric":"1234C", "tags":["VIP","CONFIRMED"]}, {"name":"D", "nric":"2234D", "tags":["CONFIRMED"]}]`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gs.GuestExistsFn = guestExistsGenerator(nil)
+
+	//test error registering guests
+	gs.RegisterGuestsFn = registerGuestsGenerator(errors.New("An error"), []checkin.Guest{
+		checkin.Guest{
+			NRIC: "1234A",
+			Name: "A",
+			Tags: []string{},
+		},
+		checkin.Guest{
+			NRIC: "1234B",
+			Name: "B",
+			Tags: nil,
+		},
+		checkin.Guest{
+			NRIC: "1234C",
+			Name: "C",
+			Tags: []string{"VIP", "CONFIRMED"},
+		},
+		checkin.Guest{
+			NRIC: "2234D",
+			Name: "D",
+			Tags: []string{"CONFIRMED"},
+		},
+	})
+	r = httptest.NewRequest("POST", "/api/v1-3/events/300/guests",
+		strings.NewReader(`[{"name":"A", "nric":"1234A", "tags":[]},{"name":"B", "nric":"1234B", "tags":null},
+		{"name":"C", "nric":"1234C", "tags":["VIP","CONFIRMED"]}, {"name":"D", "nric":"2234D", "tags":["CONFIRMED"]}]`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	gs.RegisterGuestsFn = registerGuestsGenerator(nil, []checkin.Guest{
+		checkin.Guest{
+			NRIC: "1234A",
+			Name: "A",
+			Tags: []string{},
+		},
+		checkin.Guest{
+			NRIC: "1234B",
+			Name: "B",
+			Tags: nil,
+		},
+		checkin.Guest{
+			NRIC: "1234C",
+			Name: "C",
+			Tags: []string{"VIP", "CONFIRMED"},
+		},
+		checkin.Guest{
+			NRIC: "2234D",
+			Name: "D",
+			Tags: []string{"CONFIRMED"},
+		},
+	})
+
+	//test pass in guest object instead of array of guest objects, should fail
+	r = httptest.NewRequest("POST", "/api/v1-3/events/300/guests",
+		strings.NewReader(`{"name":"D", "nric":"2234D", "tags":["CONFIRMED"]}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	//test extra fields supplied in a guest
+	r = httptest.NewRequest("POST", "/api/v1-3/events/300/guests",
+		strings.NewReader(`[{"name":"A", "nric":"1234A", "tags":[]},{"name":"B", "nric":"1234B", "tags":null},
+		{"name":"C", "nric":"1234C", "tags":["VIP","CONFIRMED"], "something":"lol"}, {"name":"D", "nric":"2234D", "tags":["CONFIRMED"]}]`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	//access restriction tests
+	//Test access by another user
+	r = httptest.NewRequest("POST", "/api/v1-3/events/300/guests",
+		strings.NewReader(`[{"name":"A", "nric":"1234A", "tags":[]},{"name":"B", "nric":"1234B", "tags":null},
+		{"name":"C", "nric":"1234C", "tags":["VIP","CONFIRMED"]}, {"name":"D", "nric":"2234D", "tags":["CONFIRMED"]}]`))
+	nonHostAccessTest(t, r, h, &auth, &es, "unauthorized_person")
+
+	//Test access by admin
+	r = httptest.NewRequest("POST", "/api/v1-3/events/300/guests",
+		strings.NewReader(`[{"name":"A", "nric":"1234A", "tags":[]},{"name":"B", "nric":"1234B", "tags":null},
+		{"name":"C", "nric":"1234C", "tags":["VIP","CONFIRMED"]}, {"name":"D", "nric":"2234D", "tags":["CONFIRMED"]}]`))
+	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
+		test.Equals(t, http.StatusCreated, r.StatusCode)
+	})
+
+	//Test invalid token
+	r = httptest.NewRequest("POST", "/api/v1-3/events/300/guests",
+		strings.NewReader(`[{"name":"A", "nric":"1234A", "tags":[]},{"name":"B", "nric":"1234B", "tags":null},
+		{"name":"C", "nric":"1234C", "tags":["VIP","CONFIRMED"]}, {"name":"D", "nric":"2234D", "tags":["CONFIRMED"]}]`))
+	noValidTokenTest(t, r, h, &auth)
+
+	//Test invalid eventID
+	r = httptest.NewRequest("POST", "/api/v1-3/events/100/guests",
+		strings.NewReader(`[{"name":"A", "nric":"1234A", "tags":[]},{"name":"B", "nric":"1234B", "tags":null},
+		{"name":"C", "nric":"1234C", "tags":["VIP","CONFIRMED"]}, {"name":"D", "nric":"2234D", "tags":["CONFIRMED"]}]`))
+	eventDoesNotExistTest(t, r, h, &es)
+}
+
 func TestHandleRegisterGuest(t *testing.T) {
 	// Inject our mock into our handler.
 	var gs mock.GuestService

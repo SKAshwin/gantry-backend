@@ -48,8 +48,12 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, gm GuestM
 		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}/guests", Adapt(http.HandlerFunc(h.handleRegisterGuest),
 		tokenCheck, existCheck, credentialsCheck)).Methods("POST")
+	h.Handle("/api/v1-3/events/{eventID}/guests", Adapt(http.HandlerFunc(h.handleRegisterGuests),
+		tokenCheck, existCheck, credentialsCheck)).Methods("POST")
 	h.Handle("/api/v0/events/{eventID}/guests", Adapt(http.HandlerFunc(h.handleRemoveGuest),
 		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
+	h.Handle("/api/v1-3/events/{eventID}/guests/tags", Adapt(http.HandlerFunc(h.handleTags),
+		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}/guests/checkedin", Adapt(http.HandlerFunc(h.handleGuestsCheckedIn),
 		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}/guests/checkedin", Adapt(http.HandlerFunc(h.handleCheckInGuest),
@@ -66,6 +70,17 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, gm GuestM
 		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 
 	return h
+}
+
+func (h *GuestHandler) handleTags(w http.ResponseWriter, r *http.Request) {
+	tags, err := h.GuestService.AllTags(mux.Vars(r)["eventID"])
+	if err != nil {
+		h.Logger.Println("Error in handleTags: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error fetching all tags for event", w)
+		return
+	}
+	reply, _ := json.Marshal(tags)
+	w.Write(reply)
 }
 
 func (h *GuestHandler) handleGuests(w http.ResponseWriter, r *http.Request) {
@@ -96,6 +111,46 @@ func (h *GuestHandler) handleGuests(w http.ResponseWriter, r *http.Request) {
 	}
 	reply, _ := json.Marshal(guests)
 	w.Write(reply)
+}
+
+func (h *GuestHandler) handleRegisterGuests(w http.ResponseWriter, r *http.Request) {
+	var guests []checkin.Guest
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&guests)
+	if err != nil {
+		h.Logger.Println("Error when decoding guests's details: " + err.Error())
+		WriteMessage(http.StatusBadRequest,
+			`Incorrect fields for adding new guests. Must be an array of guest objects, i.e. in the form [{"nric":"1234A","name":"Hello","tags":["VIP","CONFIRMED"]}]. Even registering one guest should be one guest object in an array`,
+			w)
+		return
+	}
+
+	if guests == nil || len(guests) == 0 {
+		WriteMessage(http.StatusBadRequest, `Cannot register an empty or null array of guests`, w)
+		return
+	}
+
+	eventID := mux.Vars(r)["eventID"]
+	for _, guest := range guests {
+		//check if the guest already exists first before attempting to create one, for each guest
+		if guestExists, err := h.GuestService.GuestExists(eventID, guest.NRIC); err == nil && guestExists {
+			WriteMessage(http.StatusConflict, "Guest with that NRIC already in list for guest: "+guest.NRIC, w)
+			return
+		} else if err != nil {
+			h.Logger.Println("Error checking if guest exists: " + err.Error())
+			WriteMessage(http.StatusInternalServerError, "Error checking if guest exists, for guest: "+guest.NRIC, w)
+			return
+		}
+	}
+
+	err = h.GuestService.RegisterGuests(eventID, guests)
+	if err != nil {
+		h.Logger.Println("Error registering guests: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Guests registration failed; thus none of the guests supplied were registered", w)
+	} else {
+		WriteMessage(http.StatusCreated, "Registration successful for all guests", w)
+	}
 }
 
 func (h *GuestHandler) handleRegisterGuest(w http.ResponseWriter, r *http.Request) {
