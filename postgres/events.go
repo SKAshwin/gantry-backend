@@ -16,6 +16,14 @@ type EventService struct {
 	DB *sqlx.DB
 }
 
+//rawEvent has all the fields of an event, but reads the timetags as a JSON byte array
+//corresponds to the DB representation of an Event (which does not have a TimeTag type, and therefore
+//store TimeTags as JSON
+type rawEvent struct {
+	checkin.Event
+	TimetagJSON []byte `db:"timetags"`
+}
+
 //Event Fetches the details of an event, given its ID
 func (es *EventService) Event(eventID string) (checkin.Event, error) {
 	var event checkin.Event
@@ -43,7 +51,6 @@ func (es *EventService) Events() ([]checkin.Event, error) {
 
 	events, err := es.scanRowsIntoEvents(rows, numEvents)
 	if err == sql.ErrNoRows {
-		log.Println("No rows, returned empty event")
 		return make([]checkin.Event, 0), nil
 	} else if err != nil {
 		return nil, errors.New("Error scanning rows into events:" + err.Error())
@@ -56,7 +63,7 @@ func (es *EventService) Events() ([]checkin.Event, error) {
 //Returns an array of all the events hosted by that user
 //Will return an empty array (with no error) if that user hosts no events
 func (es *EventService) EventsBy(username string) ([]checkin.Event, error) {
-	rows, err := es.DB.Queryx("SELECT ID, name, \"start\", \"end\", release, lat, long, radius, url, createdAt, updatedAt from event, hosts where hosts.username = $1 and hosts.eventID = event.ID",
+	rows, err := es.DB.Queryx("SELECT * from event, hosts where hosts.username = $1 and hosts.eventID = event.ID",
 		username)
 	if err != nil {
 		return nil, errors.New("Error fetching all events for user: " + err.Error())
@@ -69,7 +76,6 @@ func (es *EventService) EventsBy(username string) ([]checkin.Event, error) {
 
 	events, err := es.scanRowsIntoEvents(rows, numEvents)
 	if err == sql.ErrNoRows {
-		log.Println("No rows, returned empty event")
 		return make([]checkin.Event, 0), nil
 	} else if err != nil {
 		return nil, errors.New("Error scanning rows into events:" + err.Error())
@@ -96,13 +102,16 @@ func (es *EventService) CreateEvent(e checkin.Event, hostUsername string) error 
 		}
 	}()
 
-	_, err = tx.NamedExec("INSERT INTO event(id, name, url,start, \"end\", release, lat, long, radius) VALUES (:id, :name, :url, :start, :end, :release,:lat, :long, :radius)", e)
+	timetags, _ := json.Marshal(e.TimeTags)
+	rawEvent := rawEvent{Event: e, TimetagJSON: timetags}
+
+	_, err = tx.NamedExec("INSERT INTO event(id, name, url, start, \"end\", timetags, lat, long, radius) VALUES (:id, :name, :url, :start, :end, :timetags,:lat, :long, :radius)", rawEvent)
 	if err != nil {
 		tx.Rollback()
 		return errors.New("Error inserting event data: " + err.Error())
 	}
 
-	_, err = tx.Exec("INSERT into hosts(eventID, username) VALUES ($1, $2)", e.ID, hostUsername)
+	_, err = tx.Exec("INSERT into hosts(eventID, username) VALUES ($1, $2)", rawEvent.ID, hostUsername)
 	if err != nil {
 		tx.Rollback()
 		return errors.New("Error creating host relationship: " + err.Error())
@@ -125,8 +134,10 @@ func (es *EventService) CreateEvent(e checkin.Event, hostUsername string) error 
 //Except for the createdAt and updatedAt fields, which are not editable
 //Returns an error if error in executing update, or no event with that ID exists
 func (es *EventService) UpdateEvent(event checkin.Event) error {
-	res, err := es.DB.NamedExec("UPDATE event SET name = :name, release = :release, \"start\" = :start, "+
-		"\"end\" = :end, lat = :lat, long= :long, radius = :radius, url = :url, updatedAt = (NOW() at time zone 'utc') where id = :id", &event)
+	timetags, _ := json.Marshal(event.TimeTags)
+	rawEvent := rawEvent{Event: event, TimetagJSON: timetags}
+	res, err := es.DB.Exec("UPDATE event SET name = :name, timetags = :timetags, \"start\" = :start, "+
+		"\"end\" = :end, lat = :lat, long= :long, radius = :radius, url = :url, updatedAt = (NOW() at time zone 'utc') where id = :id", &rawEvent)
 	if err != nil {
 		return errors.New("Error when updating event: " + err.Error())
 	}
@@ -240,7 +251,6 @@ func (es *EventService) scanRowsIntoForms(rows *sqlx.Rows, numRows int) ([]check
 		}
 		err = json.Unmarshal(surveyJSON, &form.Survey)
 		if err != nil {
-			log.Println(string(surveyJSON))
 			return nil, errors.New("Could not unmarshal form item data from JSON: " + err.Error())
 		}
 		form.SubmitTime = form.SubmitTime.UTC() //make sure all times are in UTC (postgres has them in a +0:00 timezone)
@@ -267,10 +277,15 @@ func (es *EventService) scanRowsIntoEvents(rows *sqlx.Rows, numRows int) ([]chec
 
 	index := 0
 	for thereAreMore := rows.Next(); thereAreMore; thereAreMore = rows.Next() {
-		var event checkin.Event
-		err := rows.StructScan(&event)
+		var rawEvent rawEvent
+		err := rows.StructScan(&rawEvent)
 		if err != nil {
 			return nil, errors.New("Could not extract event: " + err.Error())
+		}
+		event := rawEvent.Event //create an actual event object from the rawEvent, parse the timetagJSON into TimeTags
+		err = json.Unmarshal(rawEvent.TimetagJSON, &event.TimeTags)
+		if err != nil {
+			return nil, errors.New("Could not unmarshal time tag data from JSON: " + err.Error())
 		}
 		events[index] = event
 		index++

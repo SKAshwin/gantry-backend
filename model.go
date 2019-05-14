@@ -35,7 +35,7 @@ type UserService interface {
 type Event struct {
 	ID        string     `json:"eventId" db:"id"`
 	Name      string     `json:"name" db:"name"`
-	Release   null.Time  `json:"releaseDateTime" db:"release"`
+	TimeTags  []TimeTag  `json:"timetags"`
 	Start     null.Time  `json:"startDateTime" db:"start"`
 	End       null.Time  `json:"endDateTime" db:"end"`
 	Lat       null.Float `json:"lat" db:"lat"`
@@ -61,18 +61,6 @@ type FeedbackForm struct {
 	SubmitTime time.Time          `json:"submitTime" db:"submittime"`
 }
 
-//Released returns true if the current time in Singapore is beyond
-//the release time in UTC
-func (event *Event) Released() bool {
-	now := time.Now().UTC()
-
-	if !event.Release.Valid {
-		//if no release time set, return true
-		return true
-	}
-	return event.Release.Time.UTC().Before(now)
-}
-
 //EventService An interface for functions that modify/fetch event data in the database
 type EventService interface {
 	Event(ID string) (Event, error)
@@ -87,6 +75,15 @@ type EventService interface {
 	CheckHost(username string, eventID string) (bool, error)
 	FeedbackForms(ID string) ([]FeedbackForm, error)
 	SubmitFeedback(ID string, ff FeedbackForm) error
+}
+
+//TimeTag a struct which represents some event that is supposed to occur at the given time
+//For example a "RELEASE" tag could exist at 10AM GMT, and a "FEEDBACKFORM" tag could exist at 12pm GMT,
+//after the event ends
+//There is no inherent meaning to a time tag, its label must be interpreted by the client
+type TimeTag struct {
+	Label string
+	Time  time.Time
 }
 
 //HashMethod An interface allowing you to hash a string, and confirm if a string matches a given hash
