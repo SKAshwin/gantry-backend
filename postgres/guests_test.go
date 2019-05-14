@@ -442,6 +442,40 @@ func TestSetTags(t *testing.T) {
 
 }
 
+func TestAllTags(t *testing.T) {
+	var hm mock.HashMethod
+	gs := postgres.GuestService{DB: db, HM: &hm}
+
+	//check normal functionality (multiple tags returns)
+	tags, err := gs.AllTags("c14a592c-950d-44ba-b173-bbb9e4f5c8b4")
+	test.Ok(t, err)
+	sort.Strings(tags)
+	test.Equals(t, []string{"ATTENDING", "OFFICER", "VIP"}, tags)
+
+	//test no tags (return empty array)
+	tags, err = gs.AllTags("03293b3b-df83-407e-b836-fb7d4a3c4966")
+	test.Ok(t, err)
+	test.Equals(t, []string{}, tags)
+
+	//test event with no guests (return empty array)
+	tags, err = gs.AllTags("3820a980-a207-4738-b82b-45808fe7aba8")
+	test.Ok(t, err)
+	test.Equals(t, []string{}, tags)
+
+	//test event does not exist (should also return empty array)
+	tags, err = gs.AllTags("1f73ed02-9427-41e4-9469-c9c4ac515f8d")
+	test.Ok(t, err)
+	test.Equals(t, []string{}, tags)
+
+	//test event does not exist, invalid UUID (should also return an empty array)
+	tags, err = gs.AllTags("ayylmao")
+	test.Ok(t, err)
+	test.Equals(t, []string{}, tags)
+	tags, err = gs.AllTags("")
+	test.Ok(t, err)
+	test.Equals(t, []string{}, tags)
+}
+
 func TestGuestExists(t *testing.T) {
 	var hm mock.HashMethod
 	gs := postgres.GuestService{DB: db, HM: &hm}
