@@ -41,6 +41,9 @@ type GuestService struct {
 
 	SetTagsFn      func(eventID string, nric string, tags []string) error
 	SetTagsInvoked bool
+
+	AllTagsFn      func(eventID string) ([]string, error)
+	AllTagsInvoked bool
 }
 
 //CheckIn invokes the mock implementation and marks the function as invoked
@@ -85,6 +88,7 @@ func (as *GuestService) RegisterGuest(eventID string, guest checkin.Guest) error
 	return as.RegisterGuestFn(eventID, guest)
 }
 
+//RegisterGuests invokes the mock implementation and marks the function as invoked
 func (as *GuestService) RegisterGuests(eventID string, guests []checkin.Guest) error {
 	as.RegisterGuestsInvoked = true
 	return as.RegisterGuestsFn(eventID, guests)
@@ -112,4 +116,10 @@ func (as *GuestService) Tags(eventID string, nric string) ([]string, error) {
 func (as *GuestService) SetTags(eventID string, nric string, tags []string) error {
 	as.SetTagsInvoked = true
 	return as.SetTagsFn(eventID, nric, tags)
+}
+
+//AllTags invokes the mock implementation and marks the function as invoked
+func (as *GuestService) AllTags(eventID string) ([]string, error) {
+	as.AllTagsInvoked = true
+	return as.AllTags(eventID)
 }

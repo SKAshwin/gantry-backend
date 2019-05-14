@@ -132,6 +132,7 @@ type GuestService interface {
 	RegisterGuests(eventID string, guests []Guest) error
 	Tags(eventID string, nric string) ([]string, error)
 	SetTags(eventID string, nric string, tags []string) error
+	AllTags(eventID string) ([]string, error)
 	RemoveGuest(eventID string, nric string) error
 	CheckInStats(eventID string, tags []string) (GuestStats, error)
 }

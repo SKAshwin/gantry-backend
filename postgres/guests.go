@@ -269,6 +269,11 @@ func (gs *GuestService) SetTags(eventID string, nric string, tags []string) erro
 	return err
 }
 
+//AllTags returns all the possible tags for guests in a given event
+func (gs *GuestService) AllTags(eventID string) ([]string, error) {
+	return nil, errors.New("Unimplemented")
+}
+
 //RemoveGuest removes a given guest (indicated by nric) from the database
 //will not return an error if guest does not exist, will merely delete no one
 func (gs *GuestService) RemoveGuest(eventID string, nric string) error {
