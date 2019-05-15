@@ -248,16 +248,18 @@ func (h *GuestHandler) handleCheckInGuest(w http.ResponseWriter, r *http.Request
 	}
 
 	//if anyone subscribed to a check in listener on this guest, update them
-	if h.GuestMessenger.HasConnection(generateGuestID(eventID, guest.NRIC)) {
-		err = h.GuestMessenger.Send(generateGuestID(eventID, guest.NRIC), GuestMessage{
-			Title:   "checkedin/1",
-			Content: checkin.Guest{Name: name, NRIC: guest.NRIC},
-		})
-		if err != nil {
-			h.Logger.Println("Error sending check in message to guest, but guest successfully checked in: " +
-				guest.NRIC + ", due to error: " + err.Error())
+	go func() {
+		if h.GuestMessenger.HasConnection(generateGuestID(eventID, guest.NRIC)) {
+			sendErr := h.GuestMessenger.Send(generateGuestID(eventID, guest.NRIC), GuestMessage{
+				Title:   "checkedin/1",
+				Content: checkin.Guest{Name: name, NRIC: guest.NRIC},
+			})
+			if sendErr != nil {
+				h.Logger.Println("Error sending check in message to guest, but guest successfully checked in: " +
+					guest.NRIC + ", due to error: " + sendErr.Error())
+			}
 		}
-	}
+	}()
 
 	reply, _ := json.Marshal(name)
 	w.Write(reply)
