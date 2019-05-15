@@ -25,7 +25,7 @@ create table event(
 	ID UUID PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
 	name text NOT NULL,
 	url text UNIQUE NOT NULL,
-	timetags json NOT NULL DEFAULT '[]', -- should just be an empty JSON array instead of null
+	timetags json NOT NULL DEFAULT '{}', -- should just be an empty JSON object instead of null
 	"start" TIMESTAMP,
 	"end" TIMESTAMP,
 	lat float8,
