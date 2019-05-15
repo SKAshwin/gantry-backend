@@ -4,12 +4,16 @@ package postgres_test
 //SOME MODIFY DATABASE STATE AND CLEAN UP BEFORE EXITING
 import (
 	"checkin"
+	"checkin/bcrypt"
 	"checkin/mock"
 	"checkin/postgres"
 	"checkin/test"
 	"errors"
+	"log"
 	"sort"
+	"strconv"
 	"testing"
+	"time"
 )
 
 func hashFnGenerator(err error) func(string) (string, error) {
@@ -557,4 +561,39 @@ func TestCheckIn(t *testing.T) {
 	//test invalid UUID eventID (should throw error)
 	name, err = gs.CheckIn("1312312312", "3118B")
 	test.Assert(t, err != nil, "No error thrown when check in called with non-existent guest (invalid UUID)")
+}
+
+func TestGuestExistsTime(t *testing.T) {
+	hm := bcrypt.HashMethod{HashCost: 5}
+	gs := postgres.GuestService{HM: &hm, DB: db}
+	eventID := "3820a980-a207-4738-b82b-45808fe7aba8"
+
+	for i := range [2000]int{} {
+		err := gs.RegisterGuest(eventID, checkin.Guest{NRIC: strconv.Itoa(i), Name: strconv.Itoa(i)})
+		test.Ok(t, err)
+	}
+
+	start := time.Now()
+	res, err := gs.GuestExists(eventID, strconv.Itoa(2000))
+	timeTaken := time.Since(start).Seconds()
+	log.Println(timeTaken)
+	test.Ok(t, err)
+	test.Equals(t, false, res)
+
+	res, err = gs.GuestExists(eventID, strconv.Itoa(1999))
+	test.Ok(t, err)
+	test.Equals(t, true, res)
+
+	res, err = gs.GuestExists(eventID, "lol fuck your logic")
+	test.Ok(t, err)
+	test.Equals(t, false, res)
+
+	res, err = gs.GuestExists(eventID, strconv.Itoa(19))
+	test.Ok(t, err)
+	test.Equals(t, true, res)
+
+	res, err = gs.GuestExists(eventID, strconv.Itoa(0))
+	test.Ok(t, err)
+	test.Equals(t, true, res)
+
 }
