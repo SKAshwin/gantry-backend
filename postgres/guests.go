@@ -8,6 +8,8 @@ import (
 
 	"strings"
 
+	"sync"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
@@ -339,13 +341,42 @@ func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.G
 		return checkin.Guest{}, errors.New("Error reading guest data from database: " + err.Error())
 	}
 
-	for _, guest := range guests {
-		if gs.HM.CompareHashAndPassword(guest.NRIC, strings.ToUpper(nric)) {
-			return guest, nil
-		}
-	}
+	return gs.findGuest(nric, guests), nil
+}
 
-	return checkin.Guest{}, nil
+func (gs *GuestService) findGuest(nric string, hashedGuests []checkin.Guest) checkin.Guest {
+	result := make(chan checkin.Guest)
+	quit := make(chan struct{})
+	wg := sync.WaitGroup{}
+	for i := 0; i < len(hashedGuests); i += 20 {
+		wg.Add(1)
+		go func(guests []checkin.Guest) {
+			defer wg.Done()
+			for _, guest := range guests {
+				if gs.HM.CompareHashAndPassword(guest.NRIC, strings.ToUpper(nric)) {
+					result <- guest
+				}
+			}
+		}(hashedGuests[i:min(len(hashedGuests), i+20)])
+	}
+	go func() {
+		wg.Wait()
+		close(quit)
+	}()
+	select {
+	case guest := <-result: //one of the goroutines found a guest
+		return guest
+	case <-quit: //Wait finished executing, which means all threads closed, and as the other
+		//case did not run, nothing was sent over the result channel
+		return checkin.Guest{}
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (gs *GuestService) scanRowsIntoGuests(rows *sqlx.Rows, rowCount int) ([]checkin.Guest, error) {
