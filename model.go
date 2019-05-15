@@ -33,17 +33,17 @@ type UserService interface {
 
 //Event represents an event which will have an associated website
 type Event struct {
-	ID        string     `json:"eventId" db:"id"`
-	Name      string     `json:"name" db:"name"`
-	TimeTags  []TimeTag  `json:"timetags"`
-	Start     null.Time  `json:"startDateTime" db:"start"`
-	End       null.Time  `json:"endDateTime" db:"end"`
-	Lat       null.Float `json:"lat" db:"lat"`
-	Long      null.Float `json:"long" db:"long"`
-	Radius    null.Float `json:"radius" db:"radius"` //in km
-	URL       string     `json:"url" db:"url"`
-	UpdatedAt time.Time  `json:"updatedAt" db:"updatedat"`
-	CreatedAt time.Time  `json:"createdAt" db:"createdat"`
+	ID        string               `json:"eventId" db:"id"`
+	Name      string               `json:"name" db:"name"`
+	TimeTags  map[string]time.Time `json:"timetags" db:"-"`
+	Start     null.Time            `json:"startDateTime" db:"start"`
+	End       null.Time            `json:"endDateTime" db:"end"`
+	Lat       null.Float           `json:"lat" db:"lat"`
+	Long      null.Float           `json:"long" db:"long"`
+	Radius    null.Float           `json:"radius" db:"radius"` //in km
+	URL       string               `json:"url" db:"url"`
+	UpdatedAt time.Time            `json:"updatedAt" db:"updatedat"`
+	CreatedAt time.Time            `json:"createdAt" db:"createdat"`
 }
 
 //FeedbackFormItem represents a question/answer pair in a feedback form
@@ -75,15 +75,6 @@ type EventService interface {
 	CheckHost(username string, eventID string) (bool, error)
 	FeedbackForms(ID string) ([]FeedbackForm, error)
 	SubmitFeedback(ID string, ff FeedbackForm) error
-}
-
-//TimeTag a struct which represents some event that is supposed to occur at the given time
-//For example a "RELEASE" tag could exist at 10AM GMT, and a "FEEDBACKFORM" tag could exist at 12pm GMT,
-//after the event ends
-//There is no inherent meaning to a time tag, its label must be interpreted by the client
-type TimeTag struct {
-	Label string
-	Time  time.Time
 }
 
 //HashMethod An interface allowing you to hash a string, and confirm if a string matches a given hash

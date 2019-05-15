@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"strings"
+	"time"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -26,12 +28,16 @@ type rawEvent struct {
 
 //Event Fetches the details of an event, given its ID
 func (es *EventService) Event(eventID string) (checkin.Event, error) {
-	var event checkin.Event
+	var rEvent rawEvent
 	err := es.DB.QueryRowx(
 		"SELECT * from event where ID = $1",
-		eventID).StructScan(&event)
+		eventID).StructScan(&rEvent)
 	if err != nil {
 		return checkin.Event{}, errors.New("Error fetching event details: " + err.Error())
+	}
+	event, err := es.unmarshalEvent(rEvent)
+	if err != nil {
+		return checkin.Event{}, errors.New("Error unmarshalling timetag in event: " + err.Error())
 	}
 	return event, nil
 }
@@ -86,6 +92,7 @@ func (es *EventService) EventsBy(username string) ([]checkin.Event, error) {
 
 //CreateEvent creates a new event in the database given its contents
 //Also creates a host relationship, given the host's username
+//e.ID needs to be a valid UUID
 func (es *EventService) CreateEvent(e checkin.Event, hostUsername string) error {
 	tx, err := es.DB.Beginx()
 	if err != nil {
@@ -102,8 +109,7 @@ func (es *EventService) CreateEvent(e checkin.Event, hostUsername string) error 
 		}
 	}()
 
-	timetags, _ := json.Marshal(e.TimeTags)
-	rawEvent := rawEvent{Event: e, TimetagJSON: timetags}
+	rawEvent := es.marshalEvent(e)
 
 	_, err = tx.NamedExec("INSERT INTO event(id, name, url, start, \"end\", timetags, lat, long, radius) VALUES (:id, :name, :url, :start, :end, :timetags,:lat, :long, :radius)", rawEvent)
 	if err != nil {
@@ -134,10 +140,10 @@ func (es *EventService) CreateEvent(e checkin.Event, hostUsername string) error 
 //Except for the createdAt and updatedAt fields, which are not editable
 //Returns an error if error in executing update, or no event with that ID exists
 func (es *EventService) UpdateEvent(event checkin.Event) error {
-	timetags, _ := json.Marshal(event.TimeTags)
-	rawEvent := rawEvent{Event: event, TimetagJSON: timetags}
-	res, err := es.DB.Exec("UPDATE event SET name = :name, timetags = :timetags, \"start\" = :start, "+
-		"\"end\" = :end, lat = :lat, long= :long, radius = :radius, url = :url, updatedAt = (NOW() at time zone 'utc') where id = :id", &rawEvent)
+	rawEvent := es.marshalEvent(event)
+	res, err := es.DB.NamedExec("UPDATE event SET name = :name, timetags = :timetags, \"start\" = :start, "+
+		"\"end\" = :end, lat = :lat, long= :long, radius = :radius, url = :url, updatedAt = (NOW() at time zone 'utc') where id = :id",
+		&rawEvent)
 	if err != nil {
 		return errors.New("Error when updating event: " + err.Error())
 	}
@@ -282,8 +288,7 @@ func (es *EventService) scanRowsIntoEvents(rows *sqlx.Rows, numRows int) ([]chec
 		if err != nil {
 			return nil, errors.New("Could not extract event: " + err.Error())
 		}
-		event := rawEvent.Event //create an actual event object from the rawEvent, parse the timetagJSON into TimeTags
-		err = json.Unmarshal(rawEvent.TimetagJSON, &event.TimeTags)
+		event, err := es.unmarshalEvent(rawEvent)
 		if err != nil {
 			return nil, errors.New("Could not unmarshal time tag data from JSON: " + err.Error())
 		}
@@ -314,4 +319,27 @@ func (es *EventService) getNumberOfEventsBy(username string) (int, error) {
 	}
 
 	return numEvents, nil
+}
+
+//Converts an event to its raw (DB-storable) form, by marshalling
+//its timetag array into a JSON
+func (es *EventService) marshalEvent(event checkin.Event) rawEvent {
+	if event.TimeTags == nil {
+		event.TimeTags = make(map[string]time.Time, 0)
+	}
+	for key, val := range event.TimeTags {
+		delete(event.TimeTags, key)
+		event.TimeTags[strings.ToLower(key)] = val
+
+	}
+	timetags, _ := json.Marshal(event.TimeTags)
+	return rawEvent{Event: event, TimetagJSON: timetags}
+}
+
+//unmarshals an event from its raw (DB-storable) form, by unmarshalling
+//its timetag JSON into a timetag array
+func (es *EventService) unmarshalEvent(re rawEvent) (checkin.Event, error) {
+	event := re.Event //create an actual event object from the rawEvent, parse the timetagJSON into TimeTags
+	err := json.Unmarshal(re.TimetagJSON, &event.TimeTags)
+	return event, err
 }

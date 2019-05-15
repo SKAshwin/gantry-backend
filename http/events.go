@@ -172,7 +172,7 @@ func (h *EventHandler) handleReleased(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reply, _ := json.Marshal(event.Released())
+	reply, _ := json.Marshal(event.TimeTags["release"].Before(time.Now()))
 	w.Write(reply)
 }
 
@@ -364,7 +364,7 @@ func eventReleased(es checkin.EventService, eventIDKey string) Adapter {
 			if err != nil {
 				log.Println("Error fetching event data in eventReleased: " + err.Error())
 				WriteMessage(http.StatusInternalServerError, "Error fetching event data", w)
-			} else if event.Released() {
+			} else if event.TimeTags["release"].Before(time.Now()) {
 				h.ServeHTTP(w, r)
 			} else {
 				WriteMessage(http.StatusForbidden, "Event has not been released yet", w)
