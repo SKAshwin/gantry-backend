@@ -7,13 +7,30 @@ import (
 	"math"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/guregu/null"
 )
 
 func TestCreateEvent(t *testing.T) {
 	es := postgres.EventService{DB: db}
 
+	event := checkin.Event{
+		ID:       uuid.New().String(),
+		Name:     "Test",
+		TimeTags: make(map[string]time.Time),
+		URL:      "hello",
+		Start:    null.TimeFrom(time.Date(2019, 10, 11, 3, 2, 1, 0, time.UTC)),
+	}
+	event.TimeTags["releAsE"] = time.Date(2019, 5, 4, 3, 2, 1, 0, time.UTC)
+	event.TimeTags["FORMRELEASE"] = time.Date(2019, 6, 5, 4, 3, 2, 0, time.UTC)
 	err := es.CreateEvent(event, "TestUser")
 	test.Ok(t, err)
+
+	fetched, err := es.Event(event.ID)
+	test.Ok(t, err)
+	test.Equals(t, time.Date(2019, 5, 4, 3, 2, 1, 0, time.UTC), fetched.TimeTags["release"])
+	test.Equals(t, time.Date(2019, 6, 5, 4, 3, 2, 0, time.UTC), fetched.TimeTags["formrelease"])
 }
 
 func TestUpdateEvent(t *testing.T) {
@@ -41,7 +58,7 @@ func TestUpdateEvent(t *testing.T) {
 	test.Assert(t, math.Abs(5-event.Radius.Float64) < 0.0001, "Radius was not successfully updated")
 	test.Assert(t, math.Abs(event.UpdatedAt.Sub(time.Now().UTC()).Seconds()) < 2, "Event last updated not within 2 seconds of now; i.e. not updated")
 	test.Assert(t, event.CreatedAt == originalCreatedAt, "Event created at time was modified; this should not be allowed")
-	test.Assert(t, event.TimeTags[0] == checkin.TimeTag{Label: "release", Time: time.Date(2019, 10, 3, 2, 5, 10, 0, time.UTC)}, "Time tags were not properly updated")
+	test.Assert(t, event.TimeTags["release"] == time.Date(2019, 10, 3, 2, 5, 10, 0, time.UTC) && len(event.TimeTags) == 1, "Time tags were not properly updated")
 
 	event.Radius = originalRadius
 	event.TimeTags = nil
@@ -51,12 +68,12 @@ func TestUpdateEvent(t *testing.T) {
 
 	event, err = es.Event("aa19239f-f9f5-4935-b1f7-0edfdceabba7")
 	test.Ok(t, err)
-	test.Equals(t, []checkin.TimeTag{}, event.TimeTags) //should not ever have TimeTags set to nil
-	//nil should be equivalent to an empty timetag array
-	event.TimeTags = []checkin.TimeTag{}
+	test.Equals(t, make(map[string]time.Time, 0), event.TimeTags) //should not ever have TimeTags set to nil
+	//nil should be equivalent to an empty map
+	event.TimeTags = make(map[string]time.Time)
 	err = es.UpdateEvent(event)
 	test.Ok(t, err)
-	test.Equals(t, []checkin.TimeTag{}, event.TimeTags)
+	test.Equals(t, make(map[string]time.Time), event.TimeTags)
 
 	//test no such event with that event ID
 	event = checkin.Event{ID: "a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8"}
