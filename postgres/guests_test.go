@@ -10,6 +10,7 @@ import (
 	"checkin/test"
 	"errors"
 	"log"
+	"os"
 	"sort"
 	"strconv"
 	"testing"
@@ -564,23 +565,26 @@ func TestCheckIn(t *testing.T) {
 }
 
 func TestGuestExistsTime(t *testing.T) {
+	if os.Getenv("BENCH") == "" {
+		t.Skip("Skipping testing since no BENCH argument provided")
+	}
 	hm := bcrypt.HashMethod{HashCost: 5}
 	gs := postgres.GuestService{HM: &hm, DB: db}
 	eventID := "3820a980-a207-4738-b82b-45808fe7aba8"
 
-	for i := range [2000]int{} {
+	for i := range [1000]int{} {
 		err := gs.RegisterGuest(eventID, checkin.Guest{NRIC: strconv.Itoa(i), Name: strconv.Itoa(i)})
 		test.Ok(t, err)
 	}
 
 	start := time.Now()
-	res, err := gs.GuestExists(eventID, strconv.Itoa(2000))
+	res, err := gs.GuestExists(eventID, strconv.Itoa(1000))
 	timeTaken := time.Since(start).Seconds()
 	log.Println(timeTaken)
 	test.Ok(t, err)
 	test.Equals(t, false, res)
 
-	res, err = gs.GuestExists(eventID, strconv.Itoa(1999))
+	res, err = gs.GuestExists(eventID, strconv.Itoa(999))
 	test.Ok(t, err)
 	test.Equals(t, true, res)
 
