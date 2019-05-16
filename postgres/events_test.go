@@ -5,6 +5,7 @@ import (
 	"checkin/postgres"
 	"checkin/test"
 	"math"
+	"sort"
 	"testing"
 	"time"
 
@@ -12,15 +13,110 @@ import (
 	"github.com/guregu/null"
 )
 
+func TestEvent(t *testing.T) {
+	es := postgres.EventService{DB: db}
+
+	//test normal functionality
+	event, err := es.Event("2c59b54d-3422-4bdb-824c-4125775b44c8")
+	test.Ok(t, err)
+	event.UpdatedAt = time.Time{}
+	event.CreatedAt = time.Time{}
+	test.Equals(t, checkin.Event{
+		ID:       "2c59b54d-3422-4bdb-824c-4125775b44c8",
+		Name:     "Data Science CoP",
+		URL:      "cop2018",
+		TimeTags: map[string]time.Time{"release": time.Date(2019, 4, 12, 9, 0, 0, 0, time.UTC)},
+	}, event)
+
+	//test multiple timetags
+	event, err = es.Event("3820a980-a207-4738-b82b-45808fe7aba8")
+	test.Ok(t, err)
+	event.UpdatedAt = time.Time{}
+	event.CreatedAt = time.Time{}
+	test.Equals(t, checkin.Event{
+		ID:       "3820a980-a207-4738-b82b-45808fe7aba8",
+		Name:     "SDB Cohesion",
+		URL:      "sdbcohesionnovember",
+		TimeTags: map[string]time.Time{"release": time.Date(2019, 10, 8, 12, 0, 0, 0, time.UTC), "formrelease": time.Date(2019, 10, 8, 16, 30, 12, 0, time.UTC)},
+	}, event)
+
+	//test no time tags
+	event, err = es.Event("03293b3b-df83-407e-b836-fb7d4a3c4966")
+	test.Ok(t, err)
+	event.UpdatedAt = time.Time{}
+	event.CreatedAt = time.Time{}
+	test.Equals(t, checkin.Event{
+		ID:       "03293b3b-df83-407e-b836-fb7d4a3c4966",
+		Name:     "CSSCOM Planning Seminar",
+		URL:      "csscom",
+		TimeTags: map[string]time.Time{},
+	}, event)
+
+	//test no such event exists
+	_, err = es.Event("810b6bf0-a29b-405b-82ee-e482924f8faa")
+	test.Assert(t, err != nil, "No error thrown when trying to fetch event that does not exist")
+
+	//test invalid UUID
+	_, err = es.Event("")
+	test.Assert(t, err != nil, "No error thrown when trying to fetch event that does not exist (invalid UUID)")
+}
+
+func TestEventsBy(t *testing.T) {
+	es := postgres.EventService{DB: db}
+
+	//test normal functionality
+	events, err := es.EventsBy("TestUser")
+	test.Ok(t, err)
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].Name < events[j].Name
+	})
+	test.Equals(t, []checkin.Event{
+		checkin.Event{
+			ID:        "aa19239f-f9f5-4935-b1f7-0edfdceabba7",
+			Name:      "Data Science Department Talk",
+			URL:       "dsdjan2019",
+			Start:     null.TimeFrom(time.Date(2019, 1, 10, 15, 0, 0, 0, time.UTC)),
+			End:       null.TimeFrom(time.Date(2019, 1, 10, 18, 0, 0, 0, time.UTC)),
+			TimeTags:  map[string]time.Time{},
+			CreatedAt: time.Date(2019, 4, 1, 4, 5, 36, 0, time.UTC),
+			UpdatedAt: time.Date(2019, 4, 10, 3, 2, 11, 0, time.UTC),
+			Lat:       null.FloatFrom(1.335932),
+			Long:      null.FloatFrom(103.744708),
+			Radius:    null.FloatFrom(0.5),
+		},
+		checkin.Event{
+			ID:        "3820a980-a207-4738-b82b-45808fe7aba8",
+			Name:      "SDB Cohesion",
+			URL:       "sdbcohesionnovember",
+			TimeTags:  map[string]time.Time{"release": time.Date(2019, 10, 8, 12, 0, 0, 0, time.UTC), "formrelease": time.Date(2019, 10, 8, 16, 30, 12, 0, time.UTC)},
+			CreatedAt: time.Date(2019, 5, 31, 02, 15, 22, 0, time.UTC),
+			UpdatedAt: time.Date(2019, 5, 31, 13, 02, 11, 0, time.UTC),
+		},
+	}, events)
+
+	//test user hosts no events
+	events, err = es.EventsBy("ME6Alice")
+	test.Ok(t, err)
+	test.Equals(t, []checkin.Event{}, events)
+
+	//test user does not exist
+	events, err = es.EventsBy("wdqdwqd")
+	test.Ok(t, err)
+	test.Equals(t, []checkin.Event{}, events)
+}
+
 func TestCreateEvent(t *testing.T) {
 	es := postgres.EventService{DB: db}
 
 	event := checkin.Event{
-		ID:       uuid.New().String(),
-		Name:     "Test",
-		TimeTags: make(map[string]time.Time),
-		URL:      "hello",
-		Start:    null.TimeFrom(time.Date(2019, 10, 11, 3, 2, 1, 0, time.UTC)),
+		ID:        uuid.New().String(),
+		Name:      "Test",
+		TimeTags:  make(map[string]time.Time),
+		URL:       "hello",
+		Long:      null.FloatFrom(10.0),
+		Start:     null.TimeFrom(time.Date(2019, 10, 11, 3, 2, 1, 0, time.UTC)),
+		UpdatedAt: time.Date(2015, 2, 3, 1, 2, 0, 0, time.UTC), //these fields should be ignored by the create funtion
+		CreatedAt: time.Date(2014, 2, 3, 1, 2, 0, 0, time.UTC), //^
 	}
 	event.TimeTags["releAsE"] = time.Date(2019, 5, 4, 3, 2, 1, 0, time.UTC)
 	event.TimeTags["FORMRELEASE"] = time.Date(2019, 6, 5, 4, 3, 2, 0, time.UTC)
@@ -31,6 +127,46 @@ func TestCreateEvent(t *testing.T) {
 	test.Ok(t, err)
 	test.Equals(t, time.Date(2019, 5, 4, 3, 2, 1, 0, time.UTC), fetched.TimeTags["release"])
 	test.Equals(t, time.Date(2019, 6, 5, 4, 3, 2, 0, time.UTC), fetched.TimeTags["formrelease"])
+	test.Assert(t, time.Since(fetched.CreatedAt) < 2*time.Second, "Create time not within 2 seconds before now; not properly set")
+	test.Assert(t, fetched.CreatedAt == fetched.UpdatedAt, "UpdatedAt time not set to be equal to the CreatedAt time upon creation")
+	event.UpdatedAt = fetched.UpdatedAt
+	event.CreatedAt = fetched.CreatedAt
+	event.TimeTags = fetched.TimeTags
+	test.Equals(t, event, fetched)
+
+	err = es.DeleteEvent(event.ID)
+	test.Ok(t, err)
+
+	//test nil timetags
+	event.TimeTags = nil
+	err = es.CreateEvent(event, "TestUser")
+	test.Ok(t, err)
+	fetched, err = es.Event(event.ID)
+	test.Ok(t, err)
+	test.Equals(t, make(map[string]time.Time), fetched.TimeTags)
+
+	err = es.DeleteEvent(event.ID)
+	test.Ok(t, err)
+
+	//test empty map time tags, should be same result as nil
+	event.TimeTags = make(map[string]time.Time)
+	err = es.CreateEvent(event, "TestUser")
+	test.Ok(t, err)
+	fetched, err = es.Event(event.ID)
+	test.Ok(t, err)
+	test.Equals(t, make(map[string]time.Time), fetched.TimeTags)
+
+	err = es.DeleteEvent(event.ID)
+	test.Ok(t, err)
+
+	//test missing ID
+	event.ID = ""
+	err = es.CreateEvent(event, "TestUser")
+	test.Assert(t, err != nil, "No error when creating an event without an ID")
+
+	//test host does not exist
+	err = es.CreateEvent(event, "Notauser")
+	test.Assert(t, err != nil, "No error when creating an event without an ID")
 }
 
 func TestUpdateEvent(t *testing.T) {
