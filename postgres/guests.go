@@ -345,17 +345,28 @@ func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.G
 }
 
 func (gs *GuestService) findGuest(nric string, hashedGuests []checkin.Guest) checkin.Guest {
-	result := make(chan checkin.Guest)
-	quit := make(chan struct{})
+	result := make(chan checkin.Guest) //channel to send a found guest
+	quit := make(chan bool)            //channel to signal that all goroutines have finished execution
+	found := make(chan bool)           //channel to signal that a guest has been found
+	upperNRIC := strings.ToUpper(nric)
 	wg := sync.WaitGroup{}
 	for i := 0; i < len(hashedGuests); i += 20 {
 		wg.Add(1)
 		go func(guests []checkin.Guest) {
 			defer wg.Done()
 			for _, guest := range guests {
-				if gs.HM.CompareHashAndPassword(guest.NRIC, strings.ToUpper(nric)) {
-					result <- guest
+				select {
+				case <-found:
+					//guest found by another goroutine, end execution
+					return
+				default:
+					if gs.HM.CompareHashAndPassword(guest.NRIC, upperNRIC) {
+						result <- guest
+						close(found)
+						return
+					}
 				}
+
 			}
 		}(hashedGuests[i:min(len(hashedGuests), i+20)])
 	}
