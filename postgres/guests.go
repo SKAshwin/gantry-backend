@@ -372,7 +372,7 @@ func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.G
 	}
 
 	guest := gs.findGuest(nric, guests)
-	gs.addCache(eventID, nric, guest)
+	go gs.addCache(eventID, nric, guest)
 	return guest, nil
 }
 
