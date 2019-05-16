@@ -10,6 +10,7 @@ import (
 
 	"sync"
 
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
@@ -18,8 +19,11 @@ import (
 //Needs a HashMethod as all NRICs are stored internally as hashes for
 //security purposes
 type GuestService struct {
-	DB *sqlx.DB
-	HM checkin.HashMethod
+	DB         *sqlx.DB
+	HM         checkin.HashMethod
+	guestCache map[string]checkin.Guest //a map of eventID + " " + nric to what guest it corresponds to
+	//to speed up the execution of finding a guest
+	cacheLock sync.RWMutex //RWMutex to use when reading/writing to the guest cache
 }
 
 //CheckIn marks a guest (indicated by the last 5 digits of the nric)
@@ -322,10 +326,36 @@ func (gs *GuestService) scanRowsIntoNames(rows *sql.Rows, rowCount int) ([]strin
 	return names, nil
 }
 
-//Returns a guest and true if one could be found with that nric
+func (gs *GuestService) checkCache(eventID string, nric string) (checkin.Guest, bool) {
+	gs.cacheLock.RLock()
+	defer gs.cacheLock.RUnlock()
+	if gs.guestCache == nil {
+		gs.guestCache = make(map[string]checkin.Guest)
+	}
+	guest, ok := gs.guestCache[eventID+" "+nric]
+	return guest, ok
+}
+
+func (gs *GuestService) addCache(eventID string, nric string, guest checkin.Guest) {
+	gs.cacheLock.Lock()
+	defer gs.cacheLock.Unlock()
+	gs.guestCache[eventID+" "+nric] = guest
+}
+
+//Returns a guest and true if one could be found with that nric and eventID
 //Returns an empty guest object (and no error) if the guest could not be found
 //Returns an error if there is an error getting a guest
+//caches
 func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.Guest, error) {
+	if guest, ok := gs.checkCache(eventID, nric); ok {
+		return guest, nil
+	}
+
+	if _, err := uuid.Parse(eventID); err != nil {
+		//attempting to search for a guest associated with an event with an invalid UUID will throw an error
+		//since a guest with an invalid UUID will definitely not exist, return an empty guest object
+		return checkin.Guest{}, nil
+	}
 	rows, err := gs.DB.Queryx("SELECT name, nricHash from guest where eventID = $1", eventID)
 	if err != nil {
 		return checkin.Guest{}, errors.New("Cannot fetch all guests: " + err.Error())
@@ -341,7 +371,9 @@ func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.G
 		return checkin.Guest{}, errors.New("Error reading guest data from database: " + err.Error())
 	}
 
-	return gs.findGuest(nric, guests), nil
+	guest := gs.findGuest(nric, guests)
+	gs.addCache(eventID, nric, guest)
+	return guest, nil
 }
 
 func (gs *GuestService) findGuest(nric string, hashedGuests []checkin.Guest) checkin.Guest {
