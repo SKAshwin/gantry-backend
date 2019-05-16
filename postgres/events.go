@@ -68,8 +68,13 @@ func (es *EventService) Events() ([]checkin.Event, error) {
 //EventsBy Given a username as an argument
 //Returns an array of all the events hosted by that user
 //Will return an empty array (with no error) if that user hosts no events
+//If the user does not exist, will return an empty array (with no error)
+//as it is not the job of an EventService to perform user validation
+//Error only if there are issues fetching events from the database or scanning them
+//into structs
 func (es *EventService) EventsBy(username string) ([]checkin.Event, error) {
-	rows, err := es.DB.Queryx("SELECT * from event, hosts where hosts.username = $1 and hosts.eventID = event.ID",
+	//need to list out columns instead of * as hosts is used in the query
+	rows, err := es.DB.Queryx("SELECT id, name, \"start\", \"end\", lat, long, radius, url, updatedat, createdat, timetags from event, hosts where hosts.username = $1 and hosts.eventID = event.ID",
 		username)
 	if err != nil {
 		return nil, errors.New("Error fetching all events for user: " + err.Error())
@@ -137,7 +142,7 @@ func (es *EventService) CreateEvent(e checkin.Event, hostUsername string) error 
 //It will use the eventID as the key to know which row in the DB to update
 //So note that eventID cannot be mutated
 //All columns in the database will be set to the fields of the event object
-//Except for the createdAt and updatedAt fields, which are not editable
+//Except for the ID, createdAt and updatedAt fields, which are not editable
 //Returns an error if error in executing update, or no event with that ID exists
 func (es *EventService) UpdateEvent(event checkin.Event) error {
 	rawEvent := es.marshalEvent(event)
@@ -341,5 +346,14 @@ func (es *EventService) marshalEvent(event checkin.Event) rawEvent {
 func (es *EventService) unmarshalEvent(re rawEvent) (checkin.Event, error) {
 	event := re.Event //create an actual event object from the rawEvent, parse the timetagJSON into TimeTags
 	err := json.Unmarshal(re.TimetagJSON, &event.TimeTags)
+
+	for label, tt := range event.TimeTags {
+		event.TimeTags[label] = tt.In(time.UTC)
+	}
+	event.Start.Time = event.Start.Time.In(time.UTC)
+	event.End.Time = event.End.Time.In(time.UTC)
+	event.CreatedAt = event.CreatedAt.In(time.UTC)
+	event.UpdatedAt = event.UpdatedAt.In(time.UTC)
+
 	return event, err
 }
