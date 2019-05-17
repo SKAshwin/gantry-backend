@@ -182,6 +182,10 @@ func (gs *GuestService) RegisterGuest(eventID string, guest checkin.Guest) error
 	_, err = gs.DB.Exec("INSERT into guest(nricHash,eventID,name,tags,checkedIn) VALUES($1,$2,$3,$4,FALSE)",
 		nricHash, eventID, guest.Name, pq.Array(guest.Tags))
 
+	if err != nil {
+		gs.addCache(eventID, guest.NRIC, guest) //update the cache with the new values
+	}
+
 	return err
 }
 
@@ -239,6 +243,10 @@ func (gs *GuestService) RemoveGuest(eventID string, nric string) error {
 
 	_, err = gs.DB.Exec("DELETE from guest where eventID = $1 and nricHash = $2",
 		eventID, nricHash)
+
+	if err != nil {
+		gs.deleteCache(eventID, nric) //remove the guest from the cache, if it exists
+	}
 
 	return err
 }
@@ -339,7 +347,19 @@ func (gs *GuestService) checkCache(eventID string, nric string) (checkin.Guest, 
 func (gs *GuestService) addCache(eventID string, nric string, guest checkin.Guest) {
 	gs.cacheLock.Lock()
 	defer gs.cacheLock.Unlock()
+	if gs.guestCache == nil {
+		gs.guestCache = make(map[string]checkin.Guest)
+	}
 	gs.guestCache[eventID+" "+nric] = guest
+}
+
+func (gs *GuestService) deleteCache(eventID string, nric string) {
+	gs.cacheLock.Lock()
+	defer gs.cacheLock.Unlock()
+	if gs.guestCache == nil {
+		gs.guestCache = make(map[string]checkin.Guest)
+	}
+	delete(gs.guestCache, eventID+" "+nric)
 }
 
 //Returns a guest and true if one could be found with that nric and eventID
