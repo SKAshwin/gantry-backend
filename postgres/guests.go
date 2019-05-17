@@ -182,9 +182,10 @@ func (gs *GuestService) RegisterGuest(eventID string, guest checkin.Guest) error
 	_, err = gs.DB.Exec("INSERT into guest(nricHash,eventID,name,tags,checkedIn) VALUES($1,$2,$3,$4,FALSE)",
 		nricHash, eventID, guest.Name, pq.Array(guest.Tags))
 
-	if err != nil {
+	if err == nil {
+		plaintext := guest.NRIC
 		guest.NRIC = nricHash
-		gs.addCache(eventID, nricHash, guest) //update the cache with the new values
+		gs.addCache(eventID, plaintext, guest) //update the cache with the new values
 	}
 
 	return err
@@ -245,7 +246,7 @@ func (gs *GuestService) RemoveGuest(eventID string, nric string) error {
 	_, err = gs.DB.Exec("DELETE from guest where eventID = $1 and nricHash = $2",
 		eventID, nricHash)
 
-	if err != nil {
+	if err == nil {
 		gs.deleteCache(eventID, nric) //remove the guest from the cache, if it exists
 	}
 
