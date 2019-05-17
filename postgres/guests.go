@@ -183,7 +183,8 @@ func (gs *GuestService) RegisterGuest(eventID string, guest checkin.Guest) error
 		nricHash, eventID, guest.Name, pq.Array(guest.Tags))
 
 	if err != nil {
-		gs.addCache(eventID, guest.NRIC, guest) //update the cache with the new values
+		guest.NRIC = nricHash
+		gs.addCache(eventID, nricHash, guest) //update the cache with the new values
 	}
 
 	return err
