@@ -8,6 +8,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -985,30 +986,36 @@ func TestHandleReport(t *testing.T) {
 	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	guestsCheckedInGenerator := func(names []string, err error) func(string, []string) ([]string, error) {
+	guestsCheckedInGenerator := func(names []string, filterednames []string, err error) func(string, []string) ([]string, error) {
 		return func(eventID string, tags []string) ([]string, error) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
 			}
-			if tags != nil && len(tags) != 0 {
+			log.Println(tags)
+			if len(tags) == 2 && tags[0] == "CONFIRMED" && tags[1] == "VIP" {
+				return filterednames, err
+			} else if tags != nil && len(tags) != 0 {
 				t.Fatal("Expected nil or empty tags but got ", tags)
 			}
 			return names, err
 		}
 	}
-	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, nil)
-	guestsNotCheckedInFnGenerator := func(names []string, err error) func(string, []string) ([]string, error) {
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, []string{"Alice", "Bob"}, nil)
+	guestsNotCheckedInFnGenerator := func(names []string, filterednames []string, err error) func(string, []string) ([]string, error) {
 		return func(eventID string, tags []string) ([]string, error) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
 			}
-			if tags != nil && len(tags) != 0 {
-				t.Fatal("Expected nil or empty tags but got ", tags)
+			log.Println(tags)
+			if len(tags) == 2 && tags[0] == "CONFIRMED" && tags[1] == "VIP" {
+				return filterednames, err
+			} else if tags != nil && len(tags) != 0 {
+				t.Fatal("Expected nil or empty tags or confirmed/vip but got ", tags)
 			}
 			return names, err
 		}
 	}
-	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Herman", "Ritchie"}, nil)
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Herman", "Ritchie"}, []string{"Herman"}, nil)
 
 	r := httptest.NewRequest("GET", "/api/v0/events/100/guests/report", nil)
 
@@ -1028,8 +1035,27 @@ func TestHandleReport(t *testing.T) {
 		}
 	}
 
+	//test VIP/confirmed tags
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests/report?tags=CONFIRMED&tags=VIP", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	reader = csv.NewReader(w.Result().Body)
+	data, err = reader.ReadAll()
+	test.Ok(t, err)
+	for _, row := range data {
+		if row[0] == "Alice" || row[0] == "Bob" {
+			test.Equals(t, "1", row[1])
+		} else if row[0] == "Herman" {
+			test.Equals(t, "0", row[1])
+		} else {
+			test.Equals(t, row[0], "Name")
+		}
+	}
+
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests/report", nil)
+
 	//check empty lists
-	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, nil)
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, []string{}, nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	reader = csv.NewReader(w.Result().Body)
@@ -1040,9 +1066,9 @@ func TestHandleReport(t *testing.T) {
 			test.Equals(t, "0", row[1])
 		}
 	}
-	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, nil)
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, []string{}, nil)
 
-	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, nil)
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, []string{}, nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	reader = csv.NewReader(w.Result().Body)
@@ -1054,8 +1080,8 @@ func TestHandleReport(t *testing.T) {
 		}
 	}
 
-	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, nil)
-	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, nil)
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, []string{}, nil)
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, []string{}, nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	reader = csv.NewReader(w.Result().Body)
@@ -1064,21 +1090,21 @@ func TestHandleReport(t *testing.T) {
 	test.Equals(t, 1, len(data))
 	test.Equals(t, "Name", data[0][0])
 	test.Equals(t, "Present", data[0][1])
-	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Herman", "Ritchie"}, nil)
-	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, nil)
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Herman", "Ritchie"}, []string{}, nil)
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, []string{}, nil)
 
 	//check internal server error handling
-	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, errors.New("An error"))
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, []string{}, errors.New("An error"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
-	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, nil)
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, []string{}, nil)
 
-	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, errors.New("An error"))
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, []string{}, errors.New("An error"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
-	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Herman", "Ritchie"}, nil)
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Herman", "Ritchie"}, []string{}, nil)
 
 	//access restriction tests
 	//Test access by another user
