@@ -362,14 +362,20 @@ func (h *GuestHandler) handleStats(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *GuestHandler) handleReport(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		h.Logger.Println("Error parsing form queries: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "Could not parse query string", w)
+		return
+	}
 	eventID := mux.Vars(r)["eventID"]
-	absent, err := h.GuestService.GuestsNotCheckedIn(eventID, nil)
+	absent, err := h.GuestService.GuestsNotCheckedIn(eventID, r.Form["tags"])
 	if err != nil {
 		h.Logger.Println("Error in handleReport when getting absent guests: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching absentees", w)
 		return
 	}
-	present, err := h.GuestService.GuestsCheckedIn(eventID, nil)
+	present, err := h.GuestService.GuestsCheckedIn(eventID, r.Form["tags"])
 	if err != nil {
 		h.Logger.Println("Error in handleReport when getting present guests: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching those present", w)
