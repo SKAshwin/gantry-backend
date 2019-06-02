@@ -170,17 +170,20 @@ func (gs *GuestService) GuestExists(eventID string, nric string) (bool, error) {
 
 //RegisterGuest adds a guest with the given nric, name and event that they're attending
 //to the database, i.e. "registers" them for the event
+//NRIC in guest is case insensitive (automatically converted to upper case)
+//Will not let you register a guest that already exists
 func (gs *GuestService) RegisterGuest(eventID string, guest checkin.Guest) error {
-	nricHash, err := gs.HM.HashAndSalt(strings.ToUpper(guest.NRIC))
 	if guest.Tags == nil {
 		guest.Tags = []string{} //no nils allowed
 	}
-	if err != nil {
-		return errors.New("Error hashing NRIC: " + err.Error())
+	if ok, err := gs.GuestExists(eventID, guest.NRIC); err != nil {
+		return errors.New("Error checking if guest exists: " + err.Error())
+	} else if ok {
+		return errors.New("Guest with that NRIC already registered")
 	}
 
-	_, err = gs.DB.Exec("INSERT into guest(nricHash,eventID,name,tags,checkedIn) VALUES($1,$2,$3,$4,FALSE)",
-		nricHash, eventID, guest.Name, pq.Array(guest.Tags))
+	_, err := gs.DB.Exec("INSERT into guest(nricHash,eventID,name,tags,checkedIn) VALUES(crypt($1, gen_salt('bf',5)),$2,$3,$4,FALSE)",
+		strings.ToUpper(guest.NRIC), eventID, guest.Name, pq.Array(guest.Tags))
 
 	return err
 }
@@ -206,17 +209,18 @@ func (gs *GuestService) RegisterGuests(eventID string, guests []checkin.Guest) e
 	}()
 
 	for _, guest := range guests {
-		nricHash, err := gs.HM.HashAndSalt(strings.ToUpper(guest.NRIC))
+		//check if guest exists before you register them
+		if ok, err := gs.GuestExists(eventID, guest.NRIC); err != nil {
+			return errors.New("Error checking if guest exists: " + err.Error())
+		} else if ok {
+			return errors.New("Guest with that NRIC already registered")
+		}
 		if guest.Tags == nil {
 			guest.Tags = []string{} //no nils allowed
 		}
-		if err != nil {
-			tx.Rollback()
-			return errors.New("Error hashing NRIC: " + err.Error())
-		}
 
-		_, err = gs.DB.Exec("INSERT into guest(nricHash,eventID,name,tags,checkedIn) VALUES($1,$2,$3,$4,FALSE)",
-			nricHash, eventID, guest.Name, pq.Array(guest.Tags))
+		_, err = gs.DB.Exec("INSERT into guest(nricHash,eventID,name,tags,checkedIn) VALUES(crypt($1, gen_salt('bf',5)),$2,$3,$4,FALSE)",
+			strings.ToUpper(guest.NRIC), eventID, guest.Name, pq.Array(guest.Tags))
 		if err != nil {
 			tx.Rollback()
 			return errors.New("Error inserting one of the guests: " + err.Error())
@@ -416,22 +420,32 @@ func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.G
 		//since a guest with an invalid UUID will definitely not exist, return an empty guest object
 		return checkin.Guest{}, nil
 	}
-	rows, err := gs.DB.Queryx("SELECT name, nricHash from guest where eventID = $1", eventID)
+	var guest checkin.Guest
+	err := gs.DB.QueryRowx("SELECT name, nricHash from guest where eventID = $1 and nricHash = crypt($2, nricHash)", eventID, strings.ToUpper(nric)).StructScan(&guest)
 	if err != nil {
-		return checkin.Guest{}, errors.New("Cannot fetch all guests: " + err.Error())
-	}
-	defer rows.Close()
-
-	numGuests, err := gs.getNumberOfGuests(eventID, nil)
-	if err != nil {
-		return checkin.Guest{}, errors.New("Error fetching number of guests: " + err.Error())
-	}
-	guests, err := gs.scanRowsIntoGuests(rows, numGuests)
-	if err != nil {
-		return checkin.Guest{}, errors.New("Error reading guest data from database: " + err.Error())
+		if err == sql.ErrNoRows {
+			return checkin.Guest{}, nil
+		}
+		return checkin.Guest{}, err
 	}
 
-	return gs.findGuest(nric, guests), nil
+	return guest, nil
+	//rows, err := gs.DB.Queryx("SELECT name, nricHash from guest where eventID = $1", eventID)
+	//if err != nil {
+	//	return checkin.Guest{}, errors.New("Cannot fetch all guests: " + err.Error())
+	//}
+	//defer rows.Close()
+
+	//numGuests, err := gs.getNumberOfGuests(eventID, nil)
+	//if err != nil {
+	//	return checkin.Guest{}, errors.New("Error fetching number of guests: " + err.Error())
+	//}
+	//guests, err := gs.scanRowsIntoGuests(rows, numGuests)
+	//if err != nil {
+	//	return checkin.Guest{}, errors.New("Error reading guest data from database: " + err.Error())
+	//}
+
+	//return gs.findGuest(nric, guests), nil
 }
 
 func (gs *GuestService) findGuest(nric string, hashedGuests []checkin.Guest) checkin.Guest {

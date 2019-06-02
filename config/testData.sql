@@ -29,30 +29,30 @@ INSERT into hosts(username, eventID) VALUES
 	('ME5Bob', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7');
 
 INSERT into guest(nricHash, eventID, name, tags, checkedIn, checkInTime) VALUES
-    ('A1234', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'A', '{}', FALSE, NULL),
-	('B5678', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'B', '{}', FALSE, NULL),
-	('C2346', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'C', '{"VIP", "ATTENDING"}', FALSE, NULL),
-    ('T4916', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'D', '{"VIP"}', FALSE, NULL),
-	('G4433', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'E', '{"ATTENDING"}', FALSE, NULL),
-    ('B1234', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'F', '{}', TRUE, NOW()),
-	('C8648', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'G', '{}', TRUE, NOW()),
-	('D2146', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'H', '{"VIP", "ATTENDING"}', TRUE, NOW()),
-    ('S4215', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'I', '{"VIP"}', TRUE, NOW()),
-	('Q4333', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'J', '{"ATTENDING"}', TRUE, NOW()),
-	('A2234', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'K', '{}', FALSE, NULL),
-	('B3678', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'L', '{}', FALSE, NULL),
-	('C4346', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'M', '{"VIP", "ATTENDING"}', FALSE, NULL),
-    ('T5916', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'N', '{"VIP"}', FALSE, NULL),
-	('G6433', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'O', '{"ATTENDING"}', FALSE, NULL),
-    ('B7234', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'P', '{}', TRUE, NOW()),
-	('C9648', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'Q', '{}', TRUE, NOW()),
-	('D8146', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'R', '{"VIP", "ATTENDING"}', TRUE, NOW()),
-    ('S1215', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'S', '{"VIP"}', TRUE, NOW()),
-	('Q3333', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'T', '{"ATTENDING"}', TRUE, NOW()),
-	('A1234', '03293b3b-df83-407e-b836-fb7d4a3c4966', 'A', '{}', FALSE, NOW()),
-    ('A1234', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'A', '{"OFFICER"}', FALSE, NULL),
-    ('B2834', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'B', '{"VIP", "ATTENDING"}', TRUE, NOW()),
-    ('C1212', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'C', '{}', TRUE, NOW()),
-    ('B1132', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'D', '{"VIP", "ATTENDING"}', TRUE, NOW()),
-    ('Z4432', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'E', '{"VIP"}', TRUE, NOW()),
-    ('D2482', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'F', '{"OFFICER"}', FALSE, NULL);
+    ('$2a$05$0KDoAOK32Z7Dw3t5l8mLfeh9k4XdQ2rPLPXVmV0NMOxjMFmJgXfMG', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'A', '{}', FALSE, NULL), --1234A
+	('$2a$05$KJedrPxRji7H9PK6qC.peOJN.YKN0byARYggk2NXFSfjrT1XIx7SW', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'B', '{}', FALSE, NULL), --5678B
+	('$2a$05$yV1oi210wpqziULusDmPXukJ13Da8RUeY/vASFXAlLsN/DytFYw.u', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'C', '{"VIP", "ATTENDING"}', FALSE, NULL), --2346C
+    ('$2a$05$pUq6Q5IYnNcbWqeeudc02eeBjt1iUewWLd1lPfZH4EPI6p/A1TgP6', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'D', '{"VIP"}', FALSE, NULL), --4916T
+	('$2a$05$YWlI8xZ17iNwTbh8kGeG7OL4yLCVD7HmFVUGPgsyR/Uuwh0leMRgi', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'E', '{"ATTENDING"}', FALSE, NULL), --4433G
+    ('$2a$05$jlZfVRqXJMEkf7.VR/whpuQ2BHKdYvJVN1LPKbLb92ZHCDN3uKw6K', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'F', '{}', TRUE, NOW()), --1234B
+	('$2a$05$XsA.v2McOSjtd8I1oP.hE.2qhBnHxnb7ePEnPtdn.NULaLbVAqpNO', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'G', '{}', TRUE, NOW()), --8648C
+	('$2a$05$2vPMWiaglJAAUQJo5lQVGufOYLPPx2VeBzuNV6e38LiohrXLwhztq', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'H', '{"VIP", "ATTENDING"}', TRUE, NOW()), --2146D
+    ('$2a$05$xo.VBwQbURoel8RJPK0AVeGmsSWobC12cyIkJJ/.fP2RJxP8wZHVu', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'I', '{"VIP"}', TRUE, NOW()), --4215S
+	('$2a$05$S47CHNZvm6.m4EHUuS6YkurCifg0pOzmU6ft3WghPWpUoqt6acDt6', 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', 'J', '{"ATTENDING"}', TRUE, NOW()), --4333Q
+	('$2a$05$x64.3poyVqwy4NwE22uTZuP1AjfHhIZIs2lfNZJVtRtNW46aID.ee', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'K', '{}', FALSE, NULL), --2234A
+	('$2a$05$lel.jqGzav6PTxgN9t7klOEfVrf5wCWhcy13Oc9MoKZK6BzUWDyiO', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'L', '{}', FALSE, NULL), --3678B
+	('$2a$05$f8LJ5oBCth1IC7K.hHcr8uCttpIcCqt29O2DJZQmmhWruDIktzzOe', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'M', '{"VIP", "ATTENDING"}', FALSE, NULL), --4346C
+    ('$2a$05$KNbrT044utli70VMzSRqv.DU7b/eXWpHaXdJzVL3UnGmqvgGXiWaC', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'N', '{"VIP"}', FALSE, NULL), -- 5916T
+	('$2a$05$5RkG8P3fgX5.9kmuL0rRDex42ZEybZwU.rS2JwoUQmTwtFyOrAwlu', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'O', '{"ATTENDING"}', FALSE, NULL), --6433G
+    ('$2a$05$1ZDPchZ6SfdKvh22QNmoNuUg4GpvtbOhHga32I3NgM5Aw6vnE0j3K', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'P', '{}', TRUE, NOW()), --7234B
+	('$2a$05$ugJ5KdgL8UBGqS8gshtYMOZoxAF9IsjFrEoPDY6c9KR3.q9r.61aq', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'Q', '{}', TRUE, NOW()), --9648C
+	('$2a$05$627D548fpcSjhnUjQTEgr.Cdf3Fx6XdSKUznTLlcREDKXQcNBw0R.', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'R', '{"VIP", "ATTENDING"}', TRUE, NOW()), --8146D
+    ('$2a$05$VyIbSlqzOrH/DQnHyT3EzupEef59BiLyILqwHueVIcPu/sEotHaFm', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'S', '{"VIP"}', TRUE, NOW()), --1215S
+	('$2a$05$VI006dcHVD2QVDygGGjlLuFdg8yYeLfhiwT6RT4F9pSBLDvOJZo46', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'T', '{"ATTENDING"}', TRUE, NOW()), --3333Q
+	('$2a$05$Nt8.5PjdkFJGgQdrKRjbXeqNTQcGwLXrMCyXXyhJPH4fFnc0Br4Xa', '03293b3b-df83-407e-b836-fb7d4a3c4966', 'A', '{}', FALSE, NOW()), --1234A
+    ('$2a$05$0jc0dU6smqP/DzDAptlisuJfrKFfv4Y/i7pXYgcGjjRgApa0lSlx2', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'A', '{"OFFICER"}', FALSE, NULL), --1234A
+    ('$2a$05$HS0BoQiagbVZDVXkl5c1PuaCVB6wEL5xgSM.covh3jFjoyVMub1Ge', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'B', '{"VIP", "ATTENDING"}', TRUE, NOW()), --2834B
+    ('$2a$05$buWqmWSyLOGcaLb4PzVAne7TrHEZdPvtTE6g2x8ObHlSTYuQt/uB6', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'C', '{}', TRUE, NOW()), -- 1212C
+    ('$2a$05$yOfIuWrSfRKQCHpXqEbELOgxm7nUPjn4xgWfYcux6t6R8R5OOuy3y', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'D', '{"VIP", "ATTENDING"}', TRUE, NOW()), -- 1132B
+    ('$2a$05$3DDeeRWbDCN../1lhYIUbeqDcPX0IPTwUQJfyXmYW9JIFOimdzJbS', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'E', '{"VIP"}', TRUE, NOW()), -- 4432Z
+    ('$2a$05$ieRGDQQQAkCd7c9dOxz1r.W3iOf8iDXG2Iu4DvZyFl9QNHBldVOn2', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'F', '{"OFFICER"}', FALSE, NULL); -- 2482D

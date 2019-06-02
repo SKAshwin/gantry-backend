@@ -4,6 +4,7 @@ create DATABASE registrationapp_test;
 \connect registrationapp_test
 
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 CREATE user regapp_test with encrypted password 'henry';
 GRANT connect on database registrationapp_test to regapp_test;

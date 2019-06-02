@@ -8,7 +8,6 @@ import (
 	"checkin/mock"
 	"checkin/postgres"
 	"checkin/test"
-	"errors"
 	"log"
 	"os"
 	"sort"
@@ -16,25 +15,6 @@ import (
 	"testing"
 	"time"
 )
-
-func hashFnGenerator(err error) func(string) (string, error) {
-	return func(pwd string) (string, error) {
-		if err != nil {
-			return "", err
-		}
-		//take last char and put it in front
-		return string(pwd[len(pwd)-1]) + pwd[:len(pwd)-1], nil
-	}
-}
-
-func compareHashAndPasswordGenerator() func(string, string) bool {
-	return func(hash string, pwd string) bool {
-		if len(pwd) <= 1 {
-			return hash == pwd
-		}
-		return hash == (string(pwd[len(pwd)-1]) + pwd[:len(pwd)-1])
-	}
-}
 
 func TestGuests(t *testing.T) {
 	var hm mock.HashMethod
@@ -255,9 +235,6 @@ func TestRegisterGuest(t *testing.T) {
 	var hm mock.HashMethod
 	gs := postgres.GuestService{DB: db, HM: &hm}
 
-	hm.HashAndSaltFn = hashFnGenerator(nil)
-	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
-
 	err := gs.RegisterGuest("3820a980-a207-4738-b82b-45808fe7aba8", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"NEWLYREGISTERED"}})
 	test.Ok(t, err)
 	names, err := gs.Guests("3820a980-a207-4738-b82b-45808fe7aba8", []string{"NEWLYREGISTERED"})
@@ -265,12 +242,6 @@ func TestRegisterGuest(t *testing.T) {
 	test.Equals(t, []string{"Jim Bob"}, names)
 	err = gs.RemoveGuest("3820a980-a207-4738-b82b-45808fe7aba8", "1234A")
 	test.Ok(t, err)
-
-	//check salting fails
-	hm.HashAndSaltFn = hashFnGenerator(errors.New("An error"))
-	err = gs.RegisterGuest("3820a980-a207-4738-b82b-45808fe7aba8", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"NEWLYREGISTERED"}})
-	test.Assert(t, err != nil, "Failed hashing does not throw an error")
-	hm.HashAndSaltFn = hashFnGenerator(nil)
 
 	//check event does not even exist
 	err = gs.RegisterGuest("a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"NEWLYREGISTERED"}})
@@ -311,9 +282,6 @@ func TestRegisterGuests(t *testing.T) {
 	var hm mock.HashMethod
 	gs := postgres.GuestService{DB: db, HM: &hm}
 
-	hm.HashAndSaltFn = hashFnGenerator(nil)
-	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
-
 	//tests all kinds of valid inputs
 	guests := []checkin.Guest{
 		checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"NEWLYREGISTERED"}},
@@ -332,12 +300,6 @@ func TestRegisterGuests(t *testing.T) {
 		err := gs.RemoveGuest("3820a980-a207-4738-b82b-45808fe7aba8", guest.NRIC)
 		test.Ok(t, err)
 	}
-
-	//check salting fails
-	hm.HashAndSaltFn = hashFnGenerator(errors.New("An error"))
-	err = gs.RegisterGuests("3820a980-a207-4738-b82b-45808fe7aba8", guests)
-	test.Assert(t, err != nil, "Failed hashing does not throw an error")
-	hm.HashAndSaltFn = hashFnGenerator(nil)
 
 	//check empty or nil slice of guests - should fail
 	err = gs.RegisterGuests("3820a980-a207-4738-b82b-45808fe7aba8", []checkin.Guest{})
@@ -371,13 +333,10 @@ func TestTags(t *testing.T) {
 	var hm mock.HashMethod
 	gs := postgres.GuestService{DB: db, HM: &hm}
 
-	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
-
 	//normal functionality
 	tags, err := gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "2346C")
 	test.Ok(t, err)
 	test.Equals(t, []string{"VIP", "ATTENDING"}, tags)
-	test.Assert(t, hm.CompareHashAndPasswordInvoked, "No expected comparison of hashes in function call")
 
 	//guest doesn't exist
 	tags, err = gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "6433G")
@@ -400,8 +359,6 @@ func TestTags(t *testing.T) {
 func TestSetTags(t *testing.T) {
 	var hm mock.HashMethod
 	gs := postgres.GuestService{DB: db, HM: &hm}
-
-	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
 
 	unaffectedTags, err := gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "5678B")
 	test.Ok(t, err)
@@ -484,7 +441,6 @@ func TestAllTags(t *testing.T) {
 func TestGuestExists(t *testing.T) {
 	var hm mock.HashMethod
 	gs := postgres.GuestService{DB: db, HM: &hm}
-	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
 
 	//event exists, guest does
 	exists, err := gs.GuestExists("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "5678B")
@@ -529,7 +485,6 @@ func TestGuestExists(t *testing.T) {
 
 func TestCheckIn(t *testing.T) {
 	var hm mock.HashMethod
-	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
 	gs := postgres.GuestService{HM: &hm, DB: db}
 
 	//test normal functionality

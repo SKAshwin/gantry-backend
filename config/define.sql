@@ -5,6 +5,7 @@ create DATABASE registrationapp;
 
 --test
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 create table app_user(
 	username text PRIMARY KEY NOT NULL,
