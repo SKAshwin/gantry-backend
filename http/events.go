@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -47,19 +48,23 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 	credentialsCheck := isAdminOrHost(auth, es, "eventID")
 	existCheck := eventExists(es, "eventID")
 
-	h.Handle("/api/v0/events", Adapt(http.HandlerFunc(h.handleEventsBy),
+	h.Handle("/api/v1-3/events", Adapt(http.HandlerFunc(h.handleEventsBy),
 		tokenCheck)).Methods("GET")
-	h.Handle("/api/v0/events", Adapt(http.HandlerFunc(h.handleCreateEvent),
+	h.Handle("/api/v1-3/events", Adapt(http.HandlerFunc(h.handleCreateEvent),
 		tokenCheck)).Methods("POST")
 	h.Handle("/api/v0/events/takenurls/{eventURL}", Adapt(http.HandlerFunc(h.handleURLTaken),
 		tokenCheck)).Methods("GET")
-	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleEvent),
+	h.Handle("/api/v1-3/events/{eventID}", Adapt(http.HandlerFunc(h.handleEvent),
 		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
-	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleUpdateEvent),
+	h.Handle("/api/v1-3/events/{eventID}", Adapt(http.HandlerFunc(h.handleUpdateEvent),
 		tokenCheck, existCheck, credentialsCheck)).Methods("PATCH")
 	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleDeleteEvent),
 		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
 	h.Handle("/api/v0/events/{eventID}/released", Adapt(http.HandlerFunc(h.handleReleased),
+		existCheck)).Methods("GET")
+	h.Handle("/api/v1-3/events/{eventID}/timetags/{tag}", Adapt(http.HandlerFunc(h.handleGetTimeTag),
+		existCheck)).Methods("GET")
+	h.Handle("/api/v1-3/events/{eventID}/timetags/{tag}/occurred", Adapt(http.HandlerFunc(h.handleTimeTagOccurred),
 		existCheck)).Methods("GET")
 	h.Handle("/api/v1-2/events/{eventID}/feedback", Adapt(http.HandlerFunc(h.handleSubmitForm),
 		existCheck)).Methods("POST")
@@ -69,6 +74,38 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 	h.PathPrefix("/api/{versionNumber}/events/{eventID}/guests").Handler(gh)
 
 	return h
+}
+
+func (h *EventHandler) handleGetTimeTag(w http.ResponseWriter, r *http.Request) {
+	event, err := h.EventService.Event(mux.Vars(r)["eventID"])
+	if err != nil {
+		h.Logger.Println("Error fetching event details: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Could not fetch event information due to internal server issue", w)
+		return
+	}
+	tag := strings.ToLower(mux.Vars(r)["tag"])
+	if val, ok := event.TimeTags[tag]; !ok {
+		WriteMessage(http.StatusNotFound, "No such time tag found", w)
+	} else {
+		reply, _ := json.Marshal(val)
+		w.Write(reply)
+	}
+}
+
+func (h *EventHandler) handleTimeTagOccurred(w http.ResponseWriter, r *http.Request) {
+	event, err := h.EventService.Event(mux.Vars(r)["eventID"])
+	if err != nil {
+		h.Logger.Println("Error fetching event details: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Could not fetch event information due to internal server issue", w)
+		return
+	}
+	tag := strings.ToLower(mux.Vars(r)["tag"])
+	if val, ok := event.TimeTags[tag]; !ok {
+		WriteMessage(http.StatusNotFound, "No such time tag found", w)
+	} else {
+		reply, _ := json.Marshal(val.Before(time.Now()))
+		w.Write(reply)
+	}
 }
 
 //Takes a feedback form encoded in JSON, anonymous or otherwise, and writes it into the
@@ -172,7 +209,7 @@ func (h *EventHandler) handleReleased(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reply, _ := json.Marshal(event.Released())
+	reply, _ := json.Marshal(event.TimeTags["release"].Before(time.Now()))
 	w.Write(reply)
 }
 
@@ -364,7 +401,7 @@ func eventReleased(es checkin.EventService, eventIDKey string) Adapter {
 			if err != nil {
 				log.Println("Error fetching event data in eventReleased: " + err.Error())
 				WriteMessage(http.StatusInternalServerError, "Error fetching event data", w)
-			} else if event.Released() {
+			} else if event.TimeTags["release"].Before(time.Now()) {
 				h.ServeHTTP(w, r)
 			} else {
 				WriteMessage(http.StatusForbidden, "Event has not been released yet", w)

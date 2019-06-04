@@ -8,11 +8,11 @@ INSERT INTO app_user (username, passwordHash, name, createdAt, updatedAt, lastLo
 INSERT into app_admin(username, passwordHash, name) VALUES 
     ('Hackerman','$2a$05$YNWHk.7Su/St644J1BAX7.G8KP3t5ts16bcAPApXSw.yc4hHrgwNi','Drop Table'); --BlackFireFoodHorse
 
-INSERT into event(name, url, ID) VALUES
-    ('Data Science CoP','cop2018', '2c59b54d-3422-4bdb-824c-4125775b44c8'),
-	('SDB Cohesion','sdbcohesionnovember', '3820a980-a207-4738-b82b-45808fe7aba8'),
-	('CSSCOM Planning Seminar','csscom', '03293b3b-df83-407e-b836-fb7d4a3c4966'),
-    ('Supply Rally','supply','c14a592c-950d-44ba-b173-bbb9e4f5c8b4');
+INSERT into event(name, url, ID, timetags, createdAt, updatedAt) VALUES
+    ('Data Science CoP','cop2018', '2c59b54d-3422-4bdb-824c-4125775b44c8', '{"release":"2019-04-12T09:00:00Z"}', '2019-04-01 04:05:36', '2019-04-10 03:02:11'),
+	('SDB Cohesion','sdbcohesionnovember', '3820a980-a207-4738-b82b-45808fe7aba8', '{"release":"2019-10-08T12:00:00Z","formrelease":"2019-10-08T16:30:12Z"}', '2019-05-31 02:15:22', '2019-05-31 13:02:11'),
+	('CSSCOM Planning Seminar','csscom', '03293b3b-df83-407e-b836-fb7d4a3c4966', '{}', '2019-04-01 04:05:36', '2019-04-10 03:02:11'),
+    ('Supply Rally','supply','c14a592c-950d-44ba-b173-bbb9e4f5c8b4', '{"testlabel":"2019-06-08T20:30:00Z"}', '2019-04-01 04:05:36', '2019-04-10 03:02:11');
 
 INSERT into event(name, url, start, "end", lat, long, radius, ID, createdAt, updatedAt) VALUES
     ('Data Science Department Talk', 'dsdjan2019', '2019-01-10 15:00:00', '2019-01-10 18:00:00', 1.335932, 103.744708, 0.5, 'aa19239f-f9f5-4935-b1f7-0edfdceabba7', '2019-04-01 04:05:36', '2019-04-10 03:02:11');
