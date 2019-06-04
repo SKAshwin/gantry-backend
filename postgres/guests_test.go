@@ -60,7 +60,7 @@ func TestGuests(t *testing.T) {
 	expectedNames = []string{"C", "D", "H", "I"}
 	test.Equals(t, expectedNames, names)
 
-	names, err = gs.Guests("aa19239f-f9f5-4935-b1f7-0edfdceabba7", []string{"ATTENDING"})
+	names, err = gs.Guests("aa19239f-f9f5-4935-b1f7-0edfdceabba7", []string{"attenDING"}) //check case insensitivity
 	test.Ok(t, err)
 	expectedNames = []string{"C", "E", "H", "J"}
 	test.Equals(t, expectedNames, names)
@@ -97,7 +97,7 @@ func TestGuestsCheckedIn(t *testing.T) {
 	test.Equals(t, names, names2)
 
 	//check that tag searching works as expected
-	names, err = gs.GuestsCheckedIn("aa19239f-f9f5-4935-b1f7-0edfdceabba7", []string{"VIP"})
+	names, err = gs.GuestsCheckedIn("aa19239f-f9f5-4935-b1f7-0edfdceabba7", []string{"vip"}) //check case insensitivity
 	test.Ok(t, err)
 	expectedNames = []string{"H", "I"}
 	test.Equals(t, expectedNames, names)
@@ -146,7 +146,7 @@ func TestGuestsNotCheckedIn(t *testing.T) {
 	test.Equals(t, names, names2)
 
 	//check that tag searching works as expected
-	names, err = gs.GuestsNotCheckedIn("aa19239f-f9f5-4935-b1f7-0edfdceabba7", []string{"VIP"})
+	names, err = gs.GuestsNotCheckedIn("aa19239f-f9f5-4935-b1f7-0edfdceabba7", []string{"vip"}) //check case insensitivity
 	test.Ok(t, err)
 	expectedNames = []string{"C", "D"}
 	test.Equals(t, expectedNames, names)
@@ -156,7 +156,7 @@ func TestGuestsNotCheckedIn(t *testing.T) {
 	expectedNames = []string{"C", "E"}
 	test.Equals(t, expectedNames, names)
 
-	names, err = gs.GuestsNotCheckedIn("aa19239f-f9f5-4935-b1f7-0edfdceabba7", []string{"ATTENDING", "VIP"})
+	names, err = gs.GuestsNotCheckedIn("aa19239f-f9f5-4935-b1f7-0edfdceabba7", []string{"attending", "VIP"}) //check case insenstivity
 	test.Ok(t, err)
 	expectedNames = []string{"C"}
 	test.Equals(t, expectedNames, names)
@@ -211,7 +211,7 @@ func TestCheckInStats(t *testing.T) {
 	}
 	test.Equals(t, expectedStats, stats)
 
-	stats, err = gs.CheckInStats("aa19239f-f9f5-4935-b1f7-0edfdceabba7", []string{"ATTENDING", "VIP"})
+	stats, err = gs.CheckInStats("aa19239f-f9f5-4935-b1f7-0edfdceabba7", []string{"AttENDiNG", "vip"}) //random capitalization check
 	test.Ok(t, err)
 	expectedStats = checkin.GuestStats{
 		TotalGuests:      2,
@@ -258,9 +258,9 @@ func TestRegisterGuest(t *testing.T) {
 	hm.HashAndSaltFn = hashFnGenerator(nil)
 	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
 
-	err := gs.RegisterGuest("3820a980-a207-4738-b82b-45808fe7aba8", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"NEWLYREGISTERED"}})
+	err := gs.RegisterGuest("3820a980-a207-4738-b82b-45808fe7aba8", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"newlyREGISTERED"}})
 	test.Ok(t, err)
-	names, err := gs.Guests("3820a980-a207-4738-b82b-45808fe7aba8", []string{"NEWLYREGISTERED"})
+	names, err := gs.Guests("3820a980-a207-4738-b82b-45808fe7aba8", []string{"NEWLYregistered"}) //check case insensitivity of tag while you're at it
 	test.Ok(t, err)
 	test.Equals(t, []string{"Jim Bob"}, names)
 	err = gs.RemoveGuest("3820a980-a207-4738-b82b-45808fe7aba8", "1234A")
@@ -316,10 +316,10 @@ func TestRegisterGuests(t *testing.T) {
 
 	//tests all kinds of valid inputs
 	guests := []checkin.Guest{
-		checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"NEWLYREGISTERED"}},
+		checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"newlyregistered"}},
 		checkin.Guest{NRIC: "1234B", Name: "Mayank", Tags: nil},
 		checkin.Guest{NRIC: "1234C", Name: "Eugene", Tags: []string{}},
-		checkin.Guest{NRIC: "1234D", Name: "Ya wei", Tags: []string{"SOME", "THING"}},
+		checkin.Guest{NRIC: "1234D", Name: "Ya wei", Tags: []string{"some", "THING"}},
 	}
 
 	//test normal functionality

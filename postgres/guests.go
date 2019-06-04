@@ -98,6 +98,7 @@ func (gs *GuestService) Guests(eventID string, tags []string) ([]string, error) 
 	if tags == nil {
 		tags = []string{}
 	}
+	tags = gs.capitalizeTags(tags)
 	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and $2 <@ tags", eventID, pq.Array(tags))
 	if err != nil {
 		return nil, errors.New("Cannot fetch guest names: " + err.Error())
@@ -120,6 +121,7 @@ func (gs *GuestService) GuestsCheckedIn(eventID string, tags []string) ([]string
 	if tags == nil {
 		tags = []string{}
 	}
+	tags = gs.capitalizeTags(tags)
 	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and checkedIn = TRUE and $2 <@ tags", eventID, pq.Array(tags))
 	if err != nil {
 		return nil, errors.New("Cannot fetch checked in guest names: " + err.Error())
@@ -142,6 +144,7 @@ func (gs *GuestService) GuestsNotCheckedIn(eventID string, tags []string) ([]str
 	if tags == nil {
 		tags = []string{}
 	}
+	tags = gs.capitalizeTags(tags)
 	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and checkedIn = FALSE and $2 <@ tags", eventID, pq.Array(tags))
 	if err != nil {
 		return nil, errors.New("Cannot fetch not checked in guest names: " + err.Error())
@@ -175,6 +178,7 @@ func (gs *GuestService) RegisterGuest(eventID string, guest checkin.Guest) error
 	if guest.Tags == nil {
 		guest.Tags = []string{} //no nils allowed
 	}
+	guest.Tags = gs.capitalizeTags(guest.Tags)
 	if err != nil {
 		return errors.New("Error hashing NRIC: " + err.Error())
 	}
@@ -210,6 +214,7 @@ func (gs *GuestService) RegisterGuests(eventID string, guests []checkin.Guest) e
 		if guest.Tags == nil {
 			guest.Tags = []string{} //no nils allowed
 		}
+		guest.Tags = gs.capitalizeTags(guest.Tags)
 		if err != nil {
 			tx.Rollback()
 			return errors.New("Error hashing NRIC: " + err.Error())
@@ -255,6 +260,7 @@ func (gs *GuestService) Tags(eventID string, nric string) ([]string, error) {
 //SetTags sets the tags of a given guest; it overwrites all previous tags on that guest
 //nil tags treated as empty array tags
 //Error if guest does not exist or error updating/fetching the guest
+//tags automatically capitalized by the function
 func (gs *GuestService) SetTags(eventID string, nric string, tags []string) error {
 	guest, err := gs.getGuestWithNRIC(eventID, nric)
 	if err != nil {
@@ -266,6 +272,7 @@ func (gs *GuestService) SetTags(eventID string, nric string, tags []string) erro
 	if tags == nil { //treat nils as empty arrays
 		tags = []string{}
 	}
+	tags = gs.capitalizeTags(tags)
 
 	_, err = gs.DB.Exec("UPDATE guest SET tags = $1 where eventID = $2 and nricHash = $3", pq.Array(tags), eventID, guest.NRIC)
 	return err
@@ -359,6 +366,7 @@ func (gs *GuestService) getNumberOfGuests(eventID string, tags []string) (int, e
 	var i int
 	var err error
 	if tags != nil {
+		tags = gs.capitalizeTags(tags)
 		err = gs.DB.QueryRow("SELECT count(*) from guest where eventID = $1 and $2 <@ tags",
 			eventID, pq.Array(tags)).Scan(&i)
 	} else {
@@ -377,6 +385,7 @@ func (gs *GuestService) getNumberOfGuestsCheckInStatus(eventID string, checkInSt
 	var i int
 	var err error
 	if tags != nil {
+		tags = gs.capitalizeTags(tags)
 		err = gs.DB.QueryRow("SELECT count(*) from guest where eventID = $1 and checkedIn = $2 and $3 <@ tags",
 			eventID, checkInStatus, pq.Array(tags)).Scan(&i)
 	} else {
@@ -495,4 +504,15 @@ func (gs *GuestService) scanRowsIntoGuests(rows *sqlx.Rows, rowCount int) ([]che
 	}
 
 	return guests, nil
+}
+
+func (gs *GuestService) capitalizeTags(tags []string) []string {
+	if tags == nil {
+		return nil
+	}
+	capital := make([]string, len(tags))
+	for i, tag := range tags {
+		capital[i] = strings.ToUpper(tag)
+	}
+	return capital
 }
