@@ -47,15 +47,15 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 	credentialsCheck := isAdminOrHost(auth, es, "eventID")
 	existCheck := eventExists(es, "eventID")
 
-	h.Handle("/api/v0/events", Adapt(http.HandlerFunc(h.handleEventsBy),
+	h.Handle("/api/v1-3/events", Adapt(http.HandlerFunc(h.handleEventsBy),
 		tokenCheck)).Methods("GET")
-	h.Handle("/api/v0/events", Adapt(http.HandlerFunc(h.handleCreateEvent),
+	h.Handle("/api/v1-3/events", Adapt(http.HandlerFunc(h.handleCreateEvent),
 		tokenCheck)).Methods("POST")
 	h.Handle("/api/v0/events/takenurls/{eventURL}", Adapt(http.HandlerFunc(h.handleURLTaken),
 		tokenCheck)).Methods("GET")
-	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleEvent),
+	h.Handle("/api/v1-3/events/{eventID}", Adapt(http.HandlerFunc(h.handleEvent),
 		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
-	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleUpdateEvent),
+	h.Handle("/api/v1-3/events/{eventID}", Adapt(http.HandlerFunc(h.handleUpdateEvent),
 		tokenCheck, existCheck, credentialsCheck)).Methods("PATCH")
 	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleDeleteEvent),
 		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
