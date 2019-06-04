@@ -93,7 +93,19 @@ func (h *EventHandler) handleGetTimeTag(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *EventHandler) handleTimeTagOccurred(w http.ResponseWriter, r *http.Request) {
-	WriteMessage(404, "Not Implemented", w)
+	event, err := h.EventService.Event(mux.Vars(r)["eventID"])
+	if err != nil {
+		h.Logger.Println("Error fetching event details: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Could not fetch event information due to internal server issue", w)
+		return
+	}
+	tag := strings.ToLower(mux.Vars(r)["tag"])
+	if val, ok := event.TimeTags[tag]; !ok {
+		WriteMessage(http.StatusNotFound, "No such time tag found", w)
+	} else {
+		reply, _ := json.Marshal(val.Before(time.Now()))
+		w.Write(reply)
+	}
 }
 
 //Takes a feedback form encoded in JSON, anonymous or otherwise, and writes it into the
