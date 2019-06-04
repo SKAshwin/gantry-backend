@@ -1026,3 +1026,74 @@ func TestHandleFeedbackReport(t *testing.T) {
 	r = httptest.NewRequest("GET", "/api/v1-2/events/200/feedback/report", nil)
 	eventDoesNotExistTest(t, r, h, &es)
 }
+
+func TestHandleGetTimeTag(t *testing.T) {
+	var es mock.EventService
+	var auth mock.Authenticator
+	gh := myhttp.GuestHandler{}
+	h := myhttp.NewEventHandler(&es, &auth, &gh)
+
+	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
+	eventGenerator := func(err error) func(string) (checkin.Event, error) {
+		return func(ID string) (checkin.Event, error) {
+			if ID != "300" {
+				t.Fatal("Unexpected username: " + ID + ", expected 300")
+			}
+			if err != nil {
+				return checkin.Event{}, err
+			}
+			return checkin.Event{ID: "300", TimeTags: map[string]time.Time{
+				"release":           time.Date(2020, 2, 29, 8, 4, 10, 0, time.UTC),
+				"formrelease":       time.Date(2019, 1, 3, 10, 2, 0, 0, time.UTC),
+				"registrationstart": time.Date(2019, 6, 5, 1, 2, 0, 0, time.UTC),
+				"registrationend":   time.Date(2019, 9, 2, 8, 4, 0, 0, time.UTC),
+			}}, nil
+		}
+	}
+	es.EventFn = eventGenerator(nil)
+
+	//test normal functionality
+	r := httptest.NewRequest("GET", "/api/v1-3/events/300/timetags/formrelease", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	var val time.Time
+	json.NewDecoder(w.Result().Body).Decode(&val)
+	test.Equals(t, time.Date(2019, 1, 3, 10, 2, 0, 0, time.UTC), val)
+
+	//test case insensitive
+	r = httptest.NewRequest("GET", "/api/v1-3/events/300/timetags/rEgiStraTIONend", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&val)
+	test.Equals(t, time.Date(2019, 9, 2, 8, 4, 0, 0, time.UTC), val)
+
+	//test time tag does not exist
+	r = httptest.NewRequest("GET", "/api/v1-3/events/300/timetags/somethingelse", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, w.Result().StatusCode, http.StatusNotFound)
+
+	//Test invalid eventID or event does not exist
+	r = httptest.NewRequest("GET", "/api/v1-3/events/300/timetags/somethingelse", nil)
+	eventDoesNotExistTest(t, r, h, &es)
+
+}
+
+func TestHandleTimeTagOccurred(t *testing.T) {
+	/*eventGenerator := func(err error) func(string) (checkin.Event, error) {
+		return func(ID string) (checkin.Event, error) {
+			if ID != "300" {
+				t.Fatal("Unexpected username: " + ID + ", expected 300")
+			}
+			if err != nil {
+				return checkin.Event{}, err
+			}
+			return checkin.Event{ID: "300", TimeTags: map[string]time.Time{
+				"release":           time.Now().Add(3 * time.Hour),
+				"formrelease":       time.Now().Add(5 * time.Hour),
+				"registrationstart": time.Now().Add(-240 * time.Hour),
+				"registrationend":   time.Now().Add(-1 * time.Second),
+			}}, nil
+		}
+	}*/
+}

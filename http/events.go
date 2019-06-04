@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -61,6 +62,10 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
 	h.Handle("/api/v0/events/{eventID}/released", Adapt(http.HandlerFunc(h.handleReleased),
 		existCheck)).Methods("GET")
+	h.Handle("/api/v1-3/events/{eventID}/timetags/{tag}", Adapt(http.HandlerFunc(h.handleGetTimeTag),
+		existCheck)).Methods("GET")
+	h.Handle("/api/v1-3/events/{eventID}/timetags/{tag}/occurred", Adapt(http.HandlerFunc(h.handleTimeTagOccurred),
+		existCheck)).Methods("GET")
 	h.Handle("/api/v1-2/events/{eventID}/feedback", Adapt(http.HandlerFunc(h.handleSubmitForm),
 		existCheck)).Methods("POST")
 	h.Handle("/api/v1-2/events/{eventID}/feedback/report", Adapt(http.HandlerFunc(h.handleFeedbackReport),
@@ -69,6 +74,26 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 	h.PathPrefix("/api/{versionNumber}/events/{eventID}/guests").Handler(gh)
 
 	return h
+}
+
+func (h *EventHandler) handleGetTimeTag(w http.ResponseWriter, r *http.Request) {
+	event, err := h.EventService.Event(mux.Vars(r)["eventID"])
+	if err != nil {
+		h.Logger.Println("Error fetching event details: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Could not fetch event information due to internal server issue", w)
+		return
+	}
+	tag := strings.ToLower(mux.Vars(r)["tag"])
+	if val, ok := event.TimeTags[tag]; !ok {
+		WriteMessage(http.StatusNotFound, "No such time tag found", w)
+	} else {
+		reply, _ := json.Marshal(val)
+		w.Write(reply)
+	}
+}
+
+func (h *EventHandler) handleTimeTagOccurred(w http.ResponseWriter, r *http.Request) {
+	WriteMessage(404, "Not Implemented", w)
 }
 
 //Takes a feedback form encoded in JSON, anonymous or otherwise, and writes it into the
