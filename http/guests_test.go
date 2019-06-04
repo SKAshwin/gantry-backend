@@ -14,8 +14,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/guregu/null"
 )
 
 //Generates a HasConnection mock function (for use in mock.GuestMessenger) that returns the
@@ -770,12 +768,10 @@ func TestHandleCheckInGuest(t *testing.T) {
 				return checkin.Event{}, err
 			}
 			if !valid {
-				return checkin.Event{Release: null.Time{}}, nil
+				return checkin.Event{}, nil
 			}
 			return checkin.Event{
-				Release: null.Time{Time: time.Now().UTC().Add(offset),
-					Valid: true,
-				},
+				TimeTags: map[string]time.Time{"release": time.Now().UTC().Add(offset)},
 			}, nil
 
 		}
