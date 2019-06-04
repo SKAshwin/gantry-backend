@@ -269,7 +269,7 @@ func (h *EventHandler) handleCreateEvent(w http.ResponseWriter, r *http.Request)
 		WriteMessage(http.StatusBadRequest, "Badly formatted JSON in event (Possibly invalid time format or invalid fields)", w)
 		return
 	}
-	if !validCreateInputs(eventData) {
+	if !validCreateEventInputs(eventData) {
 		WriteMessage(http.StatusBadRequest, "Invalid arguments to create event", w)
 		return
 	}
@@ -302,8 +302,23 @@ func (h *EventHandler) handleCreateEvent(w http.ResponseWriter, r *http.Request)
 }
 
 //make sure the event creation data is valid
-func validCreateInputs(event checkin.Event) bool {
-	return event.URL != "" && event.Name != "" && event.UpdatedAt == time.Time{} && event.CreatedAt == time.Time{}
+func validCreateEventInputs(event checkin.Event) bool {
+	for key := range event.TimeTags { //check that all time tags of create input aren't too long in label
+		if len(key) > 64 || key == "" {
+			return false
+		}
+	}
+	return event.URL != "" && event.Name != "" && event.UpdatedAt == time.Time{} && event.CreatedAt == time.Time{} && len(event.URL) <= 64 && len(event.Name) <= 64
+}
+
+//checks that no empty string or too long strings are involved in update data
+func validUpdateEventInputs(event checkin.Event) bool {
+	for key := range event.TimeTags { //check that all time tags of create input aren't too long in label
+		if len(key) > 64 || key == "" {
+			return false
+		}
+	}
+	return event.URL != "" && event.Name != "" && len(event.URL) <= 64 && len(event.Name) <= 64
 }
 
 //handleUpdateEvent updates the event given by the eventID provided in the endpoint
@@ -346,8 +361,8 @@ func (h *EventHandler) handleUpdateEvent(w http.ResponseWriter, r *http.Request)
 		//if caller trying to update these non-updatable fields
 		WriteMessage(http.StatusBadRequest, "Cannot update ID or update and create times", w)
 		return
-	} else if event.URL == "" || event.Name == "" {
-		WriteMessage(http.StatusBadRequest, "Cannot set name or URL to empty string", w)
+	} else if !validUpdateEventInputs(event) { //otherwise check that the object you have is valid
+		WriteMessage(http.StatusBadRequest, "Cannot set name or URL or timetag label to empty string, or longer than 64 bytes", w)
 		return
 	}
 

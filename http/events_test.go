@@ -224,6 +224,32 @@ func TestHandleCreateEvent(t *testing.T) {
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 
+	//test name or url or timetag too long
+	//timetag
+	r = httptest.NewRequest("POST", "/api/v1-3/events",
+		strings.NewReader(`{"name":"MyEvent","url":"/hello2","startDateTime":"2019-03-15T08:20:00Z",
+			"endDateTime":"2019-03-15T10:00:00Z", "timetags":{"normalthing":"2019-03-15T09:00:00Z", "1releaseqwertyuiopmnbvcxzasdfghjklreleaseqwertyuiopmnbvcxzasdfghjkl":"2019-03-15T08:00:00Z"},
+			"lat":"1.388","long":"2","radius":"5"}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	//name
+	r = httptest.NewRequest("POST", "/api/v1-3/events",
+		strings.NewReader(`{"name":"qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnmqwertyuiopqwertyuiop","url":"/hello2","startDateTime":"2019-03-15T08:20:00Z",
+			"endDateTime":"2019-03-15T10:00:00Z", "timetags":{"release":"2019-03-15T08:00:00Z"},
+			"lat":"1.388","long":"2","radius":"5"}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	//url
+	r = httptest.NewRequest("POST", "/api/v1-3/events",
+		strings.NewReader(`{"name":"Anormalname","url":"/hello2                                                          ","startDateTime":"2019-03-15T08:20:00Z",
+			"endDateTime":"2019-03-15T10:00:00Z", "timetags":{"release":"2019-03-15T08:00:00Z"},
+			"lat":"1.388","long":"2","radius":"5"}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
 	//test supplied update or create
 	es.CreateEventInvoked = false
 	r = httptest.NewRequest("POST", "/api/v1-3/events",
@@ -244,7 +270,7 @@ func TestHandleCreateEvent(t *testing.T) {
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 	test.Assert(t, !es.CreateEventInvoked, "Create event invoked even though updatedAt or createdAt invoked")
 
-	//test no URL or name
+	//test no URL or name or empty string timetag
 	es.CreateEventInvoked = false
 	r = httptest.NewRequest("POST", "/api/v1-3/events",
 		strings.NewReader("{\"url\":\"/hello2\",\"startDateTime\":\"2019-03-15T08:20:00Z\","+
@@ -263,6 +289,15 @@ func TestHandleCreateEvent(t *testing.T) {
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 	test.Assert(t, !es.CreateEventInvoked, "Create event invoked even though blank URL/name")
+	es.CreateEventInvoked = false
+	r = httptest.NewRequest("POST", "/api/v1-3/events",
+		strings.NewReader(`{"name":"MyEvent","url":"something","startDateTime":"2019-03-15T08:20:00Z",
+			"endDateTime":"2019-03-15T10:00:00Z", "timetags":{"hello":"2019-03-15T09:00:00Z", "":"2019-03-15T08:00:00Z"},
+			"lat":"1.388","long":"2","radius":"5"}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.CreateEventInvoked, "Create event invoked even though blank timetag")
 
 	//test URL already in use
 	r = httptest.NewRequest("POST", "/api/v1-3/events",
@@ -369,8 +404,8 @@ func TestHandleUpdateEvent(t *testing.T) {
 	}
 	expEvent := checkin.Event{
 		ID:        "300",
-		Name:      "MyEvent",
-		URL:       "/hello2",
+		Name:      "Hello",
+		URL:       "/someplace",
 		Start:     null.Time{Time: time.Date(2019, 3, 15, 8, 20, 0, 0, time.UTC), Valid: true},
 		End:       null.Time{Time: time.Date(2019, 3, 15, 10, 0, 0, 0, time.UTC), Valid: true},
 		TimeTags:  map[string]time.Time{"release": time.Date(2019, 3, 15, 8, 0, 0, 0, time.UTC)},
@@ -384,7 +419,7 @@ func TestHandleUpdateEvent(t *testing.T) {
 
 	//test normal functionality, replace everything
 	r := httptest.NewRequest("PATCH", "/api/v1-3/events/300",
-		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\",\"startDateTime\":\"2019-03-15T08:20:00Z\","+
+		strings.NewReader("{\"startDateTime\":\"2019-03-15T08:20:00Z\","+
 			"\"endDateTime\":\"2019-03-15T10:00:00Z\", \"timetags\":{\"release\":\"2019-03-15T08:00:00Z\"},"+
 			"\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\"}"))
 	w := httptest.NewRecorder()
@@ -423,7 +458,7 @@ func TestHandleUpdateEvent(t *testing.T) {
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 	test.Assert(t, !es.UpdateEventInvoked, "Update event invoked even though ID changed")
 
-	//test try to set blank URL/name
+	//test try to set blank URL/name/timetag label
 	es.UpdateEventInvoked = false
 	r = httptest.NewRequest("PATCH", "/api/v1-3/events/300",
 		strings.NewReader("{\"name\":\"\", \"startDateTime\":\"2019-03-12T09:30:00Z\"}"))
@@ -438,6 +473,36 @@ func TestHandleUpdateEvent(t *testing.T) {
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 	test.Assert(t, !es.UpdateEventInvoked, "Update event invoked even though url set to blank")
+	es.UpdateEventInvoked = false
+	r = httptest.NewRequest("PATCH", "/api/v1-3/events/300",
+		strings.NewReader(`{"timetags":{"":"2019-03-12T09:30:00Z"}, "startDateTime":"2019-03-12T09:30:00Z"}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.UpdateEventInvoked, "Update event invoked even though time tag label set to blank")
+
+	//test try to set too long url/name/timetag label
+	es.UpdateEventInvoked = false
+	r = httptest.NewRequest("PATCH", "/api/v1-3/events/300",
+		strings.NewReader(`{"name":"qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjkl", "startDateTime":"2019-03-12T09:30:00Z"}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.UpdateEventInvoked, "Update event invoked even though name set to blank")
+	es.UpdateEventInvoked = false
+	r = httptest.NewRequest("PATCH", "/api/v1-3/events/300",
+		strings.NewReader(`{"url":"                                                                                    ", "startDateTime":"2019-03-12T09:30:00Z"}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.UpdateEventInvoked, "Update event invoked even though url set to blank")
+	es.UpdateEventInvoked = false
+	r = httptest.NewRequest("PATCH", "/api/v1-3/events/300",
+		strings.NewReader(`{"timetags":{"zxcvbnmasdfghjklqwertyuiopzxcvbnmasdfghjklzxcvbnmasdfghjklqwertyuiop":"2019-03-12T10:31:20Z"}, "startDateTime":"2019-03-12T09:30:00Z"}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	test.Assert(t, !es.UpdateEventInvoked, "Update event invoked even though time tag label set to blank")
 
 	//test URL already in use
 	r = httptest.NewRequest("PATCH", "/api/v1-3/events/300",
