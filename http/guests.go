@@ -23,12 +23,14 @@ type GuestHandler struct {
 	GuestMessenger GuestMessenger
 	Logger         *log.Logger
 	Authenticator  Authenticator
+	MaxLengthName  int
+	MaxLengthTag   int
 }
 
 //NewGuestHandler creates a new GuestHandler, using the default logger, with the
 //pre-defined routing
 func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, gm GuestMessenger,
-	auth Authenticator) *GuestHandler {
+	auth Authenticator, maxLengthName int, maxLengthTag int) *GuestHandler {
 	h := &GuestHandler{
 		Router:         mux.NewRouter(),
 		Logger:         log.New(os.Stderr, "", log.LstdFlags),
@@ -36,6 +38,8 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, gm GuestM
 		EventService:   es,
 		GuestMessenger: gm,
 		Authenticator:  auth,
+		MaxLengthName:  maxLengthName,
+		MaxLengthTag:   maxLengthTag,
 	}
 
 	//Adapters to check if handler should serve the request
@@ -142,6 +146,12 @@ func (h *GuestHandler) handleRegisterGuests(w http.ResponseWriter, r *http.Reque
 			WriteMessage(http.StatusInternalServerError, "Error checking if guest exists, for guest: "+guest.NRIC, w)
 			return
 		}
+
+		if !h.validGuest(guest) {
+			h.Logger.Println("Invalid guest to register")
+			WriteMessage(http.StatusBadRequest, "A guest cannot have a name or tag more than 128 bytes long", w)
+			return
+		}
 	}
 
 	err = h.GuestService.RegisterGuests(eventID, guests)
@@ -151,6 +161,18 @@ func (h *GuestHandler) handleRegisterGuests(w http.ResponseWriter, r *http.Reque
 	} else {
 		WriteMessage(http.StatusCreated, "Registration successful for all guests", w)
 	}
+}
+
+func (h *GuestHandler) validGuest(guest checkin.Guest) bool {
+	if len(guest.Name) > h.MaxLengthName {
+		return false
+	}
+	for _, tag := range guest.Tags {
+		if len(tag) > h.MaxLengthTag || tag == "" {
+			return false
+		}
+	}
+	return true
 }
 
 func (h *GuestHandler) handleRegisterGuest(w http.ResponseWriter, r *http.Request) {
@@ -173,6 +195,12 @@ func (h *GuestHandler) handleRegisterGuest(w http.ResponseWriter, r *http.Reques
 	} else if err != nil {
 		h.Logger.Println("Error checking if guest exists: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error checking if guest exists", w)
+		return
+	}
+
+	if !h.validGuest(guest) {
+		h.Logger.Println("Invalid guest to register")
+		WriteMessage(http.StatusBadRequest, "A guest cannot have a name or tag more than 128 bytes long", w)
 		return
 	}
 
