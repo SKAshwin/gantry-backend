@@ -4,10 +4,10 @@ import (
 	"checkin/bcrypt"
 	"checkin/http"
 	"checkin/http/cors"
+	websocket "checkin/http/gorillawebsocket"
 	"checkin/http/jwt"
 	"checkin/postgres"
 	"checkin/qrcode"
-	websocket "checkin/http/gorillawebsocket"
 	"fmt"
 	"log"
 	"os"
@@ -51,7 +51,7 @@ func main() {
 
 	authHandler := http.NewAuthHandler(as, jwtAuthenticator, us)
 	userHandler := http.NewUserHandler(us, jwtAuthenticator)
-	guestHandler := http.NewGuestHandler(gs, es, guestMessenger, jwtAuthenticator)
+	guestHandler := http.NewGuestHandler(gs, es, guestMessenger, jwtAuthenticator, 128, 128)
 	eventHandler := http.NewEventHandler(es, jwtAuthenticator, guestHandler)
 	utilityHandler := http.NewUtilityHandler(qrGenerator)
 
