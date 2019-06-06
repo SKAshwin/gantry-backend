@@ -52,7 +52,7 @@ func main() {
 	authHandler := http.NewAuthHandler(as, jwtAuthenticator, us)
 	userHandler := http.NewUserHandler(us, jwtAuthenticator)
 	guestHandler := http.NewGuestHandler(gs, es, guestMessenger, jwtAuthenticator, 128, 128)
-	eventHandler := http.NewEventHandler(es, jwtAuthenticator, guestHandler)
+	eventHandler := http.NewEventHandler(es, jwtAuthenticator, guestHandler, 64, 128, 64)
 	utilityHandler := http.NewUtilityHandler(qrGenerator)
 
 	handler := http.Handler{

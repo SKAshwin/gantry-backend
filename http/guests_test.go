@@ -529,7 +529,7 @@ func TestHandleRegisterGuest(t *testing.T) {
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
-		strings.NewReader(`{"name":"Hello", "nric":"1234A", "tags":["heLlo","lol","qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnmqwertyuiop"]}`))
+		strings.NewReader(`{"name":"Hello", "nric":"1234A", "tags":["heLlo","lol","qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjkl"]}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)

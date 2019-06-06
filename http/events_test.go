@@ -175,7 +175,7 @@ func TestHandleCreateEvent(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	gh := myhttp.GuestHandler{}
-	h := myhttp.NewEventHandler(&es, &auth, &gh)
+	h := myhttp.NewEventHandler(&es, &auth, &gh, 64, 64, 64)
 
 	es.URLExistsFn = urlExistsGenerator("/hello", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
@@ -369,7 +369,7 @@ func TestHandleUpdateEvent(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	gh := myhttp.GuestHandler{}
-	h := myhttp.NewEventHandler(&es, &auth, &gh)
+	h := myhttp.NewEventHandler(&es, &auth, &gh, 64, 64, 64)
 
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
 	es.CheckHostFn = checkHostGenerator("testing_username", "300", nil)
@@ -586,7 +586,7 @@ func TestHandleReleased(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	gh := myhttp.GuestHandler{}
-	h := myhttp.NewEventHandler(&es, &auth, &gh)
+	h := myhttp.NewEventHandler(&es, &auth, &gh, 64, 64, 64)
 
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
 	eventFnGenerator := func(offset time.Duration, trueID string, valid bool, err error) func(string) (checkin.Event, error) {
@@ -652,7 +652,7 @@ func TestHandleEventsBy(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	gh := myhttp.GuestHandler{}
-	h := myhttp.NewEventHandler(&es, &auth, &gh)
+	h := myhttp.NewEventHandler(&es, &auth, &gh, 64, 64, 64)
 
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
@@ -705,7 +705,7 @@ func TestHandleEvent(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	gh := myhttp.GuestHandler{}
-	h := myhttp.NewEventHandler(&es, &auth, &gh)
+	h := myhttp.NewEventHandler(&es, &auth, &gh, 64, 64, 64)
 
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
 	es.CheckHostFn = checkHostGenerator("testing_username", "300", nil)
@@ -765,7 +765,7 @@ func TestHandleDeleteEvent(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	gh := myhttp.GuestHandler{}
-	h := myhttp.NewEventHandler(&es, &auth, &gh)
+	h := myhttp.NewEventHandler(&es, &auth, &gh, 64, 64, 64)
 
 	es.CheckIfExistsFn = checkIfExistsGenerator("200", nil)
 	es.CheckHostFn = checkHostGenerator("some_guy", "200", nil)
@@ -817,7 +817,7 @@ func TestHandleURLTaken(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	gh := myhttp.GuestHandler{}
-	h := myhttp.NewEventHandler(&es, &auth, &gh)
+	h := myhttp.NewEventHandler(&es, &auth, &gh, 64, 64, 64)
 
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
@@ -855,7 +855,7 @@ func TestSubmitForm(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	gh := myhttp.GuestHandler{}
-	h := myhttp.NewEventHandler(&es, &auth, &gh)
+	h := myhttp.NewEventHandler(&es, &auth, &gh, 64, 64, 64)
 
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
 	submitFeedbackFnGenerator := func(err error, expected *checkin.FeedbackForm) func(string, checkin.FeedbackForm) error {
@@ -983,7 +983,7 @@ func TestHandleFeedbackReport(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	gh := myhttp.GuestHandler{}
-	h := myhttp.NewEventHandler(&es, &auth, &gh)
+	h := myhttp.NewEventHandler(&es, &auth, &gh, 64, 64, 64)
 
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
 	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
@@ -1096,7 +1096,7 @@ func TestHandleGetTimeTag(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	gh := myhttp.GuestHandler{}
-	h := myhttp.NewEventHandler(&es, &auth, &gh)
+	h := myhttp.NewEventHandler(&es, &auth, &gh, 64, 64, 64)
 
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
 	eventGenerator := func(err error) func(string) (checkin.Event, error) {
@@ -1156,7 +1156,7 @@ func TestHandleTimeTagOccurred(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	gh := myhttp.GuestHandler{}
-	h := myhttp.NewEventHandler(&es, &auth, &gh)
+	h := myhttp.NewEventHandler(&es, &auth, &gh, 64, 64, 64)
 
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
 	eventGenerator := func(err error) func(string) (checkin.Event, error) {

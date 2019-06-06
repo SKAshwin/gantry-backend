@@ -24,10 +24,13 @@ import (
 //Call NewEventHandler to initialize an EventHandler with the correct routes
 type EventHandler struct {
 	*mux.Router
-	GuestHandler  *GuestHandler
-	EventService  checkin.EventService
-	Logger        *log.Logger
-	Authenticator Authenticator
+	GuestHandler     *GuestHandler
+	EventService     checkin.EventService
+	Logger           *log.Logger
+	Authenticator    Authenticator
+	MaxLengthName    int
+	MaxLengthURL     int
+	MaxLengthTimeTag int
 }
 
 //NewEventHandler Creates a new event handler using gorilla/mux for routing
@@ -35,13 +38,16 @@ type EventHandler struct {
 //GuestHandler, EventService, Authenticator needs to be set by the calling function
 //API endpoint changes happen here, as well as changes to the routing library and logger to be used
 //and type of authenticator
-func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandler) *EventHandler {
+func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandler, maxLengthName, maxLengthURL, maxLengthTimeTag int) *EventHandler {
 	h := &EventHandler{
-		Router:        mux.NewRouter(),
-		Logger:        log.New(os.Stderr, "", log.LstdFlags),
-		Authenticator: auth,
-		EventService:  es,
-		GuestHandler:  gh,
+		Router:           mux.NewRouter(),
+		Logger:           log.New(os.Stderr, "", log.LstdFlags),
+		Authenticator:    auth,
+		EventService:     es,
+		GuestHandler:     gh,
+		MaxLengthName:    maxLengthName,
+		MaxLengthURL:     maxLengthURL,
+		MaxLengthTimeTag: maxLengthTimeTag,
 	}
 	//Adapters to check if handler should serve the request
 	tokenCheck := checkAuth(auth)
@@ -269,7 +275,7 @@ func (h *EventHandler) handleCreateEvent(w http.ResponseWriter, r *http.Request)
 		WriteMessage(http.StatusBadRequest, "Badly formatted JSON in event (Possibly invalid time format or invalid fields)", w)
 		return
 	}
-	if !validCreateEventInputs(eventData) {
+	if !h.validCreateEventInputs(eventData) {
 		WriteMessage(http.StatusBadRequest, "Invalid arguments to create event", w)
 		return
 	}
@@ -302,23 +308,23 @@ func (h *EventHandler) handleCreateEvent(w http.ResponseWriter, r *http.Request)
 }
 
 //make sure the event creation data is valid
-func validCreateEventInputs(event checkin.Event) bool {
+func (h *EventHandler) validCreateEventInputs(event checkin.Event) bool {
 	for key := range event.TimeTags { //check that all time tags of create input aren't too long in label
-		if len(key) > 64 || key == "" {
+		if len(key) > h.MaxLengthTimeTag || key == "" {
 			return false
 		}
 	}
-	return event.URL != "" && event.Name != "" && event.UpdatedAt == time.Time{} && event.CreatedAt == time.Time{} && len(event.URL) <= 64 && len(event.Name) <= 64
+	return event.URL != "" && event.Name != "" && event.UpdatedAt == time.Time{} && event.CreatedAt == time.Time{} && len(event.URL) <= h.MaxLengthURL && len(event.Name) <= h.MaxLengthName
 }
 
 //checks that no empty string or too long strings are involved in update data
-func validUpdateEventInputs(event checkin.Event) bool {
+func (h *EventHandler) validUpdateEventInputs(event checkin.Event) bool {
 	for key := range event.TimeTags { //check that all time tags of create input aren't too long in label
-		if len(key) > 64 || key == "" {
+		if len(key) > h.MaxLengthTimeTag || key == "" {
 			return false
 		}
 	}
-	return event.URL != "" && event.Name != "" && len(event.URL) <= 64 && len(event.Name) <= 64
+	return event.URL != "" && event.Name != "" && len(event.URL) <= h.MaxLengthURL && len(event.Name) <= h.MaxLengthName
 }
 
 //handleUpdateEvent updates the event given by the eventID provided in the endpoint
@@ -361,7 +367,7 @@ func (h *EventHandler) handleUpdateEvent(w http.ResponseWriter, r *http.Request)
 		//if caller trying to update these non-updatable fields
 		WriteMessage(http.StatusBadRequest, "Cannot update ID or update and create times", w)
 		return
-	} else if !validUpdateEventInputs(event) { //otherwise check that the object you have is valid
+	} else if !h.validUpdateEventInputs(event) { //otherwise check that the object you have is valid
 		WriteMessage(http.StatusBadRequest, "Cannot set name or URL or timetag label to empty string, or longer than 64 bytes", w)
 		return
 	}
