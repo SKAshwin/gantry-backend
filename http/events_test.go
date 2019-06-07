@@ -1,6 +1,6 @@
 package http_test
 
-//TODO: Complete tests for all event handler routes
+//WARNING: Tests testing ?loc form values only work if time.Local is set to +08:00 GMT.
 
 import (
 	"checkin"
@@ -665,7 +665,7 @@ func TestHandleEventsBy(t *testing.T) {
 			if err != nil {
 				return nil, err
 			}
-			return []checkin.Event{checkin.Event{ID: "100"}, checkin.Event{ID: "200", Start: null.TimeFrom(time.Date(2019, 3, 1, 11, 30, 0, 0, time.UTC))}, checkin.Event{ID: "300"}}, nil
+			return []checkin.Event{checkin.Event{ID: "100"}, checkin.Event{ID: "200", Start: null.TimeFrom(time.Date(2019, 3, 1, 23, 30, 0, 0, time.UTC))}, checkin.Event{ID: "300"}}, nil
 		}
 	}
 	es.EventsByFn = eventsByGenerator(nil)
@@ -677,7 +677,7 @@ func TestHandleEventsBy(t *testing.T) {
 	var events []checkin.Event
 	json.NewDecoder(w.Result().Body).Decode(&events)
 	test.Equals(t, []checkin.Event{checkin.Event{ID: "100"},
-		checkin.Event{ID: "200", Start: null.TimeFrom(time.Date(2019, 3, 1, 11, 30, 0, 0, time.UTC))},
+		checkin.Event{ID: "200", Start: null.TimeFrom(time.Date(2019, 3, 1, 23, 30, 0, 0, time.UTC))},
 		checkin.Event{ID: "300"}}, events)
 
 	//test change time zone
@@ -685,10 +685,8 @@ func TestHandleEventsBy(t *testing.T) {
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	json.NewDecoder(w.Result().Body).Decode(&events)
-	singapore, err := time.LoadLocation("Asia/Singapore")
-	test.Ok(t, err)
 	test.Equals(t, []checkin.Event{checkin.Event{ID: "100"},
-		checkin.Event{ID: "200", Start: null.TimeFrom(time.Date(2019, 3, 2, 7, 30, 0, 0, singapore))},
+		checkin.Event{ID: "200", Start: null.TimeFrom(time.Date(2019, 3, 2, 7, 30, 0, 0, time.Local))},
 		checkin.Event{ID: "300"}}, events)
 
 	//Test getting auth info fails
@@ -1148,20 +1146,13 @@ func TestHandleGetTimeTag(t *testing.T) {
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	json.NewDecoder(w.Result().Body).Decode(&val)
-	singapore, err := time.LoadLocation("Asia/Singapore")
-	test.Ok(t, err)
-	singapore2, err := time.LoadLocation("Asia/Singapore")
-	test.Ok(t, err)
-	test.Equals(t, singapore, singapore2)
-	test.Equals(t, singapore, val.Location())
-	test.Equals(t, time.Date(2019, 9, 2, 16, 4, 0, 0, singapore), val)
+	test.Equals(t, time.Date(2019, 9, 2, 16, 4, 0, 0, time.Local), val)
 
 	r = httptest.NewRequest("GET", "/api/v1-3/events/300/timetags/rEgiStraTIONend?loc=UTC", nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	json.NewDecoder(w.Result().Body).Decode(&val)
-	test.Ok(t, err)
-	test.Equals(t, time.Date(2019, 9, 2, 8, 4, 0, 0, time.UTC).String(), val.String())
+	test.Equals(t, time.Date(2019, 9, 2, 8, 4, 0, 0, time.UTC), val)
 
 	r = httptest.NewRequest("GET", "/api/v1-3/events/300/timetags/rEgiStraTIONend?loc=Asia/idkwhatthisis", nil)
 	w = httptest.NewRecorder()
