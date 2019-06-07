@@ -72,7 +72,13 @@ func (tzw *timeZoneAdjustedWriter) Write(b []byte) (int, error) {
 		} else {
 			//this JSON part was a time value
 			//log.Println("It was a time!")
-			newTimeVal := timeVal.In(tzw.loc)
+			var newTimeVal time.Time
+			if !timeVal.IsZero() { //don't touch zero value times (though the output shouldn't have any, by right)
+				newTimeVal = timeVal.In(tzw.loc)
+			} else {
+				newTimeVal = timeVal
+			}
+
 			result, _ := json.Marshal(newTimeVal)
 			amendedPart = strings.Split(string(result), `"`)[1] //remove quotes from JSON marshalling
 			//log.Println(tzw.loc)
