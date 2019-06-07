@@ -142,3 +142,35 @@ func TestHandleLogin(t *testing.T) {
 	test.Equals(t, checkin.AuthorizationInfo{Username: "admin123", IsAdmin: true}, ai)
 
 }
+
+func TestHandleVerify(t *testing.T) {
+	var auth mock.Authenticator
+	var as mock.AuthenticationService
+	var us mock.UserService
+	h := myhttp.NewAuthHandler(&as, &auth, &us)
+
+	auth.AuthenticateFn = authenticateGenerator(true, nil)
+
+	//test normal behavior, true and false
+	r := httptest.NewRequest("POST", "/api/v1-3/auth/verify", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	var verified bool
+	err := json.NewDecoder(w.Result().Body).Decode(&verified)
+	test.Ok(t, err)
+	test.Equals(t, true, verified)
+
+	auth.AuthenticateFn = authenticateGenerator(false, nil)
+	r = httptest.NewRequest("POST", "/api/v1-3/auth/verify", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	err = json.NewDecoder(w.Result().Body).Decode(&verified)
+	test.Ok(t, err)
+	test.Equals(t, false, verified)
+
+	auth.AuthenticateFn = authenticateGenerator(false, errors.New("An error"))
+	r = httptest.NewRequest("POST", "/api/v1-3/auth/verify", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+}

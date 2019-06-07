@@ -35,6 +35,7 @@ func NewAuthHandler(as checkin.AuthenticationService, auth Authenticator, us che
 	}
 	h.Handle("/api/v0/auth/admins/login", http.HandlerFunc(h.handleLogin(true))).Methods("POST")
 	h.Handle("/api/v0/auth/users/login", http.HandlerFunc(h.handleLogin(false))).Methods("POST")
+	h.Handle("/api/v1-3/auth/verify", http.HandlerFunc(h.handleVerify)).Methods("POST")
 	return h
 }
 
@@ -81,4 +82,15 @@ func (h *AuthHandler) handleLogin(isAdmin bool) http.HandlerFunc {
 			WriteMessage(http.StatusUnauthorized, "Incorrect Username or Password", w)
 		}
 	}
+}
+
+func (h *AuthHandler) handleVerify(w http.ResponseWriter, r *http.Request) {
+	tokenValid, err := h.Authenticator.Authenticate(r)
+	if err != nil {
+		h.Logger.Println("Error authenticating request for verify-token: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "Error parsing JSON web token. The request must have an Authorization header with value in the format Bearer {{token}}", w)
+		return
+	}
+	reply, _ := json.Marshal(tokenValid)
+	w.Write(reply)
 }
