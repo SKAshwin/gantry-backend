@@ -516,8 +516,7 @@ func TestHandleUpdateEvent(t *testing.T) {
 
 	//test badly formatted requests (no panics, etc)
 	r = httptest.NewRequest("PATCH", "/api/v1-3/events/300?loc=Europe/Asia",
-		strings.NewReader("{\"startDateTime\":\"2019-03-15T15:20:00Z\","+
-			"\"endDateTime\":\"2019-03-15T17:00:00Z\", \"timetags\":{\"release\":\"2019-03-1"))
+		strings.NewReader(""))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
