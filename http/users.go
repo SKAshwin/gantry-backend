@@ -38,11 +38,11 @@ func NewUserHandler(us checkin.UserService, auth Authenticator) *UserHandler {
 	adminOrUserCheck := isAdminOrUser(auth, us, "username")
 
 	h.Handle("/api/v0/users", Adapt(http.HandlerFunc(h.handleUsers),
-		tokenCheck, adminCheck)).Methods("GET")
+		tokenCheck, adminCheck, correctTimezonesOutput)).Methods("GET")
 	h.Handle("/api/v0/users", Adapt(http.HandlerFunc(h.handleCreateUser),
 		tokenCheck, adminCheck)).Methods("POST")
 	h.Handle("/api/v0/users/{username}", Adapt(http.HandlerFunc(h.handleUser),
-		tokenCheck, existCheck, adminOrUserCheck)).Methods("GET")
+		tokenCheck, existCheck, adminOrUserCheck, correctTimezonesOutput)).Methods("GET")
 	h.Handle("/api/v0/users/{username}", Adapt(http.HandlerFunc(h.handleUpdateUser),
 		tokenCheck, existCheck, adminOrUserCheck)).Methods("PATCH")
 	h.Handle("/api/v0/users/{username}", Adapt(http.HandlerFunc(h.handleDeleteUser),
