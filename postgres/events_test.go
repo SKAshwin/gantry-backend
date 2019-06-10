@@ -4,6 +4,7 @@ import (
 	"checkin"
 	"checkin/postgres"
 	"checkin/test"
+	"log"
 	"math"
 	"sort"
 	"testing"
@@ -108,23 +109,26 @@ func TestEventsBy(t *testing.T) {
 func TestCreateEvent(t *testing.T) {
 	es := postgres.EventService{DB: db}
 
+	singapore, err := time.LoadLocation("Asia/Singapore")
+	test.Ok(t, err)
 	event := checkin.Event{
 		ID:        uuid.New().String(),
 		Name:      "Test",
 		TimeTags:  make(map[string]time.Time),
 		URL:       "hello",
 		Long:      null.FloatFrom(10.0),
-		Start:     null.TimeFrom(time.Date(2019, 10, 11, 3, 2, 1, 0, time.UTC)),
-		UpdatedAt: time.Date(2015, 2, 3, 1, 2, 0, 0, time.UTC), //these fields should be ignored by the create funtion
-		CreatedAt: time.Date(2014, 2, 3, 1, 2, 0, 0, time.UTC), //^
+		Start:     null.TimeFrom(time.Date(2019, 10, 11, 11, 2, 1, 0, singapore)), //test how non-UTC times are handled
+		UpdatedAt: time.Date(2015, 2, 3, 1, 2, 0, 0, time.UTC),                    //these fields should be ignored by the create funtion
+		CreatedAt: time.Date(2014, 2, 3, 1, 2, 0, 0, time.UTC),                    //^
 	}
 	event.TimeTags["releAsE"] = time.Date(2019, 5, 4, 3, 2, 1, 0, time.UTC)
-	event.TimeTags["FORMRELEASE"] = time.Date(2019, 6, 5, 4, 3, 2, 0, time.UTC)
-	err := es.CreateEvent(event, "TestUser")
+	event.TimeTags["FORMRELEASE"] = time.Date(2019, 6, 5, 12, 3, 2, 0, singapore) //test non-UTC times in the timetag
+	err = es.CreateEvent(event, "TestUser")
 	test.Ok(t, err)
 
 	fetched, err := es.Event(event.ID)
 	test.Ok(t, err)
+	log.Println(fetched.Start)
 	test.Equals(t, time.Date(2019, 5, 4, 3, 2, 1, 0, time.UTC), fetched.TimeTags["release"])
 	test.Equals(t, time.Date(2019, 6, 5, 4, 3, 2, 0, time.UTC), fetched.TimeTags["formrelease"])
 	test.Assert(t, time.Since(fetched.CreatedAt) < 2*time.Second, "Create time not within 2 seconds before now; not properly set")
@@ -132,6 +136,7 @@ func TestCreateEvent(t *testing.T) {
 	event.UpdatedAt = fetched.UpdatedAt
 	event.CreatedAt = fetched.CreatedAt
 	event.TimeTags = fetched.TimeTags
+	event.Start = null.TimeFrom(time.Date(2019, 10, 11, 3, 2, 1, 0, time.UTC))
 	test.Equals(t, event, fetched)
 
 	err = es.DeleteEvent(event.ID)
@@ -174,6 +179,9 @@ func TestUpdateEvent(t *testing.T) {
 	//DO NOT RELY ON THAT VALUE IN ANY OTHER TEST
 	es := postgres.EventService{DB: db}
 
+	asmara, err := time.LoadLocation("Africa/Asmara") //off by 3
+	test.Ok(t, err)
+
 	event, err := es.Event("aa19239f-f9f5-4935-b1f7-0edfdceabba7")
 	test.Ok(t, err)
 	test.Assert(t, math.Abs(event.Radius.Float64-5) > 0.0001, "Event radius was already at updated value")
@@ -183,9 +191,9 @@ func TestUpdateEvent(t *testing.T) {
 	originalCreatedAt := event.CreatedAt
 
 	event.Radius.Float64 = 5
-	event.CreatedAt = time.Now() //this should not actually be processed as an updatable field
-	event.TimeTags["ReLeaSe"] = time.Date(2019, 10, 3, 2, 5, 10, 0, time.UTC)
-	//testing adding a time tag, make sure that its not case sensitive (should be set to all lowercase)
+	event.CreatedAt = time.Now()                                                  //this should not actually be processed as an updatable field
+	event.TimeTags["ReLeaSe"] = time.Date(2019, 10, 3, 2, 5, 10, 0, time.UTC)     //testing adding a time tag, make sure that its not case sensitive (should be set to all lowercase)
+	event.TimeTags["formrelease"] = time.Date(2019, 10, 3, 12, 15, 30, 0, asmara) //test non-UTC time
 	err = es.UpdateEvent(event)
 	test.Ok(t, err)
 
@@ -194,7 +202,8 @@ func TestUpdateEvent(t *testing.T) {
 	test.Assert(t, math.Abs(5-event.Radius.Float64) < 0.0001, "Radius was not successfully updated")
 	test.Assert(t, math.Abs(event.UpdatedAt.Sub(time.Now().UTC()).Seconds()) < 2, "Event last updated not within 2 seconds of now; i.e. not updated")
 	test.Assert(t, event.CreatedAt == originalCreatedAt, "Event created at time was modified; this should not be allowed")
-	test.Assert(t, event.TimeTags["release"] == time.Date(2019, 10, 3, 2, 5, 10, 0, time.UTC) && len(event.TimeTags) == 1, "Time tags were not properly updated")
+	test.Assert(t, event.TimeTags["release"] == time.Date(2019, 10, 3, 2, 5, 10, 0, time.UTC) && len(event.TimeTags) == 2, "Time tags were not properly updated")
+	test.Assert(t, event.TimeTags["formrelease"] == time.Date(2019, 10, 3, 9, 15, 30, 0, time.UTC) && len(event.TimeTags) == 2, "Time tags were not properly updated (non-UTC timezone issue)")
 
 	event.Radius = originalRadius
 	event.TimeTags = nil
