@@ -15,7 +15,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"syscall"
 
 	"golang.org/x/crypto/ssh/terminal"
@@ -33,12 +32,16 @@ func main() {
 		"Where the output of the program will be dumped. Optional, if not specified output"+
 			"dumped to standard output/the console")
 	tags := flag.Bool("tags", false, "Use -tags if the CSV file is in a (nric,name,tags) format; tags should be comma separated, case insensitive. E.g. vip,confirmed will add the VIP and CONFIRMED tags to the guest in that row")
-	numThreads := flag.Int64("threads", 1, "The number of guests to simultaneously register")
+	versionNum := flag.Bool("v", false, "To get the version number of uploadguests")
 
 	flag.Parse()
 
+	if *versionNum {
+		fmt.Println("uploadguests by MES Creators, Version 2.0. Compatible with Gantry by MES Version 1.3 and above.")
+		return
+	}
 	if *eventID == "" {
-		log.Fatal("Need to provide event ID (-event). See -h for help")
+		log.Fatal("Need to provide event ID (-event). See -h for help.")
 	}
 	if *token == "" && *username == "" {
 		log.Fatal("Need authentication token or username. See -h for help")
@@ -92,7 +95,7 @@ func main() {
 		token = &reply.AccessToken
 		fmt.Println("Authentication successful")
 	}
-	url := *serverAddress + "/api/v0/events/" + *eventID + "/guests"
+	url := *serverAddress + "/api/v1-3/events/" + *eventID + "/guests"
 	log.Println("Reading from " + *filePath + " and sending data to " + url)
 
 	f, err := os.Open(*filePath)
@@ -112,65 +115,51 @@ func main() {
 	}
 	client := &http.Client{Transport: tr}
 
-	wg := sync.WaitGroup{}
-	guestsPerRoutine := max(20, int(int64(len(lines)) / *numThreads))
-	log.Println("Running", guestsPerRoutine, "guests per routine")
-	fmt.Println("Running", guestsPerRoutine, "guests per routine, with", *numThreads, "goroutines")
-	for i := 0; i < len(lines); i += guestsPerRoutine {
-		wg.Add(1)
-		go func(start int, end int) {
-			defer wg.Done()
-			for j := start; j < min(len(lines), end); j++ {
-				guest := checkin.Guest{
-					Name: lines[j][1],
-					NRIC: lines[j][0],
-				}
-				if *tags {
-					guest.Tags = extractTags(lines[j][2])
-				}
-				guestJSON, err := json.Marshal(guest)
-				if err != nil {
-					log.Fatal("Error marshalling CSV into JSON for " + guest.NRIC + ", " + guest.Name + " : " +
-						err.Error())
-				}
-				log.Println("POST (" + guest.NRIC + ", " + guest.Name + ")")
+	log.Println("Converting CSV into Guest Array JSON")
+	guests := make([]checkin.Guest, len(lines))
+	for i := 0; i < len(lines); i++ {
+		guest := checkin.Guest{
+			Name: lines[i][1],
+			NRIC: lines[i][0],
+		}
+		if *tags {
+			guest.Tags = extractTags(lines[i][2])
+		}
 
-				req, err := http.NewRequest("POST", url, bytes.NewReader(guestJSON))
-				if err != nil {
-					log.Fatal("Error creating request to " + url + " :" + err.Error())
-				}
-				req.Header.Add("Authorization", "Bearer "+*token)
-
-				resp, err := client.Do(req)
-				if err != nil {
-					log.Fatal("Error posting to " + url + " :" + err.Error())
-				}
-				defer resp.Body.Close()
-
-				reply := struct {
-					Message string `json:"message"`
-				}{}
-				err = json.NewDecoder(resp.Body).Decode(&reply)
-				if err != nil {
-					body, err2 := ioutil.ReadAll(resp.Body)
-					if err2 != nil {
-						log.Fatal("wtf: " + err2.Error())
-					}
-					log.Println(string(body))
-					log.Fatal("Error reading response: " + err.Error())
-				}
-
-				if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusUnauthorized {
-					//stop for loop, all further requests will fail
-					log.Fatal("Response to registering (" + guest.NRIC + ", " + guest.Name + ", {" + strings.Join(guest.Tags, ",") + "}):" + reply.Message)
-				}
-
-				log.Println("Response to registering (" + guest.NRIC + ", " + guest.Name + ", {" + strings.Join(guest.Tags, ",") + "}):" + reply.Message)
-			}
-		}(i, i+guestsPerRoutine)
+		guests[i] = guest
+	}
+	guestsJSON, err := json.Marshal(guests)
+	if err != nil {
+		log.Fatal("Error marshalling CSV into guest array JSON : " + err.Error())
 	}
 
-	wg.Wait()
+	log.Println("Uploading guest array JSON to server")
+	req, err := http.NewRequest("POST", url, bytes.NewReader(guestsJSON))
+	if err != nil {
+		log.Fatal("Error creating request to " + url + " :" + err.Error())
+	}
+	req.Header.Add("Authorization", "Bearer "+*token)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Fatal("Error posting to " + url + " :" + err.Error())
+	}
+	defer resp.Body.Close()
+
+	reply := struct {
+		Message string `json:"message"`
+	}{}
+	err = json.NewDecoder(resp.Body).Decode(&reply)
+	if err != nil {
+		body, err2 := ioutil.ReadAll(resp.Body)
+		if err2 != nil {
+			log.Fatal("wtf: " + err2.Error())
+		}
+		log.Println(string(body))
+		log.Fatal("Error reading response: " + err.Error())
+	}
+
+	log.Println("Response from server: " + reply.Message)
 	log.Println("Finished uploading all guests")
 }
 
