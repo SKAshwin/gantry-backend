@@ -105,7 +105,6 @@ func (tzw *timeZoneAdjustedWriter) Write(b []byte) (int, error) {
 		}
 		return newTimeVal
 	})
-	log.Println("Adjusting timezone for " + jsonString + " to " + newJSON)
 	return tzw.w.Write([]byte(newJSON))
 }
 

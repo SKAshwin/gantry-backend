@@ -68,9 +68,9 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
 	h.Handle("/api/v0/events/{eventID}/released", Adapt(http.HandlerFunc(h.handleReleased),
 		existCheck)).Methods("GET")
-	h.Handle("/api/v1-3/events/{eventID}/triggers/{tag}", Adapt(http.HandlerFunc(h.handleGetTimeTag),
+	h.Handle("/api/v1-3/events/{eventID}/triggers/{triggername}", Adapt(http.HandlerFunc(h.handleGetTimeTag),
 		existCheck, correctTimezonesOutput)).Methods("GET")
-	h.Handle("/api/v1-3/events/{eventID}/triggers/{tag}/occurred", Adapt(http.HandlerFunc(h.handleTimeTagOccurred),
+	h.Handle("/api/v1-3/events/{eventID}/triggers/{triggername}/occurred", Adapt(http.HandlerFunc(h.handleTimeTagOccurred),
 		existCheck)).Methods("GET")
 	h.Handle("/api/v1-2/events/{eventID}/feedback", Adapt(http.HandlerFunc(h.handleSubmitForm),
 		existCheck)).Methods("POST")
@@ -89,7 +89,7 @@ func (h *EventHandler) handleGetTimeTag(w http.ResponseWriter, r *http.Request) 
 		WriteMessage(http.StatusInternalServerError, "Could not fetch event information due to internal server issue", w)
 		return
 	}
-	tag := strings.ToLower(mux.Vars(r)["tag"])
+	tag := strings.ToLower(mux.Vars(r)["triggername"])
 	if val, ok := event.TimeTags[tag]; !ok {
 		WriteMessage(http.StatusNotFound, "No such time tag found", w)
 	} else {
@@ -105,7 +105,7 @@ func (h *EventHandler) handleTimeTagOccurred(w http.ResponseWriter, r *http.Requ
 		WriteMessage(http.StatusInternalServerError, "Could not fetch event information due to internal server issue", w)
 		return
 	}
-	tag := strings.ToLower(mux.Vars(r)["tag"])
+	tag := strings.ToLower(mux.Vars(r)["triggername"])
 	if val, ok := event.TimeTags[tag]; !ok {
 		WriteMessage(http.StatusNotFound, "No such time tag found", w)
 	} else {
