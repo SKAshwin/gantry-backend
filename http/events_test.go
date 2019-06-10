@@ -728,7 +728,7 @@ func TestHandleEvent(t *testing.T) {
 			if err != nil {
 				return checkin.Event{}, err
 			}
-			return checkin.Event{ID: "300"}, nil
+			return checkin.Event{ID: "300", CreatedAt: time.Date(2018, 6, 14, 16, 30, 0, 0, time.UTC)}, nil
 		}
 	}
 	es.EventFn = eventGenerator("300", nil)
@@ -739,7 +739,25 @@ func TestHandleEvent(t *testing.T) {
 	h.ServeHTTP(w, r)
 	var event checkin.Event
 	json.NewDecoder(w.Result().Body).Decode(&event)
-	test.Equals(t, checkin.Event{ID: "300"}, event)
+	test.Equals(t, checkin.Event{ID: "300", CreatedAt: time.Date(2018, 6, 14, 16, 30, 0, 0, time.UTC)}, event)
+
+	//Test ?loc query param
+	r = httptest.NewRequest("GET", "/api/v1-3/events/300?loc=Asia/Singapore", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&event)
+	test.Equals(t, checkin.Event{ID: "300", CreatedAt: time.Date(2018, 6, 15, 0, 30, 0, 0, time.Local)}, event)
+
+	r = httptest.NewRequest("GET", "/api/v1-3/events/300?loc=UTC", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&event)
+	test.Equals(t, checkin.Event{ID: "300", CreatedAt: time.Date(2018, 6, 14, 16, 30, 0, 0, time.UTC)}, event)
+
+	r = httptest.NewRequest("GET", "/api/v1-3/events/300?loc=Europe/lol", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 
 	//Test error fetching event
 	es.EventFn = eventGenerator("", errors.New("An error"))
@@ -758,7 +776,7 @@ func TestHandleEvent(t *testing.T) {
 	//Test access by admin
 	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
 		json.NewDecoder(r.Body).Decode(&event)
-		test.Equals(t, checkin.Event{ID: "300"}, event)
+		test.Equals(t, checkin.Event{ID: "300", CreatedAt: time.Date(2018, 6, 14, 16, 30, 0, 0, time.UTC)}, event)
 	})
 
 	//Test invalid token
