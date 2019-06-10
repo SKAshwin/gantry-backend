@@ -328,15 +328,19 @@ func (es *EventService) getNumberOfEventsBy(username string) (int, error) {
 
 //Converts an event to its raw (DB-storable) form, by marshalling
 //its timetag array into a JSON
+//also makes sure that all times are in UTC, as postgres will lose all timezone information
 func (es *EventService) marshalEvent(event checkin.Event) rawEvent {
 	if event.TimeTags == nil {
 		event.TimeTags = make(map[string]time.Time, 0)
 	}
 	for key, val := range event.TimeTags {
 		delete(event.TimeTags, key)
-		event.TimeTags[strings.ToLower(key)] = val
-
+		event.TimeTags[strings.ToLower(key)] = val.In(time.UTC)
 	}
+	event.Start.Time = event.Start.Time.In(time.UTC)
+	event.End.Time = event.End.Time.In(time.UTC)
+	event.CreatedAt = event.CreatedAt.In(time.UTC)
+	event.UpdatedAt = event.UpdatedAt.In(time.UTC)
 	timetags, _ := json.Marshal(event.TimeTags)
 	return rawEvent{Event: event, TimetagJSON: timetags}
 }
