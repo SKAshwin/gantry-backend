@@ -30,7 +30,7 @@ func NewUtilityHandler(qrg checkin.QRGenerator) *UtilityHandler {
 		QRGenerator: qrg,
 	}
 	h.Handle("/api/v0/utility/qrcode", http.HandlerFunc(h.handleQRGeneration)).Methods("POST")
-	h.Handle("/api/v1-3/utility/time", http.HandlerFunc(h.handleCurrentTime)).Methods("GET")
+	h.Handle("/api/v1-3/utility/time", Adapt(http.HandlerFunc(h.handleCurrentTime), correctTimezonesOutput)).Methods("GET")
 	return h
 }
 
@@ -62,18 +62,7 @@ func (h *UtilityHandler) handleCurrentTime(w http.ResponseWriter, r *http.Reques
 		WriteMessage(http.StatusBadRequest, "Could not parse query string", w)
 		return
 	}
-	var loc *time.Location
-	if len(r.Form["loc"]) != 0 {
-		loc, err = time.LoadLocation(r.Form["loc"][0]) //if not provided, this will return UTC
-		if err != nil {
-			h.Logger.Println("Error loading location: " + err.Error())
-			WriteMessage(http.StatusBadRequest, "Could not parse locale", w)
-			return
-		}
-	} else {
-		loc = time.UTC
-	}
 
-	val, _ := json.Marshal(time.Now().In(loc))
+	val, _ := json.Marshal(time.Now().UTC())
 	w.Write(val)
 }
