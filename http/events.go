@@ -68,9 +68,9 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
 	h.Handle("/api/v0/events/{eventID}/released", Adapt(http.HandlerFunc(h.handleReleased),
 		existCheck)).Methods("GET")
-	h.Handle("/api/v1-3/events/{eventID}/timetags/{tag}", Adapt(http.HandlerFunc(h.handleGetTimeTag),
+	h.Handle("/api/v1-3/events/{eventID}/triggers/{tag}", Adapt(http.HandlerFunc(h.handleGetTimeTag),
 		existCheck, correctTimezonesOutput)).Methods("GET")
-	h.Handle("/api/v1-3/events/{eventID}/timetags/{tag}/occurred", Adapt(http.HandlerFunc(h.handleTimeTagOccurred),
+	h.Handle("/api/v1-3/events/{eventID}/triggers/{tag}/occurred", Adapt(http.HandlerFunc(h.handleTimeTagOccurred),
 		existCheck)).Methods("GET")
 	h.Handle("/api/v1-2/events/{eventID}/feedback", Adapt(http.HandlerFunc(h.handleSubmitForm),
 		existCheck)).Methods("POST")
