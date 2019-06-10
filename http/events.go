@@ -55,21 +55,21 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 	existCheck := eventExists(es, "eventID")
 
 	h.Handle("/api/v1-3/events", Adapt(http.HandlerFunc(h.handleEventsBy),
-		tokenCheck)).Methods("GET")
+		tokenCheck, correctTimezonesOutput)).Methods("GET")
 	h.Handle("/api/v1-3/events", Adapt(http.HandlerFunc(h.handleCreateEvent),
-		tokenCheck)).Methods("POST")
+		tokenCheck, correctTimezonesInput)).Methods("POST")
 	h.Handle("/api/v0/events/takenurls/{eventURL}", Adapt(http.HandlerFunc(h.handleURLTaken),
 		tokenCheck)).Methods("GET")
 	h.Handle("/api/v1-3/events/{eventID}", Adapt(http.HandlerFunc(h.handleEvent),
-		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
+		tokenCheck, existCheck, credentialsCheck, correctTimezonesOutput)).Methods("GET")
 	h.Handle("/api/v1-3/events/{eventID}", Adapt(http.HandlerFunc(h.handleUpdateEvent),
-		tokenCheck, existCheck, credentialsCheck)).Methods("PATCH")
+		tokenCheck, existCheck, credentialsCheck, correctTimezonesInput)).Methods("PATCH")
 	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleDeleteEvent),
 		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
 	h.Handle("/api/v0/events/{eventID}/released", Adapt(http.HandlerFunc(h.handleReleased),
 		existCheck)).Methods("GET")
 	h.Handle("/api/v1-3/events/{eventID}/timetags/{tag}", Adapt(http.HandlerFunc(h.handleGetTimeTag),
-		existCheck)).Methods("GET")
+		existCheck, correctTimezonesOutput)).Methods("GET")
 	h.Handle("/api/v1-3/events/{eventID}/timetags/{tag}/occurred", Adapt(http.HandlerFunc(h.handleTimeTagOccurred),
 		existCheck)).Methods("GET")
 	h.Handle("/api/v1-2/events/{eventID}/feedback", Adapt(http.HandlerFunc(h.handleSubmitForm),

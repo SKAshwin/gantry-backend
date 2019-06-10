@@ -1,5 +1,7 @@
 package http_test
 
+//some timezone tests will only work if this test suite is run with Singapore being the local time zone, lol
+
 import (
 	"checkin"
 	myhttp "checkin/http"
@@ -72,8 +74,8 @@ func TestHandleUsers(t *testing.T) {
 			return users, nil
 		}
 	}
-	us.UsersFn = usersFnGenerator([]checkin.User{checkin.User{Username: "Jim"}, checkin.User{Username: "Bob"},
-		checkin.User{Username: "Smith"}}, nil)
+	us.UsersFn = usersFnGenerator([]checkin.User{checkin.User{Username: "Jim"}, checkin.User{Username: "Bob", CreatedAt: time.Date(2019, 1, 9, 13, 30, 0, 0, time.UTC)},
+		checkin.User{Username: "Smith", LastLoggedIn: null.TimeFrom(time.Date(2019, 2, 14, 14, 30, 0, 0, time.UTC))}}, nil)
 
 	//Test normal behavior
 	r := httptest.NewRequest("GET", "/api/v0/users", nil)
@@ -81,10 +83,24 @@ func TestHandleUsers(t *testing.T) {
 	h.ServeHTTP(w, r)
 	var users []checkin.User
 	json.NewDecoder(w.Result().Body).Decode(&users)
-	test.Equals(t, []checkin.User{checkin.User{Username: "Jim"}, checkin.User{Username: "Bob"},
-		checkin.User{Username: "Smith"}}, users)
+	test.Equals(t, []checkin.User{checkin.User{Username: "Jim"}, checkin.User{Username: "Bob", CreatedAt: time.Date(2019, 1, 9, 13, 30, 0, 0, time.UTC)},
+		checkin.User{Username: "Smith", LastLoggedIn: null.TimeFrom(time.Date(2019, 2, 14, 14, 30, 0, 0, time.UTC))}}, users)
+
+	//test ?loc=Asia/Singapore (set output times to Singapore timezone)
+	r = httptest.NewRequest("GET", "/api/v0/users?loc=Asia/Singapore", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&users)
+	test.Equals(t, []checkin.User{checkin.User{Username: "Jim"}, checkin.User{Username: "Bob", CreatedAt: time.Date(2019, 1, 9, 21, 30, 0, 0, time.Local)},
+		checkin.User{Username: "Smith", LastLoggedIn: null.TimeFrom(time.Date(2019, 2, 14, 22, 30, 0, 0, time.Local))}}, users)
+
+	r = httptest.NewRequest("GET", "/api/v0/users?loc=Doesnt/Exist", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 
 	//Test no users
+	r = httptest.NewRequest("GET", "/api/v0/users?loc=Asia/Singapore", nil)
 	us.UsersFn = usersFnGenerator([]checkin.User{}, nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -96,8 +112,9 @@ func TestHandleUsers(t *testing.T) {
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
-	us.UsersFn = usersFnGenerator([]checkin.User{checkin.User{Username: "Jim"}, checkin.User{Username: "Bob"},
-		checkin.User{Username: "Smith"}}, nil)
+	r = httptest.NewRequest("GET", "/api/v0/users", nil)
+	us.UsersFn = usersFnGenerator([]checkin.User{checkin.User{Username: "Jim"}, checkin.User{Username: "Bob", CreatedAt: time.Date(2019, 1, 9, 13, 30, 0, 0, time.UTC)},
+		checkin.User{Username: "Smith", LastLoggedIn: null.TimeFrom(time.Date(2019, 2, 14, 14, 30, 0, 0, time.UTC))}}, nil)
 
 	//Test access controls: a user should fail to access
 	//Admin should succeed
@@ -105,8 +122,8 @@ func TestHandleUsers(t *testing.T) {
 	userAccessTest(t, r, h, &auth, "some_guy")
 	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
 		json.NewDecoder(r.Body).Decode(&users)
-		test.Equals(t, []checkin.User{checkin.User{Username: "Jim"}, checkin.User{Username: "Bob"},
-			checkin.User{Username: "Smith"}}, users)
+		test.Equals(t, []checkin.User{checkin.User{Username: "Jim"}, checkin.User{Username: "Bob", CreatedAt: time.Date(2019, 1, 9, 13, 30, 0, 0, time.UTC)},
+			checkin.User{Username: "Smith", LastLoggedIn: null.TimeFrom(time.Date(2019, 2, 14, 14, 30, 0, 0, time.UTC))}}, users)
 	})
 	noValidTokenTest(t, r, h, &auth)
 }
@@ -127,7 +144,7 @@ func TestHandleUser(t *testing.T) {
 			if err != nil {
 				return checkin.User{}, err
 			}
-			return checkin.User{Username: "somebody"}, nil
+			return checkin.User{Username: "somebody", UpdatedAt: time.Date(2018, 2, 13, 10, 30, 0, 0, time.UTC)}, nil
 		}
 	}
 	us.UserFn = userFnGenerator(nil)
@@ -138,7 +155,14 @@ func TestHandleUser(t *testing.T) {
 	h.ServeHTTP(w, r)
 	var user checkin.User
 	json.NewDecoder(w.Result().Body).Decode(&user)
-	test.Equals(t, checkin.User{Username: "somebody"}, user)
+	test.Equals(t, checkin.User{Username: "somebody", UpdatedAt: time.Date(2018, 2, 13, 10, 30, 0, 0, time.UTC)}, user)
+
+	//Test setting timezone
+	r = httptest.NewRequest("GET", "/api/v0/users/somebody?loc=Asia/Singapore", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	json.NewDecoder(w.Result().Body).Decode(&user)
+	test.Equals(t, checkin.User{Username: "somebody", UpdatedAt: time.Date(2018, 2, 13, 18, 30, 0, 0, time.Local)}, user)
 
 	//Test error getting user
 	us.UserFn = userFnGenerator(errors.New("An error"))
@@ -153,7 +177,7 @@ func TestHandleUser(t *testing.T) {
 	userAccessTest(t, r, h, &auth, "some_guy")
 	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
 		json.NewDecoder(w.Result().Body).Decode(&user)
-		test.Equals(t, checkin.User{Username: "somebody"}, user)
+		test.Equals(t, checkin.User{Username: "somebody", UpdatedAt: time.Date(2018, 2, 13, 18, 30, 0, 0, time.Local)}, user)
 	})
 	noValidTokenTest(t, r, h, &auth)
 
