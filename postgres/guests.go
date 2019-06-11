@@ -209,7 +209,7 @@ func (gs *GuestService) RegisterGuests(eventID string, guests []checkin.Guest) e
 		}
 	}()
 
-	stmt, err := tx.Prepare(pq.CopyIn("guest", "nrichash", "eventid", "name", "tags", "checkedin"))
+	stmt, err := tx.Prepare("INSERT into guest(nrichash, eventid, name, tags, checkedin) VALUES($1, $2, $3, $4, FALSE)")
 	if err != nil {
 		return errors.New("Error preparing statement: " + err.Error())
 	}
@@ -222,19 +222,16 @@ func (gs *GuestService) RegisterGuests(eventID string, guests []checkin.Guest) e
 		guest.Tags = gs.capitalizeTags(guest.Tags)
 		if err != nil {
 			tx.Rollback()
+			stmt.Close()
 			return errors.New("Error hashing NRIC: " + err.Error())
 		}
 
-		_, err = stmt.Exec(nricHash, eventID, guest.Name, pq.Array(guest.Tags), false)
+		_, err = stmt.Exec(nricHash, eventID, guest.Name, pq.Array(guest.Tags))
 		if err != nil {
 			tx.Rollback()
+			stmt.Close()
 			return errors.New("Error inserting one of the guests: " + err.Error())
 		}
-	}
-
-	_, err = stmt.Exec()
-	if err != nil {
-		return errors.New("Error executing statement: " + err.Error())
 	}
 
 	err = stmt.Close()
