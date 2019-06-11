@@ -809,6 +809,24 @@ func TestHandleEventsBy(t *testing.T) {
 		checkin.Event{ID: "200"},
 		checkin.Event{ID: "300"}}, events)
 
+	r = httptest.NewRequest("GET", "/api/v1-3/events?loc=Asia/Singapore&field=eventId&field=startDateTime", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	events = make([]checkin.Event, 100)
+	json.NewDecoder(w.Result().Body).Decode(&events)
+	test.Equals(t, []checkin.Event{checkin.Event{ID: "100"},
+		checkin.Event{ID: "200", Start: null.TimeFrom(time.Date(2019, 3, 2, 7, 30, 0, 0, time.Local))},
+		checkin.Event{ID: "300"}}, events)
+
+	r = httptest.NewRequest("GET", "/api/v1-3/events?loc=Asia/Singapore&field=eventId&field=startDateTime&field=notafield", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	events = make([]checkin.Event, 100)
+	json.NewDecoder(w.Result().Body).Decode(&events)
+	test.Equals(t, []checkin.Event{checkin.Event{ID: "100"},
+		checkin.Event{ID: "200", Start: null.TimeFrom(time.Date(2019, 3, 2, 7, 30, 0, 0, time.Local))},
+		checkin.Event{ID: "300"}}, events)
+
 	//Test getting auth info fails
 	auth.GetAuthInfoFn = getAuthInfoGenerator("", false, errors.New("An error"))
 	r = httptest.NewRequest("GET", "/api/v1-3/events", nil)
@@ -878,6 +896,30 @@ func TestHandleEvent(t *testing.T) {
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	//test ?field query param (and case sensitivity of it)
+	r = httptest.NewRequest("GET", "/api/v1-3/events/300?field=createdat", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	event = checkin.Event{} //re-initalize
+	json.NewDecoder(w.Result().Body).Decode(&event)
+	test.Equals(t, checkin.Event{CreatedAt: time.Date(2018, 6, 14, 16, 30, 0, 0, time.UTC)}, event)
+
+	//non-existent field
+	r = httptest.NewRequest("GET", "/api/v1-3/events/300?field=lol", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	event = checkin.Event{} //re-initalize
+	json.NewDecoder(w.Result().Body).Decode(&event)
+	test.Equals(t, checkin.Event{}, event)
+
+	//multiple fields
+	r = httptest.NewRequest("GET", "/api/v1-3/events/300?field=createdat&field=eventID", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	event = checkin.Event{} //re-initalize
+	json.NewDecoder(w.Result().Body).Decode(&event)
+	test.Equals(t, checkin.Event{ID: "300", CreatedAt: time.Date(2018, 6, 14, 16, 30, 0, 0, time.UTC)}, event)
 
 	//Test error fetching event
 	es.EventFn = eventGenerator("", errors.New("An error"))
