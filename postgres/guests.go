@@ -46,7 +46,7 @@ func (gs *GuestService) CheckIn(eventID string, nric string) (string, error) {
 		return "", errors.New("Error starting transaction: " + err.Error())
 	}
 
-	_, err = tx.Exec("UPDATE guest SET checkedIn = TRUE, checkInTime = NOW() WHERE eventID = $1 and nricHash = $2",
+	_, err = tx.Exec("UPDATE guest SET checkedIn = TRUE, checkInTime = (NOW() at time zone 'utc') WHERE eventID = $1 and nricHash = $2",
 		eventID, nricHash)
 	if err != nil {
 		tx.Rollback()
@@ -84,7 +84,7 @@ func (gs *GuestService) MarkAbsent(eventID string, nric string) error {
 	}
 	nricHash := guest.NRIC
 
-	_, err = gs.DB.Exec("UPDATE guest SET checkedIn = False, checkInTime = NOW() WHERE eventID = $1 and nricHash = $2",
+	_, err = gs.DB.Exec("UPDATE guest SET checkedIn = False, checkInTime = (NOW() at time zone 'utc') WHERE eventID = $1 and nricHash = $2",
 		eventID, nricHash)
 	return err
 }
