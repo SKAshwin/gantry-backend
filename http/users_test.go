@@ -86,6 +86,39 @@ func TestHandleUsers(t *testing.T) {
 	test.Equals(t, []checkin.User{checkin.User{Username: "Jim"}, checkin.User{Username: "Bob", CreatedAt: time.Date(2019, 1, 9, 13, 30, 0, 0, time.UTC)},
 		checkin.User{Username: "Smith", LastLoggedIn: null.TimeFrom(time.Date(2019, 2, 14, 14, 30, 0, 0, time.UTC))}}, users)
 
+	//test specifying fields desired
+	r = httptest.NewRequest("GET", "/api/v0/users?field=uSeRName", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	users = make([]checkin.User, 10)
+	json.NewDecoder(w.Result().Body).Decode(&users)
+	test.Equals(t, []checkin.User{checkin.User{Username: "Jim"}, checkin.User{Username: "Bob"},
+		checkin.User{Username: "Smith"}}, users)
+
+	r = httptest.NewRequest("GET", "/api/v0/users?field=lastloggedin", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	users = make([]checkin.User, 10)
+	json.NewDecoder(w.Result().Body).Decode(&users)
+	test.Equals(t, []checkin.User{checkin.User{}, checkin.User{},
+		checkin.User{LastLoggedIn: null.TimeFrom(time.Date(2019, 2, 14, 14, 30, 0, 0, time.UTC))}}, users)
+
+	r = httptest.NewRequest("GET", "/api/v0/users?field=lastloggedin&field=username", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	users = make([]checkin.User, 10)
+	json.NewDecoder(w.Result().Body).Decode(&users)
+	test.Equals(t, []checkin.User{checkin.User{Username: "Jim"}, checkin.User{Username: "Bob"},
+		checkin.User{Username: "Smith", LastLoggedIn: null.TimeFrom(time.Date(2019, 2, 14, 14, 30, 0, 0, time.UTC))}}, users)
+
+	r = httptest.NewRequest("GET", "/api/v0/users?field=doesntexist", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	users = make([]checkin.User, 10)
+	json.NewDecoder(w.Result().Body).Decode(&users)
+	test.Equals(t, []checkin.User{checkin.User{}, checkin.User{},
+		checkin.User{}}, users)
+
 	//test ?loc=Asia/Singapore (set output times to Singapore timezone)
 	r = httptest.NewRequest("GET", "/api/v0/users?loc=Asia/Singapore", nil)
 	w = httptest.NewRecorder()
@@ -156,6 +189,22 @@ func TestHandleUser(t *testing.T) {
 	var user checkin.User
 	json.NewDecoder(w.Result().Body).Decode(&user)
 	test.Equals(t, checkin.User{Username: "somebody", UpdatedAt: time.Date(2018, 2, 13, 10, 30, 0, 0, time.UTC)}, user)
+
+	//Test get specific fields only
+	r = httptest.NewRequest("GET", "/api/v0/users/somebody?field=uPDatedat", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	user = checkin.User{}
+	json.NewDecoder(w.Result().Body).Decode(&user)
+	test.Equals(t, checkin.User{UpdatedAt: time.Date(2018, 2, 13, 10, 30, 0, 0, time.UTC)}, user)
+
+	//Test get specific field, field doesn't exist
+	r = httptest.NewRequest("GET", "/api/v0/users/somebody?field=lolwut", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	user = checkin.User{}
+	json.NewDecoder(w.Result().Body).Decode(&user)
+	test.Equals(t, checkin.User{}, user)
 
 	//Test setting timezone
 	r = httptest.NewRequest("GET", "/api/v0/users/somebody?loc=Asia/Singapore", nil)

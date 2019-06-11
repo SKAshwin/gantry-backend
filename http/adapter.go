@@ -1,12 +1,11 @@
 package http
 
 import (
+	"bytes"
 	"encoding/json"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"strings"
-	"time"
 )
 
 //Adapter a function which takes a http handler and adds some functionality
@@ -23,113 +22,122 @@ func Adapt(h http.Handler, adapters ...Adapter) http.Handler {
 	return h
 }
 
-//Middleware which intercepts the response being written out, (assuming that it is in a JSON format), parses it to find any strings that are meant
-//to be times, and then corrects the time to be of a timezone that is provided in the ?loc argument
-//Timezone must follow the IANA time zone database names
-//It will run and attempt to alter times if and only if the status code of the message is less than 400
-//If no ?loc aergument is given, ensures timezones are in UTC
-func correctTimezonesOutput(h http.Handler) http.Handler {
+//Middleware which intercepts the response being written, and if any field query string params are supplied
+//it will only display those fields of the object being written out
+//Also works with arrays of objects, and arrays of arrays of objects, etc
+//If the respone being written out is neither an object nor an array (or there are any elements of an array that aren't an object)
+//it will just pass through
+func jsonSelector(h http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		locationName := r.FormValue("loc") //no loc will return "", which will be parsed as UTC
-		location, err := time.LoadLocation(locationName)
+		err := r.ParseForm()
 		if err != nil {
-			WriteMessage(http.StatusBadRequest, "Could not parse location "+locationName+" in form argument loc. Use IANA time zone database names", w)
+			log.Println("Could not parse form: " + err.Error())
+			WriteMessage(http.StatusBadRequest, "Could not parse form query values", w)
 			return
 		}
-		h.ServeHTTP(&timeZoneAdjustedWriter{w: w, loc: location}, r)
+		if len(r.Form["field"]) == 0 { //if no field params, give back all
+			h.ServeHTTP(w, r)
+		} else {
+			h.ServeHTTP(&jsonSelectorWriter{w: w, selectedFields: r.Form["field"]}, r)
+		}
+
 	})
 }
 
-//Middleware which intercepts the request, assuming that its body is in a JSON format, and parses it to find any strings that are meant to be times
-//and then ensures that the time is interpreted to be of the timezone that is provided in the ?loc form query parameter
-//Timezone must follow the IANA time zone database names
-//If no ?loc argument is given, times will be interpreted as UTC
-func correctTimezonesInput(h http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		locationName := r.FormValue("loc") //no loc will return "", which will be parsed as UTC
-		location, err := time.LoadLocation(locationName)
-		if err != nil {
-			WriteMessage(http.StatusBadRequest, "Could not parse location "+locationName+" in form argument loc. Use IANA time zone database names", w)
-			return
-		}
-		res, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			log.Println("Could not read request body in correct timezone middleware: " + err.Error())
-			WriteMessage(http.StatusBadRequest, "Could not read request body to correct timezones", w)
-			return
-		}
-		json := string(res)
+type jsonSelectorWriter struct {
+	w              http.ResponseWriter
+	selectedFields []string
+	statusCode     int
+}
 
-		newJSON := correctJSONTimeZone(json, func(old time.Time) time.Time {
-			if old.IsZero() {
-				return old
+func (jsw *jsonSelectorWriter) Header() http.Header {
+	return jsw.w.Header()
+}
+
+func (jsw *jsonSelectorWriter) WriteHeader(statusCode int) {
+	jsw.statusCode = statusCode
+	jsw.w.WriteHeader(statusCode)
+}
+
+func (jsw *jsonSelectorWriter) Write(b []byte) (int, error) {
+	if jsw.statusCode >= 400 { //if it's an error message
+		return jsw.w.Write(b)
+	}
+
+	reply, err := selectJSONFields(b, jsw.selectedFields)
+	if err != nil {
+		//an error here is a programming mistake, as the selectJSONFields method should not fail for any properly formatted
+		//object or array of objects (or array of arrays etc)
+		//and this middleware should only be used on methods that output JSON request bodies
+		log.Println("Error attempting to select JSON fields in middleware: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Internal error trying to select fields", jsw.w)
+		return 200, nil
+	}
+
+	log.Println(string(reply))
+	log.Println("Made it here!")
+
+	return jsw.w.Write(reply)
+}
+
+func selectJSONFields(jsonData []byte, selectedFields []string) ([]byte, error) {
+	// Get slice of data with optional leading whitespace removed.
+	// See RFC 7159, Section 2 for the definition of JSON whitespace.
+	x := bytes.TrimLeft(jsonData, " \t\r\n")
+
+	isArray := len(x) > 0 && x[0] == '['
+	isObject := len(x) > 0 && x[0] == '{'
+
+	if isObject {
+		var fields map[string]interface{}
+		err := json.Unmarshal(jsonData, &fields)
+		if err != nil {
+			return nil, err
+		}
+		for name := range fields {
+			log.Println(name)
+			log.Println(selectedFields)
+			if !stringInSlice(name, selectedFields) {
+				delete(fields, name) //delete all non-selected fields
 			}
-			return time.Date(old.Year(), old.Month(), old.Day(), old.Hour(), old.Minute(), old.Second(), old.Nanosecond(), location)
-		})
-
-		r.Body = ioutil.NopCloser(strings.NewReader(newJSON))
-		r.ContentLength = int64(len(newJSON))
-
-		h.ServeHTTP(w, r)
-	})
-}
-
-//Writer which adjusts timezones being written to it before sending it to the client
-type timeZoneAdjustedWriter struct {
-	w          http.ResponseWriter
-	loc        *time.Location
-	statusCode int
-}
-
-func (tzw *timeZoneAdjustedWriter) Header() http.Header {
-	return tzw.w.Header()
-}
-
-func (tzw *timeZoneAdjustedWriter) WriteHeader(statusCode int) {
-	tzw.statusCode = statusCode
-	tzw.w.WriteHeader(statusCode)
-}
-
-func (tzw *timeZoneAdjustedWriter) Write(b []byte) (int, error) {
-	if tzw.statusCode >= 400 { //if it's an error message
-		return tzw.w.Write(b)
-	}
-	//if not, alter any times in the JSON
-	jsonString := string(b)
-	newJSON := correctJSONTimeZone(jsonString, func(timeVal time.Time) time.Time {
-		var newTimeVal time.Time
-		if !timeVal.IsZero() { //don't touch zero value times (though the output shouldn't have any, by right)
-			newTimeVal = timeVal.In(tzw.loc)
-		} else {
-			newTimeVal = timeVal
 		}
-		return newTimeVal
-	})
-	return tzw.w.Write([]byte(newJSON))
-}
-
-func correctJSONTimeZone(jsonString string, correctionMethod func(time.Time) time.Time) string {
-	parts := strings.Split(jsonString, `"`)
-	newJSON := ""
-	for i, part := range parts {
-		var timeVal time.Time
-		var amendedPart string
-		if err := json.Unmarshal([]byte(`"`+part+`"`), &timeVal); err != nil {
-			//this JSON part was not a time value
-			amendedPart = part
-		} else {
-			//this JSON part was a time value
-			newTimeVal := correctionMethod(timeVal)
-			result, _ := json.Marshal(newTimeVal)
-			amendedPart = strings.Split(string(result), `"`)[1] //remove quotes from JSON marshalling
+		log.Println(fields)
+		lol, err := json.Marshal(fields)
+		log.Println(string(lol))
+		return json.Marshal(fields)
+	} else if isArray {
+		var elems []interface{}
+		err := json.Unmarshal(jsonData, &elems)
+		if err != nil {
+			return nil, err
 		}
-
-		if i == len(parts)-1 {
-			newJSON += amendedPart
-		} else {
-			newJSON += amendedPart + `"`
+		for i, elem := range elems {
+			jsonVal, err := json.Marshal(elem)
+			if err != nil {
+				return nil, err
+			}
+			newVal, err := selectJSONFields(jsonVal, selectedFields)
+			if err != nil {
+				return nil, err
+			}
+			err = json.Unmarshal(newVal, &elems[i])
+			if err != nil {
+				return nil, err
+			}
 		}
+		return json.Marshal(elems)
 	}
 
-	return newJSON
+	return jsonData, nil
+}
+
+//Checks if a string is in the list
+//case insensitive
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if strings.ToLower(b) == strings.ToLower(a) {
+			return true
+		}
+	}
+	return false
 }

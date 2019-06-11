@@ -55,13 +55,13 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 	existCheck := eventExists(es, "eventID")
 
 	h.Handle("/api/v1-3/events", Adapt(http.HandlerFunc(h.handleEventsBy),
-		tokenCheck, correctTimezonesOutput)).Methods("GET")
+		tokenCheck, correctTimezonesOutput, jsonSelector)).Methods("GET")
 	h.Handle("/api/v1-3/events", Adapt(http.HandlerFunc(h.handleCreateEvent),
 		tokenCheck, correctTimezonesInput)).Methods("POST")
 	h.Handle("/api/v0/events/takenurls/{eventURL}", Adapt(http.HandlerFunc(h.handleURLTaken),
 		tokenCheck)).Methods("GET")
 	h.Handle("/api/v1-3/events/{eventID}", Adapt(http.HandlerFunc(h.handleEvent),
-		tokenCheck, existCheck, credentialsCheck, correctTimezonesOutput)).Methods("GET")
+		tokenCheck, existCheck, credentialsCheck, correctTimezonesOutput, jsonSelector)).Methods("GET")
 	h.Handle("/api/v1-3/events/{eventID}", Adapt(http.HandlerFunc(h.handleUpdateEvent),
 		tokenCheck, existCheck, credentialsCheck, correctTimezonesInput)).Methods("PATCH")
 	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleDeleteEvent),
