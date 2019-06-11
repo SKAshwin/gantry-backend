@@ -35,6 +35,14 @@ and register all the guests in that CSV for a given event. Note that the CSV sho
 
 You will be prompted for a password after hitting enter. Upload will begin shortly after, and output will be dumped into output.txt. Make sure to read the output to check for errors registering any guests (for example, frequently there are some guests who appear twice in the CSV, though this isn't an issue, sometimes two different guests with the same last 5 digits of their NRIC appear in the CSV, and the second guest will fail to register).
 
+If guests have tags, that is to say they are in the following format:
+
+1234A,LTC Jim Bob,"VIP,CONFIRMED"
+
+1235B,ME4 John,VIP
+
+Added the `-tags` argument to ./uploadguests
+
 ### Project Layout
 
 #### Guide
@@ -71,52 +79,31 @@ slated to be added in future releases).
 
 The main file, under the cmd folder, initializes the implementations to be used, and ties everything together, before starting the server.
 
-### Deployment Branches
+### Branch Management
 
-#### Quick Guide
+The `master` branch should always contain the latest released version + hotfixes possibly. Releases, which are tagged, may also have their own branches, so hotfixes can be applied to a release but not to the project going forward. This latter method is recommended if the changes are spaghetti code/untested and meant for an urgent situation which shouldn't be part of the codebase.
 
-```
-git checkout tags/v1.1 -b heroku-deploy-v1.1
-git cherry-pick 5c77797f7a8f6c3f1860b1cc072d94355ce0581f
-git push -u origin heroku-deploy-v1.1
-```
+When a new version begins development, start a new version development "master" branch, such as `v1.3dev` (in that naming convention). To begin making a change, create a new branch first, make your changes, test them, and merge them (or make a pull request if the team lead wants to review your code) with the development branch. WARNING: Trying to merge a pull request, by default, will merge into master. Carefully select your development branch instead.
 
-Cherry-pick picks a commit which adds the procfile and comments out loadEnvironmentalVariables() in the main.
+The "change" branches should be worked on by one person at one time, but many people can work on the same version development branch, making different changes, in different branches (The general principle is a branch should only have one person committing to it, and changes should be integrated into the larger branch). The change branches should follow the following naming convention `category/changename`. The categories commonly used are `feat` for new features (like a new API endpoint), `bug` for bugfixes, or `optimize` for optimization changes.
 
-#### In-Depth Guide
+For example `feat/websitebuilder` could be a branch creating the website builder back end, `bug/utcfix` could be the branch fixing times not being in UTC on the data access layer, `optimize/parallelfind` could be parallelizing a findGuests function to make it faster. These branches should be deleted after they have been merged back into the version, or after they've been abandoned.
 
-All deployments should be off a separate branch from master, and should be tied to a specific release of the project. Start by switching to a new branch at the tag of the release you want to deploy (the example below assumes you are trying to deploy v1.1; try to follow the naming convention)
+Once all the changes for the release have been merged with the version development branch, merge it with master, and deploy the new version of heroku. Before merging the branch, make sure the docs are updated to the new release.
 
-```
-git checkout tags/v1.1 -b heroku-deploy-v1.1
-```
+`git checkout -b <branch_name>` to create a new branch from the current commit
 
-You need a file called Procfile in your root directory, which tells heroku where the main function is, effectively, and what commands to run to run the go program (after the go buildpack actually compiles the program). Add the following line in the Procfile,
+`git checkout -d <branch_name>` deletes a branch locally
+
+`git push --delete <remote_name> <branch_name>` deletes a branch in the remote (GitHub). Remote name is usually origin
+
+`git merge <branch_name>` merges the commits of the branch named with the branch the user is currently on. Use this to merge a branch's changes with the development branch, for example:
 
 ```
-web: cd cmd/checkin && checkin
-```
-
-You can automate creating the file by just running the following command from the command line, in the root directory:
-
-```
-echo web: cd cmd/checkin ^&^& checkin >> Procfile
-```
-
-This Procfile tells heroku to navigate to the checkin folder, and then run the checkin executable (note that heroku runs on Ubuntu 18.04 as of the time of writing - google heroku stacks to learn more - so the executable is a linux binary). If the main function is in a file in another directory, update the cd half of the command accordingly.
-
-Go to `cmd/checkin/main.go` and comment out the first line: 
-
-```go
-func main() {
-	//loadEnvironmentalVariables() //comment this out for heroku production
-  ...
-```
-
-Commit the new main.go and Procfile to the deployment branch. 
-
-```
-git push -u origin heroku-deploy-v1.1
+git checkout v1.3dev
+git pull
+git merge feat/timezones
+git push -u origin v1.3dev
 ```
 
 ### Heroku Deployment
@@ -127,8 +114,8 @@ From Scratch:
 2. Set the environmental variables, according to the keys in `env.example`.
 3. Go to the Deploy tab, and choose GitHub as the Deployment method. Under the connect to github section, type `gantry-backend`.
 3. Click connect next to the right repository.
-4. Select the branch you want to deploy from.
-5. Press 'Enable Automatic Deploys'. Now any commits to the deployment branch will automatically cause heroku to rebuild, and be deployed.
+4. Select the branch you want to deploy from. This is usually master. A test back end may deploy off the development branches.
+5. Press 'Enable Automatic Deploys' for test back ends. Now any commits to the specified branch will automatically cause heroku to rebuild, and be deployed. This is probably not desirable for the real backend, which can manually be deployed through 'Manual Deploy' upon new version releases.
 6. The current branch has not been deployed yet, however. Go to the 'Manual Deploy' section , select the right branch, and press Deploy.
 7. Give heroku a few seconds, and it will finish building the app. Use the Heroku CLI to monitor the progress of the app
 
@@ -180,5 +167,19 @@ In order to view exactly which lines in each file were tested and which were not
 
 ```
 go tool cover -html=fmt
+```
+
+In order to test all packages, from the root folder run
+
+```
+go test ./...
+```
+
+In order to test race conditions (very important for websocket/database access layer!), add the `-race` argument while testing a package. You can add the `-race` argument while testing all packages like above, make sure to do this before merging to master or a main development branch.
+
+To run a specific test, run
+
+```
+go test -run "^(TestFunctionName)$"
 ```
 
