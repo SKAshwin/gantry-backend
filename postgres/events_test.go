@@ -348,3 +348,28 @@ func TestSubmitFeedback(t *testing.T) {
 	test.Assert(t, err != nil, "Empty survey does not throw an error")
 
 }
+
+func TestCheckIfExists(t *testing.T) {
+	es := postgres.EventService{DB: db}
+
+	//test event exists
+	exists, err := es.CheckIfExists("c14a592c-950d-44ba-b173-bbb9e4f5c8b4")
+	test.Ok(t, err)
+	test.Equals(t, true, exists)
+
+	//test event does not exist
+	exists, err = es.CheckIfExists("812d513d-8bb1-4216-93f5-17bd3056fff4")
+	test.Ok(t, err)
+	test.Equals(t, false, exists)
+
+	//test invalid UUID
+	exists, err = es.CheckIfExists("helloworld")
+	test.Ok(t, err)
+	test.Equals(t, false, exists)
+
+	//test empty string
+	exists, err = es.CheckIfExists("")
+	test.Ok(t, err)
+	test.Equals(t, false, exists)
+
+}

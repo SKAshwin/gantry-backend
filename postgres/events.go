@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/jmoiron/sqlx"
 )
 
@@ -181,6 +183,12 @@ func (es *EventService) URLExists(url string) (bool, error) {
 //Return a non-nil error if there is an error in querying the database
 func (es *EventService) CheckIfExists(id string) (bool, error) {
 	var num int
+	if _, err := uuid.Parse(id); err != nil {
+		//if id is not even a valid UUID, event does not exist
+		//this check is necessary, because otherwise an SQL error will be thrown in the next statement
+		//so this function will return an error instead of false for the event not existing
+		return false, nil
+	}
 	err := es.DB.QueryRow("SELECT count(*) from event where id = $1", id).Scan(&num)
 	return num == 1, err
 }
