@@ -209,6 +209,12 @@ func (gs *GuestService) RegisterGuests(eventID string, guests []checkin.Guest) e
 		}
 	}()
 
+	stmt, err := tx.Prepare("INSERT into guest(nricHash,eventID,name,tags,checkedIn) VALUES($1,$2,$3,$4,FALSE)")
+	if err != nil {
+		return errors.New("Error preparing statement: " + err.Error())
+	}
+	defer stmt.Close()
+
 	for _, guest := range guests {
 		nricHash, err := gs.HM.HashAndSalt(strings.ToUpper(guest.NRIC))
 		if guest.Tags == nil {
@@ -220,8 +226,7 @@ func (gs *GuestService) RegisterGuests(eventID string, guests []checkin.Guest) e
 			return errors.New("Error hashing NRIC: " + err.Error())
 		}
 
-		_, err = tx.Exec("INSERT into guest(nricHash,eventID,name,tags,checkedIn) VALUES($1,$2,$3,$4,FALSE)",
-			nricHash, eventID, guest.Name, pq.Array(guest.Tags))
+		_, err = stmt.Exec(nricHash, eventID, guest.Name, pq.Array(guest.Tags))
 		if err != nil {
 			tx.Rollback()
 			return errors.New("Error inserting one of the guests: " + err.Error())
