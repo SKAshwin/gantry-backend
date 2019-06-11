@@ -3,7 +3,9 @@ package http
 import (
 	"bytes"
 	"encoding/json"
+	"log"
 	"net/http"
+	"strings"
 )
 
 //Adapter a function which takes a http handler and adds some functionality
@@ -18,6 +20,64 @@ func Adapt(h http.Handler, adapters ...Adapter) http.Handler {
 		h = adapter(h)
 	}
 	return h
+}
+
+//Middleware which intercepts the response being written, and if any field query string params are supplied
+//it will only display those fields of the object being written out
+//Also works with arrays of objects, and arrays of arrays of objects, etc
+//If the respone being written out is neither an object nor an array (or there are any elements of an array that aren't an object)
+//it will just pass through
+func jsonSelector(h http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		err := r.ParseForm()
+		if err != nil {
+			log.Println("Could not parse form: " + err.Error())
+			WriteMessage(http.StatusBadRequest, "Could not parse form query values", w)
+			return
+		}
+		if len(r.Form["field"]) == 0 { //if no field params, give back all
+			h.ServeHTTP(w, r)
+		} else {
+			h.ServeHTTP(&jsonSelectorWriter{w: w, selectedFields: r.Form["field"]}, r)
+		}
+
+	})
+}
+
+type jsonSelectorWriter struct {
+	w              http.ResponseWriter
+	selectedFields []string
+	statusCode     int
+}
+
+func (jsw *jsonSelectorWriter) Header() http.Header {
+	return jsw.w.Header()
+}
+
+func (jsw *jsonSelectorWriter) WriteHeader(statusCode int) {
+	jsw.statusCode = statusCode
+	jsw.w.WriteHeader(statusCode)
+}
+
+func (jsw *jsonSelectorWriter) Write(b []byte) (int, error) {
+	if jsw.statusCode >= 400 { //if it's an error message
+		return jsw.w.Write(b)
+	}
+
+	reply, err := selectJSONFields(b, jsw.selectedFields)
+	if err != nil {
+		//an error here is a programming mistake, as the selectJSONFields method should not fail for any properly formatted
+		//object or array of objects (or array of arrays etc)
+		//and this middleware should only be used on methods that output JSON request bodies
+		log.Println("Error attempting to select JSON fields in middleware: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Internal error trying to select fields", jsw.w)
+		return 200, nil
+	}
+
+	log.Println(string(reply))
+	log.Println("Made it here!")
+
+	return jsw.w.Write(reply)
 }
 
 func selectJSONFields(jsonData []byte, selectedFields []string) ([]byte, error) {
@@ -35,10 +95,15 @@ func selectJSONFields(jsonData []byte, selectedFields []string) ([]byte, error) 
 			return nil, err
 		}
 		for name := range fields {
+			log.Println(name)
+			log.Println(selectedFields)
 			if !stringInSlice(name, selectedFields) {
 				delete(fields, name) //delete all non-selected fields
 			}
 		}
+		log.Println(fields)
+		lol, err := json.Marshal(fields)
+		log.Println(string(lol))
 		return json.Marshal(fields)
 	} else if isArray {
 		var elems []interface{}
@@ -55,11 +120,10 @@ func selectJSONFields(jsonData []byte, selectedFields []string) ([]byte, error) 
 			if err != nil {
 				return nil, err
 			}
-			newElem, err := json.Marshal(newVal)
+			err = json.Unmarshal(newVal, &elems[i])
 			if err != nil {
 				return nil, err
 			}
-			elems[i] = newElem
 		}
 		return json.Marshal(elems)
 	}
@@ -67,9 +131,11 @@ func selectJSONFields(jsonData []byte, selectedFields []string) ([]byte, error) 
 	return jsonData, nil
 }
 
+//Checks if a string is in the list
+//case insensitive
 func stringInSlice(a string, list []string) bool {
 	for _, b := range list {
-		if b == a {
+		if strings.ToLower(b) == strings.ToLower(a) {
 			return true
 		}
 	}

@@ -793,9 +793,20 @@ func TestHandleEventsBy(t *testing.T) {
 	r = httptest.NewRequest("GET", "/api/v1-3/events?loc=Asia/Singapore", nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
+	events = make([]checkin.Event, 100)
 	json.NewDecoder(w.Result().Body).Decode(&events)
 	test.Equals(t, []checkin.Event{checkin.Event{ID: "100"},
 		checkin.Event{ID: "200", Start: null.TimeFrom(time.Date(2019, 3, 2, 7, 30, 0, 0, time.Local))},
+		checkin.Event{ID: "300"}}, events)
+
+	//Test only ask for certain fields
+	r = httptest.NewRequest("GET", "/api/v1-3/events?loc=Asia/Singapore&field=eventId", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	events = make([]checkin.Event, 100)
+	json.NewDecoder(w.Result().Body).Decode(&events)
+	test.Equals(t, []checkin.Event{checkin.Event{ID: "100"},
+		checkin.Event{ID: "200"},
 		checkin.Event{ID: "300"}}, events)
 
 	//Test getting auth info fails
