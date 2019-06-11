@@ -119,8 +119,12 @@ func (us *UserService) CheckIfExists(username string) (bool, error) {
 }
 
 //UpdateLastLoggedIn Sets the lastLoggedIn attribute of this user to the current time
+//Returns an error if the user with that username does not exist, or error updating last logged in
 func (us *UserService) UpdateLastLoggedIn(username string) error {
-	_, err := us.DB.Exec("UPDATE app_user SET lastLoggedIn = (NOW() at time zone 'utc') where username = $1", username)
+	res, err := us.DB.Exec("UPDATE app_user SET lastLoggedIn = (NOW() at time zone 'utc') where username = $1", username)
+	if num, _ := res.RowsAffected(); num == 0 {
+		return errors.New("User does not exist")
+	}
 	return err
 }
 
