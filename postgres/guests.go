@@ -209,11 +209,10 @@ func (gs *GuestService) RegisterGuests(eventID string, guests []checkin.Guest) e
 		}
 	}()
 
-	stmt, err := tx.Prepare("INSERT into guest(nricHash,eventID,name,tags,checkedIn) VALUES($1,$2,$3,$4,FALSE)")
+	stmt, err := tx.Prepare(pq.CopyIn("guest", "nrichash", "eventid", "name", "tags", "checkedin"))
 	if err != nil {
 		return errors.New("Error preparing statement: " + err.Error())
 	}
-	defer stmt.Close()
 
 	for _, guest := range guests {
 		nricHash, err := gs.HM.HashAndSalt(strings.ToUpper(guest.NRIC))
@@ -226,11 +225,21 @@ func (gs *GuestService) RegisterGuests(eventID string, guests []checkin.Guest) e
 			return errors.New("Error hashing NRIC: " + err.Error())
 		}
 
-		_, err = stmt.Exec(nricHash, eventID, guest.Name, pq.Array(guest.Tags))
+		_, err = stmt.Exec(nricHash, eventID, guest.Name, pq.Array(guest.Tags), false)
 		if err != nil {
 			tx.Rollback()
 			return errors.New("Error inserting one of the guests: " + err.Error())
 		}
+	}
+
+	_, err = stmt.Exec()
+	if err != nil {
+		return errors.New("Error executing statement: " + err.Error())
+	}
+
+	err = stmt.Close()
+	if err != nil {
+		return errors.New("Error closing statement: " + err.Error())
 	}
 
 	err = tx.Commit()
