@@ -220,7 +220,7 @@ func (gs *GuestService) RegisterGuests(eventID string, guests []checkin.Guest) e
 			return errors.New("Error hashing NRIC: " + err.Error())
 		}
 
-		_, err = gs.DB.Exec("INSERT into guest(nricHash,eventID,name,tags,checkedIn) VALUES($1,$2,$3,$4,FALSE)",
+		_, err = tx.Exec("INSERT into guest(nricHash,eventID,name,tags,checkedIn) VALUES($1,$2,$3,$4,FALSE)",
 			nricHash, eventID, guest.Name, pq.Array(guest.Tags))
 		if err != nil {
 			tx.Rollback()
