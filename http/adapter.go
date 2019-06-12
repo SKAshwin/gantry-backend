@@ -3,6 +3,7 @@ package http
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -20,6 +21,19 @@ func Adapt(h http.Handler, adapters ...Adapter) http.Handler {
 		h = adapter(h)
 	}
 	return h
+}
+
+//Middleware which redirects any http requests to use https
+func redirectToHTTPSRouter(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+		proto := req.Header.Get("x-forwarded-proto")
+		if proto == "http" || proto == "HTTP" {
+			http.Redirect(res, req, fmt.Sprintf("https://%s%s", req.Host, req.URL), http.StatusPermanentRedirect)
+			return
+		}
+
+		next.ServeHTTP(res, req)
+	})
 }
 
 //Middleware which intercepts the response being written, and if any field query string params are supplied
