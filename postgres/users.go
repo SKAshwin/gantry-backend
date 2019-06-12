@@ -22,11 +22,7 @@ func (us *UserService) User(username string) (checkin.User, error) {
 		"SELECT username, name, passwordHash, createdAt, updatedAt, lastLoggedIn from app_user where username = $1",
 		username).StructScan(&u)
 
-	if err != nil {
-		return checkin.User{}, errors.New("Could not fetch user details: " + err.Error())
-	}
-
-	return u, nil
+	return u, err
 }
 
 //Users Returns the details of all users
