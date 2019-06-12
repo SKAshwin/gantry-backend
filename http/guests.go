@@ -43,10 +43,10 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, gm GuestM
 	}
 
 	//Adapters to check if handler should serve the request
-	tokenCheck := checkAuth(auth)
-	credentialsCheck := isAdminOrHost(auth, es, "eventID")
-	existCheck := eventExists(es, "eventID")
-	releaseCheck := eventReleased(es, "eventID")
+	tokenCheck := checkAuth(auth, h.Logger)
+	credentialsCheck := isAdminOrHost(auth, es, "eventID", h.Logger)
+	existCheck := eventExists(es, "eventID", h.Logger)
+	releaseCheck := eventReleased(es, "eventID", h.Logger)
 
 	h.Handle("/api/v0/events/{eventID}/guests", Adapt(http.HandlerFunc(h.handleGuests),
 		tokenCheck, existCheck, credentialsCheck)).Methods("GET")

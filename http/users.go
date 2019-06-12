@@ -32,10 +32,10 @@ func NewUserHandler(us checkin.UserService, auth Authenticator) *UserHandler {
 	}
 
 	//Adapters to check if handler should serve the request
-	tokenCheck := checkAuth(auth)
-	adminCheck := isAdmin(auth)
-	existCheck := userExists(us, "username")
-	adminOrUserCheck := isAdminOrUser(auth, us, "username")
+	tokenCheck := checkAuth(auth, h.Logger)
+	adminCheck := isAdmin(auth, h.Logger)
+	existCheck := userExists(us, "username", h.Logger)
+	adminOrUserCheck := isAdminOrUser(auth, us, "username", h.Logger)
 
 	h.Handle("/api/v0/users", Adapt(http.HandlerFunc(h.handleUsers),
 		tokenCheck, adminCheck, correctTimezonesOutput, jsonSelector)).Methods("GET")
@@ -180,12 +180,12 @@ func (h *UserHandler) handleDeleteUser(w http.ResponseWriter, r *http.Request) {
 
 //Adapter generator that checks if a user exists before allowing
 //handler to serve request
-func userExists(us checkin.UserService, usernameKey string) Adapter {
+func userExists(us checkin.UserService, usernameKey string, logger *log.Logger) Adapter {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			username := mux.Vars(r)[usernameKey]
 			if exists, err := us.CheckIfExists(username); err != nil {
-				log.Println("Error checking if user exists" + err.Error())
+				logger.Println("Error checking if user exists" + err.Error())
 				WriteMessage(http.StatusInternalServerError, "Error checking if user exists", w)
 			} else if !exists {
 				WriteMessage(http.StatusNotFound, "User does not exist", w)
