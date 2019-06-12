@@ -107,3 +107,49 @@ func TestCreateUser(t *testing.T) {
 	test.Assert(t, err != nil, "Hash failing does not throw an error")
 
 }
+
+func TestUpdateUser(t *testing.T) {
+	us := postgres.UserService{DB: db}
+
+	originalUser, err := us.User("AirForceMan")
+	test.Ok(t, err)
+
+	//try no new password plaintext first
+	newUser := checkin.User{
+		Username:     "Jasmine",
+		PasswordHash: "ahash", //should be used
+		Name:         "Wei Juan",
+		CreatedAt:    time.Date(2018, 12, 16, 15, 0, 0, 0, time.UTC),                //should be ignored
+		UpdatedAt:    time.Date(2018, 12, 31, 6, 0, 0, 0, time.UTC),                 //should be ignored
+		LastLoggedIn: null.TimeFrom(time.Date(2019, 5, 31, 15, 30, 0, 0, time.UTC)), //should be ignored
+	}
+	err = us.UpdateUser(originalUser.Username, newUser)
+	test.Ok(t, err)
+	updated, err := us.User("Jasmine")
+	test.Ok(t, err)
+	test.Equals(t, newUser.Username, updated.Username)
+	test.Equals(t, newUser.Name, updated.Name)
+	test.Equals(t, newUser.PasswordHash, updated.PasswordHash)
+	test.Equals(t, originalUser.LastLoggedIn, updated.LastLoggedIn)
+	test.Assert(t, time.Since(updated.UpdatedAt) < 2*time.Second && time.Since(updated.UpdatedAt) > 0, "Updated at time not updated with update")
+
+	//try updating password via plaintext
+	var hm mock.HashMethod
+	hm.HashAndSaltFn = hashFnGenerator(nil)
+	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
+	us.HM = &hm
+	password := "mygirlfriendleftme"
+	newUser = updated
+	newUser.PasswordPlaintext = &password
+	newUser.PasswordHash = "ahash" //should be ignored
+	err = us.UpdateUser(updated.Username, newUser)
+	test.Ok(t, err)
+	updated2, err := us.User("Jasmine")
+	test.Ok(t, err)
+	test.Equals(t, true, hm.CompareHashAndPassword(updated2.PasswordHash, *newUser.PasswordPlaintext))
+
+	//test hashing fails
+	hm.HashAndSaltFn = hashFnGenerator(errors.New("An error"))
+	err = us.UpdateUser(updated2.Username, newUser)
+	test.Assert(t, err != nil, "No error returned even though hashing of plaintext password failed")
+}
