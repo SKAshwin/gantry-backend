@@ -131,7 +131,7 @@ func TestCreateEvent(t *testing.T) {
 	log.Println(fetched.Start)
 	test.Equals(t, time.Date(2019, 5, 4, 3, 2, 1, 0, time.UTC), fetched.TimeTags["release"])
 	test.Equals(t, time.Date(2019, 6, 5, 4, 3, 2, 0, time.UTC), fetched.TimeTags["formrelease"])
-	test.Assert(t, time.Since(fetched.CreatedAt) < 2*time.Second, "Create time not within 2 seconds before now; not properly set")
+	test.Assert(t, time.Since(fetched.CreatedAt) < 2*time.Second && time.Since(fetched.CreatedAt) > 0, "Create time not within 2 seconds before now; not properly set")
 	test.Assert(t, fetched.CreatedAt == fetched.UpdatedAt, "UpdatedAt time not set to be equal to the CreatedAt time upon creation")
 	event.UpdatedAt = fetched.UpdatedAt
 	event.CreatedAt = fetched.CreatedAt
