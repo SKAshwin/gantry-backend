@@ -50,9 +50,9 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 		MaxLengthTimeTag: maxLengthTimeTag,
 	}
 	//Adapters to check if handler should serve the request
-	tokenCheck := checkAuth(auth)
-	credentialsCheck := isAdminOrHost(auth, es, "eventID")
-	existCheck := eventExists(es, "eventID")
+	tokenCheck := checkAuth(auth, h.Logger)
+	credentialsCheck := isAdminOrHost(auth, es, "eventID", h.Logger)
+	existCheck := eventExists(es, "eventID", h.Logger)
 
 	h.Handle("/api/v1-3/events", Adapt(http.HandlerFunc(h.handleEventsBy),
 		tokenCheck, correctTimezonesOutput, jsonSelector)).Methods("GET")
@@ -397,13 +397,13 @@ func (h *EventHandler) handleURLTaken(w http.ResponseWriter, r *http.Request) {
 //an event exists before allowing the handler to execute
 //Returns a 404 otherwise (or a 500 if an error occurred when checking
 //if event exists)
-func eventExists(es checkin.EventService, eventIDKey string) Adapter {
+func eventExists(es checkin.EventService, eventIDKey string, logger *log.Logger) Adapter {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			eventID := mux.Vars(r)[eventIDKey]
 			ok, err := es.CheckIfExists(eventID)
 			if err != nil {
-				log.Println("Error checking that event exists: " + err.Error())
+				logger.Println("Error checking that event exists: " + err.Error())
 				WriteMessage(http.StatusInternalServerError, "Error checking if event exists", w)
 			} else if ok {
 				h.ServeHTTP(w, r)
@@ -414,13 +414,13 @@ func eventExists(es checkin.EventService, eventIDKey string) Adapter {
 	}
 }
 
-func eventReleased(es checkin.EventService, eventIDKey string) Adapter {
+func eventReleased(es checkin.EventService, eventIDKey string, logger *log.Logger) Adapter {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			eventID := mux.Vars(r)[eventIDKey]
 			event, err := es.Event(eventID)
 			if err != nil {
-				log.Println("Error fetching event data in eventReleased: " + err.Error())
+				logger.Println("Error fetching event data in eventReleased: " + err.Error())
 				WriteMessage(http.StatusInternalServerError, "Error fetching event data", w)
 			} else if event.TimeTags["release"].Before(time.Now()) {
 				h.ServeHTTP(w, r)
