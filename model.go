@@ -41,7 +41,7 @@ type Event struct {
 	Lat       null.Float           `json:"lat" db:"lat"`
 	Long      null.Float           `json:"long" db:"long"`
 	Radius    null.Float           `json:"radius" db:"radius"` //in km
-	URL       string               `json:"url" db:"url"`
+	URL       null.String          `json:"url" db:"url"`
 	UpdatedAt time.Time            `json:"updatedAt" db:"updatedat"`
 	CreatedAt time.Time            `json:"createdAt" db:"createdat"`
 }
