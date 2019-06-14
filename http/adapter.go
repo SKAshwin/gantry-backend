@@ -88,9 +88,6 @@ func (jsw *jsonSelectorWriter) Write(b []byte) (int, error) {
 		return 200, nil
 	}
 
-	log.Println(string(reply))
-	log.Println("Made it here!")
-
 	return jsw.w.Write(reply)
 }
 
@@ -109,15 +106,10 @@ func selectJSONFields(jsonData []byte, selectedFields []string) ([]byte, error) 
 			return nil, err
 		}
 		for name := range fields {
-			log.Println(name)
-			log.Println(selectedFields)
 			if !stringInSlice(name, selectedFields) {
 				delete(fields, name) //delete all non-selected fields
 			}
 		}
-		log.Println(fields)
-		lol, err := json.Marshal(fields)
-		log.Println(string(lol))
 		return json.Marshal(fields)
 	} else if isArray {
 		var elems []interface{}
