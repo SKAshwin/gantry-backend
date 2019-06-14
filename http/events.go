@@ -346,12 +346,14 @@ func (h *EventHandler) handleUpdateEvent(w http.ResponseWriter, r *http.Request)
 
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
+	h.Logger.Println("Before", event.URL)
 	err = dec.Decode(&event)
 	if err != nil {
 		h.Logger.Println("Error when decoding update fields: " + err.Error())
 		WriteMessage(http.StatusBadRequest, "JSON could not be decoded (Possibly invalid time format or unknown fields)", w)
 		return
 	}
+	h.Logger.Println(event.URL)
 
 	//validate inputs
 	if (event.ID != mux.Vars(r)["eventID"]) || (event.UpdatedAt != originalUpdatedAt) ||
