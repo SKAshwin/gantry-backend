@@ -197,7 +197,7 @@ func TestHandleCreateEvent(t *testing.T) {
 	}
 	expectedEvent := checkin.Event{
 		Name:     "MyEvent",
-		URL:      "/hello2",
+		URL:      null.StringFrom("/hello2"),
 		Start:    null.Time{Time: time.Date(2019, 3, 15, 8, 20, 0, 0, time.UTC), Valid: true},
 		End:      null.Time{Time: time.Date(2019, 3, 15, 10, 0, 0, 0, time.UTC), Valid: true},
 		TimeTags: map[string]time.Time{"release": time.Date(2019, 3, 15, 8, 0, 0, 0, time.UTC)},
@@ -357,7 +357,7 @@ func TestHandleCreateEvent(t *testing.T) {
 	//test minimum required fields
 	expectedEvent = checkin.Event{
 		Name: "MyEvent",
-		URL:  "/hello2",
+		URL:  null.StringFrom("/hello2"),
 	}
 	es.CreateEventFn = createEventGenerator(expectedEvent, nil)
 	r = httptest.NewRequest("POST", "/api/v1-3/events?loc=Asia/Singapore",
@@ -423,7 +423,7 @@ func TestHandleUpdateEvent(t *testing.T) {
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
 	srcEvent := checkin.Event{ID: "300",
 		Name:      "Hello",
-		URL:       "/someplace",
+		URL:       null.StringFrom("/someplace"),
 		CreatedAt: time.Date(2019, 3, 26, 15, 35, 10, 0, time.UTC),
 		UpdatedAt: time.Date(2019, 3, 26, 15, 35, 10, 0, time.UTC),
 	}
@@ -451,7 +451,7 @@ func TestHandleUpdateEvent(t *testing.T) {
 	expEvent := checkin.Event{
 		ID:        "300",
 		Name:      "Hello",
-		URL:       "/someplace",
+		URL:       null.StringFrom("/someplace"),
 		Start:     null.Time{Time: time.Date(2019, 3, 15, 8, 20, 0, 0, time.UTC), Valid: true},
 		End:       null.Time{Time: time.Date(2019, 3, 15, 10, 0, 0, 0, time.UTC), Valid: true},
 		TimeTags:  map[string]time.Time{"release": time.Date(2019, 3, 15, 8, 0, 0, 0, time.UTC)},
@@ -487,7 +487,7 @@ func TestHandleUpdateEvent(t *testing.T) {
 	expEvent = checkin.Event{
 		ID:        "300",
 		Name:      "Hello",
-		URL:       "/someplace",
+		URL:       null.StringFrom("/someplace"),
 		Start:     null.Time{Time: time.Date(2019, 3, 15, 15, 20, 0, 0, tehran), Valid: true},
 		End:       null.Time{Time: time.Date(2019, 3, 15, 17, 0, 0, 0, tehran), Valid: true},
 		TimeTags:  map[string]time.Time{"release": time.Date(2019, 3, 15, 15, 0, 0, 0, tehran)},
@@ -524,7 +524,7 @@ func TestHandleUpdateEvent(t *testing.T) {
 	expEvent = checkin.Event{
 		ID:        "300",
 		Name:      "Hello",
-		URL:       "/someplace",
+		URL:       null.StringFrom("/someplace"),
 		Start:     null.Time{Time: time.Date(2019, 3, 15, 8, 20, 0, 0, time.UTC), Valid: true},
 		End:       null.Time{Time: time.Date(2019, 3, 15, 10, 0, 0, 0, time.UTC), Valid: true},
 		TimeTags:  map[string]time.Time{"release": time.Date(2019, 3, 15, 8, 0, 0, 0, time.UTC)},
@@ -623,7 +623,7 @@ func TestHandleUpdateEvent(t *testing.T) {
 	expEvent = checkin.Event{
 		ID:        "300",
 		Name:      "MyEvent",
-		URL:       "/hello2",
+		URL:       null.StringFrom("/hello2"),
 		Start:     null.Time{Time: time.Date(2019, 3, 15, 8, 20, 0, 0, time.UTC), Valid: true},
 		CreatedAt: time.Date(2019, 3, 26, 15, 35, 10, 0, time.UTC),
 		UpdatedAt: time.Date(2019, 3, 26, 15, 35, 10, 0, time.UTC),
