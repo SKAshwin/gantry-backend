@@ -7,6 +7,7 @@ import (
 	myhttp "checkin/http"
 	"checkin/mock"
 	"checkin/test"
+	"database/sql"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
@@ -172,6 +173,48 @@ func eventDoesNotExistTest(t *testing.T, badRequest *http.Request, h http.Handle
 	es.CheckIfExistsFn = original
 }
 
+func timeEquals(t *testing.T, actTime, expectedTime time.Time) {
+	test.Equals(t, true, actTime.Equal(expectedTime))
+	_, actOffset := actTime.Zone()
+	_, expectedOffset := expectedTime.Zone()
+	test.Equals(t, actOffset, expectedOffset)
+}
+
+func eventEquals(t *testing.T, event, expectedEvent checkin.Event) {
+	test.Equals(t, event.ID, expectedEvent.ID)
+	test.Equals(t, event.Name, expectedEvent.Name)
+	test.Equals(t, event.URL.Valid, expectedEvent.URL.Valid)
+	if expectedEvent.URL.Valid {
+		test.Equals(t, event.URL.String, expectedEvent.URL.String)
+	}
+	test.Equals(t, event.Start.Valid, expectedEvent.Start.Valid)
+	test.Equals(t, event.End.Valid, expectedEvent.End.Valid)
+	if event.Start.Valid {
+		timeEquals(t, event.Start.Time, expectedEvent.Start.Time)
+	}
+	if event.End.Valid {
+		timeEquals(t, event.End.Time, expectedEvent.End.Time)
+	}
+	test.Equals(t, len(event.TimeTags), len(expectedEvent.TimeTags))
+	for tag, val := range event.TimeTags {
+		expectVal, ok := expectedEvent.TimeTags[tag]
+		test.Equals(t, true, ok)
+		timeEquals(t, val, expectVal)
+	}
+	test.Equals(t, event.Lat, expectedEvent.Lat)
+	test.Equals(t, event.Long, expectedEvent.Long)
+	test.Equals(t, event.Radius, expectedEvent.Radius)
+	timeEquals(t, event.CreatedAt, expectedEvent.CreatedAt)
+	timeEquals(t, event.UpdatedAt, expectedEvent.UpdatedAt)
+}
+
+func eventSliceEquals(t *testing.T, events, expectedEvents []checkin.Event) {
+	test.Equals(t, len(events), len(expectedEvents))
+	for i, event := range events {
+		eventEquals(t, event, expectedEvents[i])
+	}
+}
+
 func TestHandleCreateEvent(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
@@ -181,10 +224,10 @@ func TestHandleCreateEvent(t *testing.T) {
 	es.URLExistsFn = urlExistsGenerator("/hello", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	createEventGenerator := func(expectedEvent checkin.Event, err error) func(checkin.Event, string) error {
+	createEventGenerator := func(expectedEvent *checkin.Event, err error) func(checkin.Event, string) error {
 		return func(event checkin.Event, hostname string) error {
 			event.ID = ""
-			if !reflect.DeepEqual(fmt.Sprint(event), fmt.Sprint(expectedEvent)) {
+			if !reflect.DeepEqual(fmt.Sprint(event), fmt.Sprint(*expectedEvent)) {
 				t.Fatal("Event was differented than expected. Received: ", event, " expected",
 					expectedEvent)
 			}
@@ -197,7 +240,7 @@ func TestHandleCreateEvent(t *testing.T) {
 	}
 	expectedEvent := checkin.Event{
 		Name:     "MyEvent",
-		URL:      "/hello2",
+		URL:      null.StringFrom("/hello2"),
 		Start:    null.Time{Time: time.Date(2019, 3, 15, 8, 20, 0, 0, time.UTC), Valid: true},
 		End:      null.Time{Time: time.Date(2019, 3, 15, 10, 0, 0, 0, time.UTC), Valid: true},
 		TimeTags: map[string]time.Time{"release": time.Date(2019, 3, 15, 8, 0, 0, 0, time.UTC)},
@@ -205,7 +248,7 @@ func TestHandleCreateEvent(t *testing.T) {
 		Long:     null.FloatFrom(2),
 		Radius:   null.FloatFrom(5),
 	}
-	es.CreateEventFn = createEventGenerator(expectedEvent, nil)
+	es.CreateEventFn = createEventGenerator(&expectedEvent, nil)
 
 	//test normal functionality
 	r := httptest.NewRequest("POST", "/api/v1-3/events",
@@ -215,6 +258,18 @@ func TestHandleCreateEvent(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
+
+	//test no URL (should work, be read as null string)
+	originalExpectedURL := expectedEvent.URL
+	expectedEvent.URL = null.String{}
+	r = httptest.NewRequest("POST", "/api/v1-3/events?loc=UTC",
+		strings.NewReader(`{"name":"MyEvent","startDateTime":"2019-03-15T08:20:00Z",
+		"endDateTime":"2019-03-15T10:00:00Z", "triggers":{"release":"2019-03-15T08:00:00Z"},
+		"lat":"1.388","long":"2","radius":"5"}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
+	expectedEvent.URL = originalExpectedURL
 
 	//test ?loc query parameter
 	r = httptest.NewRequest("POST", "/api/v1-3/events?loc=UTC",
@@ -230,7 +285,6 @@ func TestHandleCreateEvent(t *testing.T) {
 	expectedEvent.Start = null.Time{Time: time.Date(2019, 3, 15, 8, 20, 0, 0, singapore), Valid: true}
 	expectedEvent.End = null.Time{Time: time.Date(2019, 3, 15, 10, 0, 0, 0, singapore), Valid: true}
 	expectedEvent.TimeTags = map[string]time.Time{"release": time.Date(2019, 3, 15, 8, 0, 0, 0, singapore)}
-	es.CreateEventFn = createEventGenerator(expectedEvent, nil)
 	r = httptest.NewRequest("POST", "/api/v1-3/events?loc=Asia/Singapore",
 		strings.NewReader(`{"name":"MyEvent","url":"/hello2","startDateTime":"2019-03-15T08:20:00Z",
 			"endDateTime":"2019-03-15T10:00:00Z", "triggers":{"release":"2019-03-15T08:00:00Z"},
@@ -316,7 +370,7 @@ func TestHandleCreateEvent(t *testing.T) {
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 	test.Assert(t, !es.CreateEventInvoked, "Create event invoked even though updatedAt or createdAt invoked")
 
-	//test no URL or name or empty string timetag
+	//test empty URL or name or empty string timetag
 	es.CreateEventInvoked = false
 	r = httptest.NewRequest("POST", "/api/v1-3/events?loc=Asia/Singapore",
 		strings.NewReader("{\"url\":\"/hello2\",\"startDateTime\":\"2019-03-15T08:20:00Z\","+
@@ -328,7 +382,7 @@ func TestHandleCreateEvent(t *testing.T) {
 	test.Assert(t, !es.CreateEventInvoked, "Create event invoked even though blank URL/name")
 	es.CreateEventInvoked = false
 	r = httptest.NewRequest("POST", "/api/v1-3/events",
-		strings.NewReader("{\"name\":\"MyEvent\",\"startDateTime\":\"2019-03-15T08:20:00Z\","+
+		strings.NewReader("{\"url\":\"\",\"name\":\"MyEvent\",\"startDateTime\":\"2019-03-15T08:20:00Z\","+
 			"\"endDateTime\":\"2019-03-15T10:00:00Z\", \"triggers\":{\"release\":\"2019-03-15T08:00:00Z\"},"+
 			"\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\"}"))
 	w = httptest.NewRecorder()
@@ -357,9 +411,9 @@ func TestHandleCreateEvent(t *testing.T) {
 	//test minimum required fields
 	expectedEvent = checkin.Event{
 		Name: "MyEvent",
-		URL:  "/hello2",
+		URL:  null.StringFrom("/hello2"),
 	}
-	es.CreateEventFn = createEventGenerator(expectedEvent, nil)
+	es.CreateEventFn = createEventGenerator(&expectedEvent, nil)
 	r = httptest.NewRequest("POST", "/api/v1-3/events?loc=Asia/Singapore",
 		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\"}"))
 	w = httptest.NewRecorder()
@@ -397,13 +451,13 @@ func TestHandleCreateEvent(t *testing.T) {
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
 
 	//test error creating event
-	es.CreateEventFn = createEventGenerator(expectedEvent, errors.New("An error"))
+	es.CreateEventFn = createEventGenerator(&expectedEvent, errors.New("An error"))
 	r = httptest.NewRequest("POST", "/api/v1-3/events?loc=Asia/Singapore",
 		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\"}"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
-	es.CreateEventFn = createEventGenerator(expectedEvent, nil)
+	es.CreateEventFn = createEventGenerator(&expectedEvent, nil)
 
 	//test invalid token
 	r = httptest.NewRequest("POST", "/api/v1-3/events?loc=Asia/Singapore",
@@ -423,7 +477,7 @@ func TestHandleUpdateEvent(t *testing.T) {
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
 	srcEvent := checkin.Event{ID: "300",
 		Name:      "Hello",
-		URL:       "/someplace",
+		URL:       null.StringFrom("/lol"),
 		CreatedAt: time.Date(2019, 3, 26, 15, 35, 10, 0, time.UTC),
 		UpdatedAt: time.Date(2019, 3, 26, 15, 35, 10, 0, time.UTC),
 	}
@@ -440,18 +494,17 @@ func TestHandleUpdateEvent(t *testing.T) {
 	}
 	es.EventFn = eventGenerator(srcEvent, nil)
 	es.URLExistsFn = urlExistsGenerator("/knownurl", nil)
+
 	updateEventGenerator := func(expectedEvent *checkin.Event, err error) func(checkin.Event) error {
 		return func(event checkin.Event) error {
-			if !reflect.DeepEqual(fmt.Sprint(event), fmt.Sprint(*expectedEvent)) {
-				t.Fatal("Unexpected event. Expected: ", *expectedEvent, ", received ", event)
-			}
+			eventEquals(t, event, *expectedEvent)
 			return err
 		}
 	}
 	expEvent := checkin.Event{
 		ID:        "300",
 		Name:      "Hello",
-		URL:       "/someplace",
+		URL:       null.StringFrom("/lol"),
 		Start:     null.Time{Time: time.Date(2019, 3, 15, 8, 20, 0, 0, time.UTC), Valid: true},
 		End:       null.Time{Time: time.Date(2019, 3, 15, 10, 0, 0, 0, time.UTC), Valid: true},
 		TimeTags:  map[string]time.Time{"release": time.Date(2019, 3, 15, 8, 0, 0, 0, time.UTC)},
@@ -463,7 +516,7 @@ func TestHandleUpdateEvent(t *testing.T) {
 	}
 	es.UpdateEventFn = updateEventGenerator(&expEvent, nil)
 
-	//test normal functionality, replace everything
+	//test normal functionality, replace random things
 	r := httptest.NewRequest("PATCH", "/api/v1-3/events/300",
 		strings.NewReader("{\"startDateTime\":\"2019-03-15T08:20:00Z\","+
 			"\"endDateTime\":\"2019-03-15T10:00:00Z\", \"triggers\":{\"release\":\"2019-03-15T08:00:00Z\"},"+
@@ -471,6 +524,18 @@ func TestHandleUpdateEvent(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+
+	//test URL set to null
+	expEvent.URL = null.String{NullString: sql.NullString{String: srcEvent.URL.String, Valid: false}} //because of the weird way the null library works - keeps the old string
+	//but sets Valid to false
+	r = httptest.NewRequest("PATCH", "/api/v1-3/events/300",
+		strings.NewReader("{\"url\":null, \"startDateTime\":\"2019-03-15T08:20:00Z\","+
+			"\"endDateTime\":\"2019-03-15T10:00:00Z\", \"triggers\":{\"release\":\"2019-03-15T08:00:00Z\"},"+
+			"\"lat\":\"1.388\",\"long\":\"2\",\"radius\":\"5\"}"))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusOK, w.Result().StatusCode)
+	expEvent.URL = srcEvent.URL
 
 	//test ?loc query parameter
 	r = httptest.NewRequest("PATCH", "/api/v1-3/events/300?loc=UTC",
@@ -484,19 +549,9 @@ func TestHandleUpdateEvent(t *testing.T) {
 	//test non-UTC loc
 	tehran, err := time.LoadLocation("Asia/Tehran")
 	test.Ok(t, err)
-	expEvent = checkin.Event{
-		ID:        "300",
-		Name:      "Hello",
-		URL:       "/someplace",
-		Start:     null.Time{Time: time.Date(2019, 3, 15, 15, 20, 0, 0, tehran), Valid: true},
-		End:       null.Time{Time: time.Date(2019, 3, 15, 17, 0, 0, 0, tehran), Valid: true},
-		TimeTags:  map[string]time.Time{"release": time.Date(2019, 3, 15, 15, 0, 0, 0, tehran)},
-		Lat:       null.FloatFrom(1.388),
-		Long:      null.FloatFrom(2),
-		Radius:    null.FloatFrom(5),
-		CreatedAt: time.Date(2019, 3, 26, 15, 35, 10, 0, time.UTC),
-		UpdatedAt: time.Date(2019, 3, 26, 15, 35, 10, 0, time.UTC),
-	}
+	expEvent.Start = null.Time{Time: time.Date(2019, 3, 15, 15, 20, 0, 0, tehran), Valid: true}
+	expEvent.End = null.Time{Time: time.Date(2019, 3, 15, 17, 0, 0, 0, tehran), Valid: true}
+	expEvent.TimeTags = map[string]time.Time{"release": time.Date(2019, 3, 15, 15, 0, 0, 0, tehran)}
 	r = httptest.NewRequest("PATCH", "/api/v1-3/events/300?loc=Asia/Tehran",
 		strings.NewReader("{\"startDateTime\":\"2019-03-15T15:20:00Z\","+
 			"\"endDateTime\":\"2019-03-15T17:00:00Z\", \"triggers\":{\"release\":\"2019-03-15T15:00:00Z\"},"+
@@ -524,7 +579,7 @@ func TestHandleUpdateEvent(t *testing.T) {
 	expEvent = checkin.Event{
 		ID:        "300",
 		Name:      "Hello",
-		URL:       "/someplace",
+		URL:       null.StringFrom("/someplace"),
 		Start:     null.Time{Time: time.Date(2019, 3, 15, 8, 20, 0, 0, time.UTC), Valid: true},
 		End:       null.Time{Time: time.Date(2019, 3, 15, 10, 0, 0, 0, time.UTC), Valid: true},
 		TimeTags:  map[string]time.Time{"release": time.Date(2019, 3, 15, 8, 0, 0, 0, time.UTC)},
@@ -623,7 +678,7 @@ func TestHandleUpdateEvent(t *testing.T) {
 	expEvent = checkin.Event{
 		ID:        "300",
 		Name:      "MyEvent",
-		URL:       "/hello2",
+		URL:       null.StringFrom("/hello2"),
 		Start:     null.Time{Time: time.Date(2019, 3, 15, 8, 20, 0, 0, time.UTC), Valid: true},
 		CreatedAt: time.Date(2019, 3, 26, 15, 35, 10, 0, time.UTC),
 		UpdatedAt: time.Date(2019, 3, 26, 15, 35, 10, 0, time.UTC),

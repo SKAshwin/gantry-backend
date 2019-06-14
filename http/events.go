@@ -280,7 +280,7 @@ func (h *EventHandler) handleCreateEvent(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if exists, err := h.EventService.URLExists(eventData.URL); err != nil {
+	if exists, err := h.EventService.URLExists(eventData.URL.String); err != nil {
 		//check if the URL provided is available
 		h.Logger.Println("Error checking if URL already taken: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error checking if URL is available", w)
@@ -314,7 +314,7 @@ func (h *EventHandler) validCreateEventInputs(event checkin.Event) bool {
 			return false
 		}
 	}
-	return event.URL != "" && event.Name != "" && event.UpdatedAt == time.Time{} && event.CreatedAt == time.Time{} && len(event.URL) <= h.MaxLengthURL && len(event.Name) <= h.MaxLengthName
+	return !(event.URL.String == "" && event.URL.Valid) && event.Name != "" && event.UpdatedAt == time.Time{} && event.CreatedAt == time.Time{} && len(event.URL.String) <= h.MaxLengthURL && len(event.Name) <= h.MaxLengthName
 }
 
 //checks that no empty string or too long strings are involved in update data
@@ -324,7 +324,9 @@ func (h *EventHandler) validUpdateEventInputs(event checkin.Event) bool {
 			return false
 		}
 	}
-	return event.URL != "" && event.Name != "" && len(event.URL) <= h.MaxLengthURL && len(event.Name) <= h.MaxLengthName
+	//don't allow empty string URLs
+	//but allow null URLs
+	return !(event.URL.String == "" && event.URL.Valid) && event.Name != "" && len(event.URL.String) <= h.MaxLengthURL && len(event.Name) <= h.MaxLengthName
 }
 
 //handleUpdateEvent updates the event given by the eventID provided in the endpoint
@@ -344,24 +346,16 @@ func (h *EventHandler) handleUpdateEvent(w http.ResponseWriter, r *http.Request)
 
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
+	h.Logger.Println("Before", event.URL)
 	err = dec.Decode(&event)
 	if err != nil {
 		h.Logger.Println("Error when decoding update fields: " + err.Error())
 		WriteMessage(http.StatusBadRequest, "JSON could not be decoded (Possibly invalid time format or unknown fields)", w)
 		return
 	}
+	h.Logger.Println(event.URL)
 
-	if event.URL != originalURL { //if the caller is attempting to update the url
-		if ok, err := h.EventService.URLExists(event.URL); err != nil {
-			h.Logger.Println("Error checking if URL taken: " + err.Error())
-			WriteMessage(http.StatusInternalServerError, "Error checking if URL already taken", w)
-			return
-		} else if ok {
-			WriteMessage(http.StatusConflict, "URL already exists", w)
-			return
-		}
-	}
-
+	//validate inputs
 	if (event.ID != mux.Vars(r)["eventID"]) || (event.UpdatedAt != originalUpdatedAt) ||
 		(event.CreatedAt != originalCreatedAt) {
 		//if caller trying to update these non-updatable fields
@@ -370,6 +364,17 @@ func (h *EventHandler) handleUpdateEvent(w http.ResponseWriter, r *http.Request)
 	} else if !h.validUpdateEventInputs(event) { //otherwise check that the object you have is valid
 		WriteMessage(http.StatusBadRequest, "Cannot set name or URL or timetag label to empty string, or longer than 64 bytes", w)
 		return
+	}
+
+	if event.URL != originalURL { //if the caller is attempting to update the url
+		if ok, err := h.EventService.URLExists(event.URL.String); err != nil {
+			h.Logger.Println("Error checking if URL taken: " + err.Error())
+			WriteMessage(http.StatusInternalServerError, "Error checking if URL already taken", w)
+			return
+		} else if ok {
+			WriteMessage(http.StatusConflict, "URL already exists", w)
+			return
+		}
 	}
 
 	err = h.EventService.UpdateEvent(event)
