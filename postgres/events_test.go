@@ -25,7 +25,7 @@ func TestEvent(t *testing.T) {
 	test.Equals(t, checkin.Event{
 		ID:       "2c59b54d-3422-4bdb-824c-4125775b44c8",
 		Name:     "Data Science CoP",
-		URL:      "cop2018",
+		URL:      null.StringFrom("cop2018"),
 		TimeTags: map[string]time.Time{"release": time.Date(2019, 4, 12, 9, 0, 0, 0, time.UTC)},
 	}, event)
 
@@ -37,7 +37,7 @@ func TestEvent(t *testing.T) {
 	test.Equals(t, checkin.Event{
 		ID:       "3820a980-a207-4738-b82b-45808fe7aba8",
 		Name:     "SDB Cohesion",
-		URL:      "sdbcohesionnovember",
+		URL:      null.String{}, //also tests NULL URL
 		TimeTags: map[string]time.Time{"release": time.Date(2019, 10, 8, 12, 0, 0, 0, time.UTC), "formrelease": time.Date(2019, 10, 8, 16, 30, 12, 0, time.UTC)},
 	}, event)
 
@@ -49,7 +49,7 @@ func TestEvent(t *testing.T) {
 	test.Equals(t, checkin.Event{
 		ID:       "03293b3b-df83-407e-b836-fb7d4a3c4966",
 		Name:     "CSSCOM Planning Seminar",
-		URL:      "csscom",
+		URL:      null.StringFrom("csscom"),
 		TimeTags: map[string]time.Time{},
 	}, event)
 
@@ -75,7 +75,7 @@ func TestEventsBy(t *testing.T) {
 		checkin.Event{
 			ID:        "aa19239f-f9f5-4935-b1f7-0edfdceabba7",
 			Name:      "Data Science Department Talk",
-			URL:       "dsdjan2019",
+			URL:       null.StringFrom("dsdjan2019"),
 			Start:     null.TimeFrom(time.Date(2019, 1, 10, 15, 0, 0, 0, time.UTC)),
 			End:       null.TimeFrom(time.Date(2019, 1, 10, 18, 0, 0, 0, time.UTC)),
 			TimeTags:  map[string]time.Time{},
@@ -88,7 +88,6 @@ func TestEventsBy(t *testing.T) {
 		checkin.Event{
 			ID:        "3820a980-a207-4738-b82b-45808fe7aba8",
 			Name:      "SDB Cohesion",
-			URL:       "sdbcohesionnovember",
 			TimeTags:  map[string]time.Time{"release": time.Date(2019, 10, 8, 12, 0, 0, 0, time.UTC), "formrelease": time.Date(2019, 10, 8, 16, 30, 12, 0, time.UTC)},
 			CreatedAt: time.Date(2019, 5, 31, 02, 15, 22, 0, time.UTC),
 			UpdatedAt: time.Date(2019, 5, 31, 13, 02, 11, 0, time.UTC),
@@ -115,7 +114,7 @@ func TestCreateEvent(t *testing.T) {
 		ID:        uuid.New().String(),
 		Name:      "Test",
 		TimeTags:  make(map[string]time.Time),
-		URL:       "hello",
+		URL:       null.String{}, //test null URL as well
 		Long:      null.FloatFrom(10.0),
 		Start:     null.TimeFrom(time.Date(2019, 10, 11, 11, 2, 1, 0, singapore)), //test how non-UTC times are handled
 		UpdatedAt: time.Date(2015, 2, 3, 1, 2, 0, 0, time.UTC),                    //these fields should be ignored by the create funtion
