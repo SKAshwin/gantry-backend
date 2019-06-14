@@ -173,6 +173,48 @@ func eventDoesNotExistTest(t *testing.T, badRequest *http.Request, h http.Handle
 	es.CheckIfExistsFn = original
 }
 
+func timeEquals(t *testing.T, actTime, expectedTime time.Time) {
+	test.Equals(t, true, actTime.Equal(expectedTime))
+	_, actOffset := actTime.Zone()
+	_, expectedOffset := expectedTime.Zone()
+	test.Equals(t, actOffset, expectedOffset)
+}
+
+func eventEquals(t *testing.T, event, expectedEvent checkin.Event) {
+	test.Equals(t, event.ID, expectedEvent.ID)
+	test.Equals(t, event.Name, expectedEvent.Name)
+	test.Equals(t, event.URL.Valid, expectedEvent.URL.Valid)
+	if expectedEvent.URL.Valid {
+		test.Equals(t, event.URL.String, expectedEvent.URL.String)
+	}
+	test.Equals(t, event.Start.Valid, expectedEvent.Start.Valid)
+	test.Equals(t, event.End.Valid, expectedEvent.End.Valid)
+	if event.Start.Valid {
+		timeEquals(t, event.Start.Time, expectedEvent.Start.Time)
+	}
+	if event.End.Valid {
+		timeEquals(t, event.End.Time, expectedEvent.End.Time)
+	}
+	test.Equals(t, len(event.TimeTags), len(expectedEvent.TimeTags))
+	for tag, val := range event.TimeTags {
+		expectVal, ok := expectedEvent.TimeTags[tag]
+		test.Equals(t, true, ok)
+		timeEquals(t, val, expectVal)
+	}
+	test.Equals(t, event.Lat, expectedEvent.Lat)
+	test.Equals(t, event.Long, expectedEvent.Long)
+	test.Equals(t, event.Radius, expectedEvent.Radius)
+	timeEquals(t, event.CreatedAt, expectedEvent.CreatedAt)
+	timeEquals(t, event.UpdatedAt, expectedEvent.UpdatedAt)
+}
+
+func eventSliceEquals(t *testing.T, events, expectedEvents []checkin.Event) {
+	test.Equals(t, len(events), len(expectedEvents))
+	for i, event := range events {
+		eventEquals(t, event, expectedEvents[i])
+	}
+}
+
 func TestHandleCreateEvent(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
@@ -421,41 +463,6 @@ func TestHandleCreateEvent(t *testing.T) {
 	r = httptest.NewRequest("POST", "/api/v1-3/events?loc=Asia/Singapore",
 		strings.NewReader("{\"name\":\"MyEvent\",\"url\":\"/hello2\"}"))
 	noValidTokenTest(t, r, h, &auth)
-}
-
-func timeEquals(t *testing.T, actTime, expectedTime time.Time) {
-	test.Equals(t, true, actTime.Equal(expectedTime))
-	_, actOffset := actTime.Zone()
-	_, expectedOffset := expectedTime.Zone()
-	test.Equals(t, actOffset, expectedOffset)
-}
-
-func eventEquals(t *testing.T, event, expectedEvent checkin.Event) {
-	test.Equals(t, event.ID, expectedEvent.ID)
-	test.Equals(t, event.Name, expectedEvent.Name)
-	test.Equals(t, event.URL.Valid, expectedEvent.URL.Valid)
-	if expectedEvent.URL.Valid {
-		test.Equals(t, event.URL.String, expectedEvent.URL.String)
-	}
-	test.Equals(t, event.Start.Valid, expectedEvent.Start.Valid)
-	test.Equals(t, event.End.Valid, expectedEvent.End.Valid)
-	if event.Start.Valid {
-		timeEquals(t, event.Start.Time, expectedEvent.Start.Time)
-	}
-	if event.End.Valid {
-		timeEquals(t, event.End.Time, expectedEvent.End.Time)
-	}
-	test.Equals(t, len(event.TimeTags), len(expectedEvent.TimeTags))
-	for tag, val := range event.TimeTags {
-		expectVal, ok := expectedEvent.TimeTags[tag]
-		test.Equals(t, true, ok)
-		timeEquals(t, val, expectVal)
-	}
-	test.Equals(t, event.Lat, expectedEvent.Lat)
-	test.Equals(t, event.Long, expectedEvent.Long)
-	test.Equals(t, event.Radius, expectedEvent.Radius)
-	timeEquals(t, event.CreatedAt, expectedEvent.CreatedAt)
-	timeEquals(t, event.UpdatedAt, expectedEvent.UpdatedAt)
 }
 
 func TestHandleUpdateEvent(t *testing.T) {
