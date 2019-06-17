@@ -1095,6 +1095,68 @@ func TestHandleURLTaken(t *testing.T) {
 	noValidTokenTest(t, r, h, &auth)
 }
 
+func TestHandleIDByURL(t *testing.T) {
+	var es mock.EventService
+	var auth mock.Authenticator
+	gh := myhttp.GuestHandler{}
+	h := myhttp.NewEventHandler(&es, &auth, &gh, 64, 64, 64)
+
+	eventByURLFnGenerator := func(err error, urlToID *map[string]checkin.Event) func(string) (checkin.Event, error) {
+		return func(url string) (checkin.Event, error) {
+			if err != nil {
+				return checkin.Event{}, err
+			}
+
+			return (*urlToID)[url], nil
+		}
+	}
+	urlToID := map[string]checkin.Event{
+		"testurl": checkin.Event{
+			ID: "100",
+		},
+		"somethingelse": checkin.Event{
+			ID: "200",
+		},
+	}
+	es.EventByURLFn = eventByURLFnGenerator(nil, &urlToID)
+	es.URLExistsFn = urlExistsGenerator("testurl", nil)
+
+	//test normal functionality
+	r := httptest.NewRequest("GET", "/api/v1-3/events/id/testurl", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	var id string
+	json.NewDecoder(w.Result().Body).Decode(&id)
+	test.Equals(t, "100", id)
+
+	//test no event with that url
+	r = httptest.NewRequest("GET", "/api/v1-3/events/id/something", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+
+	//test case sensitivity (there should be case sensitivity)
+	r = httptest.NewRequest("GET", "/api/v1-3/events/id/tEsTURL", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
+
+	//test error checking if event exists with that URL
+	es.URLExistsFn = urlExistsGenerator("testurl", errors.New("An error"))
+	r = httptest.NewRequest("GET", "/api/v1-3/events/id/testurl", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+	es.URLExistsFn = urlExistsGenerator("testurl", nil)
+
+	//test error fetching event ID
+	es.EventByURLFn = eventByURLFnGenerator(errors.New("An error"), &urlToID)
+	r = httptest.NewRequest("GET", "/api/v1-3/events/id/testurl", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
+}
+
 func TestSubmitForm(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
