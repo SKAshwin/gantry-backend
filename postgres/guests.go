@@ -20,8 +20,10 @@ import (
 //Needs a HashMethod as all NRICs are stored internally as hashes for
 //security purposes
 type GuestService struct {
-	DB *sqlx.DB
-	HM checkin.HashMethod
+	DB        *sqlx.DB
+	HM        checkin.HashMethod
+	hashCache map[string]string
+	cacheLock sync.RWMutex
 }
 
 //CheckIn marks a guest (indicated by the last 5 digits of the nric)
@@ -425,6 +427,25 @@ func (gs *GuestService) scanRowsIntoStrings(rows *sql.Rows, rowCount int) ([]str
 	}
 
 	return strings, nil
+}
+
+func (gs *GuestService) setCache(eventID, nric, hash string) {
+	gs.cacheLock.Lock()
+	defer gs.cacheLock.Unlock()
+	gs.hashCache[strings.ToLower(eventID+nric)] = hash
+}
+
+func (gs *GuestService) deleteCache(eventID, nric string) {
+	gs.cacheLock.Lock()
+	defer gs.cacheLock.Unlock()
+	delete(gs.hashCache, strings.ToLower(eventID+nric))
+}
+
+func (gs *GuestService) getCache(eventID, nric string) (string, bool) {
+	gs.cacheLock.RLock()
+	defer gs.cacheLock.RUnlock()
+	hash, ok := gs.hashCache[strings.ToLower(eventID+nric)]
+	return hash, ok
 }
 
 //Returns a guest and true if one could be found with that nric and eventID
