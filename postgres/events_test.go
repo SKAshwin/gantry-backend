@@ -62,6 +62,26 @@ func TestEvent(t *testing.T) {
 	test.Assert(t, err != nil, "No error thrown when trying to fetch event that does not exist (invalid UUID)")
 }
 
+func TestEventByURL(t *testing.T) {
+	es := postgres.EventService{DB: db}
+
+	//test normal functionality
+	event, err := es.EventByURL("cop2018")
+	test.Ok(t, err)
+	event.UpdatedAt = time.Time{}
+	event.CreatedAt = time.Time{}
+	test.Equals(t, checkin.Event{
+		ID:       "2c59b54d-3422-4bdb-824c-4125775b44c8",
+		Name:     "Data Science CoP",
+		URL:      null.StringFrom("cop2018"),
+		TimeTags: map[string]time.Time{"release": time.Date(2019, 4, 12, 9, 0, 0, 0, time.UTC)},
+	}, event)
+
+	//test event does not exist
+	_, err = es.EventByURL("Nonexistent event")
+	test.Assert(t, err != nil, "No error thrown trying to fetch by url event that does not exist")
+}
+
 func TestEventsBy(t *testing.T) {
 	es := postgres.EventService{DB: db}
 

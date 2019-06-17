@@ -44,8 +44,21 @@ func (es *EventService) Event(eventID string) (checkin.Event, error) {
 	return event, nil
 }
 
-func (es *EventService) EventByURL(eventID string) (checkin.Event, error) {
-	return checkin.Event{}, nil
+//EventByURL Fetches the details of an event, given its URL
+//Obviously, this cannot fetch events which have null event IDs
+func (es *EventService) EventByURL(url string) (checkin.Event, error) {
+	var rEvent rawEvent
+	err := es.DB.QueryRowx(
+		"SELECT * from event where url = $1",
+		url).StructScan(&rEvent)
+	if err != nil {
+		return checkin.Event{}, errors.New("Error fetching event details: " + err.Error())
+	}
+	event, err := es.unmarshalEvent(rEvent)
+	if err != nil {
+		return checkin.Event{}, errors.New("Error unmarshalling timetag in event: " + err.Error())
+	}
+	return event, nil
 }
 
 //Events Returns every event, by every user
