@@ -64,6 +64,7 @@ type FeedbackForm struct {
 //EventService An interface for functions that modify/fetch event data in the database
 type EventService interface {
 	Event(ID string) (Event, error)
+	EventByURL(url string) (Event, error)
 	EventsBy(username string) ([]Event, error)
 	Events() ([]Event, error)
 	CreateEvent(e Event, hostUsername string) error

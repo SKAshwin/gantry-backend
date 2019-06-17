@@ -44,6 +44,10 @@ func (es *EventService) Event(eventID string) (checkin.Event, error) {
 	return event, nil
 }
 
+func (es *EventService) EventByURL(eventID string) (checkin.Event, error) {
+	return checkin.Event{}, nil
+}
+
 //Events Returns every event, by every user
 func (es *EventService) Events() ([]checkin.Event, error) {
 	rows, err := es.DB.Queryx(

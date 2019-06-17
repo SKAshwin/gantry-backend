@@ -9,6 +9,9 @@ type EventService struct {
 	EventFn      func(ID string) (checkin.Event, error)
 	EventInvoked bool
 
+	EventByURLFn      func(url string) (checkin.Event, error)
+	EventByURLInvoked bool
+
 	EventsByFn      func(username string) ([]checkin.Event, error)
 	EventsByInvoked bool
 
@@ -36,10 +39,10 @@ type EventService struct {
 	CheckHostFn      func(username string, eventID string) (bool, error)
 	CheckHostInvoked bool
 
-	FeedbackFormsFn func(ID string) ([]checkin.FeedbackForm, error)
+	FeedbackFormsFn      func(ID string) ([]checkin.FeedbackForm, error)
 	FeedbackFormsInvoked bool
 
-	SubmitFeedbackFn func(ID string, ff checkin.FeedbackForm) error
+	SubmitFeedbackFn      func(ID string, ff checkin.FeedbackForm) error
 	SubmitFeedbackInvoked bool
 }
 
@@ -103,12 +106,20 @@ func (es *EventService) CheckHost(username string, eventID string) (bool, error)
 	return es.CheckHostFn(username, eventID)
 }
 
+//FeedbackForms invokes the mock implementation and marks the function as invoked
 func (es *EventService) FeedbackForms(ID string) ([]checkin.FeedbackForm, error) {
 	es.FeedbackFormsInvoked = true
 	return es.FeedbackFormsFn(ID)
 }
 
+//SubmitFeedback invokes the mock implementation and marks the function as invoked
 func (es *EventService) SubmitFeedback(ID string, ff checkin.FeedbackForm) error {
 	es.SubmitFeedbackInvoked = true
 	return es.SubmitFeedbackFn(ID, ff)
+}
+
+//EventByURL invokes the mock implementation and marks the function as invoked
+func (es *EventService) EventByURL(url string) (checkin.Event, error) {
+	es.EventByURLInvoked = true
+	return es.EventByURLFn(url)
 }
