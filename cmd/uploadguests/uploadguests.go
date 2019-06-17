@@ -8,6 +8,7 @@ import (
 	"checkin"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -98,37 +99,14 @@ func main() {
 	url := *serverAddress + "/api/v1-3/events/" + *eventID + "/guests"
 	log.Println("Reading from " + *filePath + " and sending data to " + url)
 
-	f, err := os.Open(*filePath)
-	if err != nil {
-		log.Fatal("Error opening CSV: " + err.Error())
-		return
-	}
-	defer f.Close() // this needs to be after the err check
-	lines, err := csv.NewReader(f).ReadAll()
+	lines, err := ReadCSV(*filePath)
 	if err != nil {
 		log.Fatal("Error reading CSV: " + err.Error())
 	}
 
-	tr := &http.Transport{
-		MaxIdleConns:        20,
-		MaxIdleConnsPerHost: 20,
-	}
-	client := &http.Client{Transport: tr}
-
+	client := &http.Client{}
 	log.Println("Converting CSV into Guest Array JSON")
-	guests := make([]checkin.Guest, len(lines))
-	for i := 0; i < len(lines); i++ {
-		guest := checkin.Guest{
-			Name: lines[i][1],
-			NRIC: lines[i][0],
-		}
-		if *tags {
-			guest.Tags = extractTags(lines[i][2])
-		}
-
-		guests[i] = guest
-	}
-	guestsJSON, err := json.Marshal(guests)
+	guestsJSON, err := CSVToJSON(lines, *tags)
 	if err != nil {
 		log.Fatal("Error marshalling CSV into guest array JSON : " + err.Error())
 	}
@@ -161,6 +139,35 @@ func main() {
 
 	log.Println("Response from server: " + reply.Message)
 	log.Println("Finished uploading all guests")
+}
+
+//CSVToJSON converts csv data (in the form of an array of strings) into a JSON guest array
+//readTags is a flag indicating whether each row of the CSV data has a third column which has tags that should be read
+//if not guest.Tags is set to nil for each guest
+func CSVToJSON(guestCSV [][]string, readTags bool) ([]byte, error) {
+	guests := make([]checkin.Guest, len(guestCSV))
+	for i := 0; i < len(guestCSV); i++ {
+		guest := checkin.Guest{
+			Name: guestCSV[i][1],
+			NRIC: guestCSV[i][0],
+		}
+		if readTags {
+			guest.Tags = extractTags(guestCSV[i][2])
+		}
+
+		guests[i] = guest
+	}
+	return json.Marshal(guests)
+}
+
+//ReadCSV returns a string matrix or an error
+func ReadCSV(filePath string) ([][]string, error) {
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, errors.New("Error opening CSV: " + err.Error())
+	}
+	defer f.Close() // this needs to be after the err check
+	return csv.NewReader(f).ReadAll()
 }
 
 func extractTags(tags string) []string {
