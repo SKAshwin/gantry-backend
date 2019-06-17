@@ -60,6 +60,7 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 		tokenCheck, correctTimezonesInput)).Methods("POST")
 	h.Handle("/api/v0/events/takenurls/{eventURL}", Adapt(http.HandlerFunc(h.handleURLTaken),
 		tokenCheck)).Methods("GET")
+	h.Handle("/api/v1-3/events/id/{eventURL}", http.HandlerFunc(h.handleIDByURL)).Methods("GET")
 	h.Handle("/api/v1-3/events/{eventID}", Adapt(http.HandlerFunc(h.handleEvent),
 		tokenCheck, existCheck, credentialsCheck, correctTimezonesOutput, jsonSelector)).Methods("GET")
 	h.Handle("/api/v1-3/events/{eventID}", Adapt(http.HandlerFunc(h.handleUpdateEvent),
@@ -80,6 +81,28 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 	h.PathPrefix("/api/{versionNumber}/events/{eventID}/guests").Handler(gh)
 
 	return h
+}
+
+func (h *EventHandler) handleIDByURL(w http.ResponseWriter, r *http.Request) {
+	exists, err := h.EventService.URLExists(mux.Vars(r)["eventURL"])
+	if err != nil {
+		h.Logger.Println("Error checking whether event exists with that URL: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error checking if event exists with that URL", w)
+		return
+	} else if !exists {
+		WriteMessage(http.StatusNotFound, "No event with that URL", w)
+		return
+	}
+
+	event, err := h.EventService.EventByURL(mux.Vars(r)["eventURL"])
+	if err != nil {
+		h.Logger.Println("Error getting event with the provided URL: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error getting event with the provided URL", w)
+		return
+	}
+
+	reply, _ := json.Marshal(event.ID)
+	w.Write(reply)
 }
 
 func (h *EventHandler) handleGetTimeTag(w http.ResponseWriter, r *http.Request) {
