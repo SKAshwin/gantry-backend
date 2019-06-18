@@ -5,6 +5,7 @@ import (
 	"checkin"
 	"database/sql"
 	"errors"
+	"log"
 
 	"github.com/google/uuid"
 
@@ -458,6 +459,7 @@ func (gs *GuestService) DeleteCache(eventID, nric string) {
 }
 
 //GetCache returns the nricHash of a guest with that eventID and NRIC, from the cache
+//Returns an empty string if that guest is known not to exist
 func (gs *GuestService) GetCache(eventID, nric string) (string, bool) {
 	gs.cacheLock.RLock()
 	defer gs.cacheLock.RUnlock()
@@ -482,10 +484,12 @@ func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.G
 		//since a guest with an invalid UUID will definitely not exist, return an empty guest object
 		return checkin.Guest{}, nil
 	}
-	if hash, ok := gs.GetCache(eventID, nric); ok {
+	if hash, ok := gs.GetCache(eventID, nric); ok && hash != "" {
 		var guest checkin.Guest
 		err := gs.DB.QueryRowx("SELECT name, nricHash from guest where nricHash = $1", hash).StructScan(&guest)
 		return guest, err
+	} else if hash == "" && ok {
+		return checkin.Guest{}, nil
 	}
 	rows, err := gs.DB.Queryx("SELECT name, nricHash from guest where eventID = $1", eventID)
 	if err != nil {
@@ -503,7 +507,8 @@ func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.G
 	}
 
 	guest := gs.findGuest(nric, guests)
-	go gs.SetCache(eventID, nric, guest.NRIC)
+	log.Println(nric, guest.NRIC)
+	gs.SetCache(eventID, nric, guest.NRIC) //puts an empty string if guest not found
 	return guest, nil
 }
 
