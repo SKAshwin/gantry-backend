@@ -38,7 +38,7 @@ func compareHashAndPasswordGenerator() func(string, string) bool {
 
 func TestGuests(t *testing.T) {
 	var hm mock.HashMethod
-	gs := postgres.GuestService{DB: db, HM: &hm}
+	gs := postgres.GuestService{DB: db, HM: &hm, HashCache: make(map[string]string)}
 
 	names, err := gs.Guests("aa19239f-f9f5-4935-b1f7-0edfdceabba7", []string{})
 	test.Ok(t, err)
@@ -84,7 +84,7 @@ func TestGuests(t *testing.T) {
 
 func TestGuestsCheckedIn(t *testing.T) {
 	var hm mock.HashMethod
-	gs := postgres.GuestService{DB: db, HM: &hm}
+	gs := postgres.GuestService{DB: db, HM: &hm, HashCache: make(map[string]string)}
 
 	names, err := gs.GuestsCheckedIn("aa19239f-f9f5-4935-b1f7-0edfdceabba7", []string{})
 	test.Ok(t, err)
@@ -133,7 +133,7 @@ func TestGuestsCheckedIn(t *testing.T) {
 
 func TestGuestsNotCheckedIn(t *testing.T) {
 	var hm mock.HashMethod
-	gs := postgres.GuestService{DB: db, HM: &hm}
+	gs := postgres.GuestService{DB: db, HM: &hm, HashCache: make(map[string]string)}
 
 	names, err := gs.GuestsNotCheckedIn("aa19239f-f9f5-4935-b1f7-0edfdceabba7", []string{})
 	test.Ok(t, err)
@@ -176,7 +176,7 @@ func TestGuestsNotCheckedIn(t *testing.T) {
 
 func TestCheckInStats(t *testing.T) {
 	var hm mock.HashMethod
-	gs := postgres.GuestService{DB: db, HM: &hm}
+	gs := postgres.GuestService{DB: db, HM: &hm, HashCache: make(map[string]string)}
 
 	stats, err := gs.CheckInStats("aa19239f-f9f5-4935-b1f7-0edfdceabba7", []string{})
 	test.Ok(t, err)
@@ -251,9 +251,16 @@ func TestCheckInStats(t *testing.T) {
 	test.Equals(t, expectedStats, stats)
 }
 
+//Tests whether the given eventID and NRIC are stored in the hash of the GuestService
+func testCache(eventID, nric string, gs *postgres.GuestService, hm checkin.HashMethod) bool {
+	hash, err := hm.HashAndSalt(nric)
+	cachedHash, ok := (*gs).GetCache(eventID, nric)
+	return err == nil && ok && cachedHash == hash
+}
+
 func TestRegisterGuest(t *testing.T) {
 	var hm mock.HashMethod
-	gs := postgres.GuestService{DB: db, HM: &hm}
+	gs := postgres.GuestService{DB: db, HM: &hm, HashCache: make(map[string]string)}
 
 	hm.HashAndSaltFn = hashFnGenerator(nil)
 	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
@@ -263,17 +270,21 @@ func TestRegisterGuest(t *testing.T) {
 	names, err := gs.Guests("3820a980-a207-4738-b82b-45808fe7aba8", []string{"NEWLYregistered"}) //check case insensitivity of tag while you're at it
 	test.Ok(t, err)
 	test.Equals(t, []string{"Jim Bob"}, names)
+	test.Equals(t, true, testCache("3820a980-a207-4738-b82b-45808fe7aba8", "1234A", &gs, &hm))
 	err = gs.RemoveGuest("3820a980-a207-4738-b82b-45808fe7aba8", "1234A")
 	test.Ok(t, err)
+	test.Equals(t, gs.HashCache, map[string]string{}) //cache should be empty
 
 	//check salting fails
 	hm.HashAndSaltFn = hashFnGenerator(errors.New("An error"))
 	err = gs.RegisterGuest("3820a980-a207-4738-b82b-45808fe7aba8", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"NEWLYREGISTERED"}})
 	test.Assert(t, err != nil, "Failed hashing does not throw an error")
+	test.Equals(t, gs.HashCache, map[string]string{}) //cache should be empty
 	hm.HashAndSaltFn = hashFnGenerator(nil)
 
 	//check event does not even exist
 	err = gs.RegisterGuest("a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{"NEWLYREGISTERED"}})
+	test.Equals(t, gs.HashCache, map[string]string{}) //cache should be empty
 	test.Assert(t, err != nil, "Registering guest for non-existent event does not throw an error")
 
 	//check nil tag and empty tag do the same thing
@@ -282,8 +293,10 @@ func TestRegisterGuest(t *testing.T) {
 	names, err = gs.Guests("3820a980-a207-4738-b82b-45808fe7aba8", []string{})
 	test.Ok(t, err)
 	test.Equals(t, []string{"Jim Bob"}, names)
+	test.Equals(t, true, testCache("3820a980-a207-4738-b82b-45808fe7aba8", "1234A", &gs, &hm))
 	err = gs.RemoveGuest("3820a980-a207-4738-b82b-45808fe7aba8", "1234A")
 	test.Ok(t, err)
+	test.Equals(t, gs.HashCache, map[string]string{}) //cache should be empty
 
 	err = gs.RegisterGuest("3820a980-a207-4738-b82b-45808fe7aba8", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{}})
 	test.Ok(t, err)
@@ -292,24 +305,29 @@ func TestRegisterGuest(t *testing.T) {
 	test.Equals(t, []string{"Jim Bob"}, names)
 	err = gs.RemoveGuest("3820a980-a207-4738-b82b-45808fe7aba8", "1234A")
 	test.Ok(t, err)
+	test.Equals(t, gs.HashCache, map[string]string{}) //cache should be empty
 
 	//check case insensitivity of NRIC
 	err = gs.RegisterGuest("3820a980-a207-4738-b82b-45808fe7aba8", checkin.Guest{NRIC: "1234A", Name: "Jim Bob", Tags: []string{}})
 	test.Ok(t, err)
+	test.Equals(t, true, testCache("3820a980-a207-4738-b82b-45808fe7aba8", "1234A", &gs, &hm))
 	err = gs.RegisterGuest("3820a980-a207-4738-b82b-45808fe7aba8", checkin.Guest{NRIC: "1234a", Name: "Other name", Tags: []string{}})
 	test.Assert(t, err != nil, "Registering same guest but with different last char did not throw an error (no case insensitivity)")
+	test.Equals(t, true, testCache("3820a980-a207-4738-b82b-45808fe7aba8", "1234A", &gs, &hm))
 	err = gs.RemoveGuest("3820a980-a207-4738-b82b-45808fe7aba8", "1234A")
 	test.Ok(t, err)
+	test.Equals(t, gs.HashCache, map[string]string{}) //cache should be empty
 
 	//check that its empty now, before moving on to next test
 	names, err = gs.Guests("3820a980-a207-4738-b82b-45808fe7aba8", []string{})
 	test.Ok(t, err)
 	test.Equals(t, []string{}, names)
+
 }
 
 func TestRegisterGuests(t *testing.T) {
 	var hm mock.HashMethod
-	gs := postgres.GuestService{DB: db, HM: &hm}
+	gs := postgres.GuestService{DB: db, HM: &hm, HashCache: make(map[string]string)}
 
 	hm.HashAndSaltFn = hashFnGenerator(nil)
 	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
@@ -369,7 +387,7 @@ func TestRegisterGuests(t *testing.T) {
 
 func TestTags(t *testing.T) {
 	var hm mock.HashMethod
-	gs := postgres.GuestService{DB: db, HM: &hm}
+	gs := postgres.GuestService{DB: db, HM: &hm, HashCache: make(map[string]string)}
 
 	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
 
@@ -399,7 +417,7 @@ func TestTags(t *testing.T) {
 
 func TestSetTags(t *testing.T) {
 	var hm mock.HashMethod
-	gs := postgres.GuestService{DB: db, HM: &hm}
+	gs := postgres.GuestService{DB: db, HM: &hm, HashCache: make(map[string]string)}
 
 	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
 
@@ -449,7 +467,7 @@ func TestSetTags(t *testing.T) {
 
 func TestAllTags(t *testing.T) {
 	var hm mock.HashMethod
-	gs := postgres.GuestService{DB: db, HM: &hm}
+	gs := postgres.GuestService{DB: db, HM: &hm, HashCache: make(map[string]string)}
 
 	//check normal functionality (multiple tags returns)
 	tags, err := gs.AllTags("c14a592c-950d-44ba-b173-bbb9e4f5c8b4")
@@ -483,7 +501,7 @@ func TestAllTags(t *testing.T) {
 
 func TestGuestExists(t *testing.T) {
 	var hm mock.HashMethod
-	gs := postgres.GuestService{DB: db, HM: &hm}
+	gs := postgres.GuestService{DB: db, HM: &hm, HashCache: make(map[string]string)}
 	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
 
 	//event exists, guest does
@@ -530,7 +548,7 @@ func TestGuestExists(t *testing.T) {
 func TestCheckIn(t *testing.T) {
 	var hm mock.HashMethod
 	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
-	gs := postgres.GuestService{HM: &hm, DB: db}
+	gs := postgres.GuestService{HM: &hm, DB: db, HashCache: make(map[string]string)}
 
 	//test normal functionality
 	name, err := gs.CheckIn("03293b3b-df83-407e-b836-fb7d4a3c4966", "1234A")
@@ -569,7 +587,7 @@ func TestGuestExistsTime(t *testing.T) {
 		t.Skip("Skipping testing since no BENCH argument provided")
 	}
 	hm := bcrypt.HashMethod{HashCost: 5}
-	gs := postgres.GuestService{HM: &hm, DB: db}
+	gs := postgres.GuestService{HM: &hm, DB: db, HashCache: make(map[string]string)}
 	eventID := "3820a980-a207-4738-b82b-45808fe7aba8"
 
 	for i := range [1000]int{} {
@@ -600,4 +618,11 @@ func TestGuestExistsTime(t *testing.T) {
 	test.Ok(t, err)
 	test.Equals(t, true, res)
 
+}
+
+func TestCaching(t *testing.T) {
+	/*var hm mock.HashMethod
+	hm.HashAndSaltFn = hashFnGenerator(nil)
+	hm.CompareHashAndPasswordFn = compareHashAndPasswordGenerator()
+	gs := postgres.GuestService{DB: db, HM: &hm, HashCache: make(map[string]string)}*/
 }

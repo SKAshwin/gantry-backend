@@ -22,7 +22,7 @@ import (
 type GuestService struct {
 	DB        *sqlx.DB
 	HM        checkin.HashMethod
-	hashCache map[string]string
+	HashCache map[string]string
 	cacheLock sync.RWMutex
 }
 
@@ -188,6 +188,10 @@ func (gs *GuestService) RegisterGuest(eventID string, guest checkin.Guest) error
 	_, err = gs.DB.Exec("INSERT into guest(nricHash,eventID,name,tags,checkedIn) VALUES($1,$2,$3,$4,FALSE)",
 		nricHash, eventID, guest.Name, pq.Array(guest.Tags))
 
+	if err == nil {
+		gs.SetCache(eventID, guest.NRIC, nricHash)
+	}
+
 	return err
 }
 
@@ -246,6 +250,12 @@ func (gs *GuestService) RegisterGuests(eventID string, guests []checkin.Guest) e
 		tx.Rollback()
 		return errors.New("Error committing changes to database: " + err.Error())
 	}
+
+	for _, guest := range guests {
+		nricHash, _ := gs.HM.HashAndSalt(strings.ToUpper(guest.NRIC))
+		gs.SetCache(eventID, guest.NRIC, nricHash)
+	}
+
 	return nil
 }
 
@@ -333,6 +343,10 @@ func (gs *GuestService) RemoveGuest(eventID string, nric string) error {
 
 	_, err = gs.DB.Exec("DELETE from guest where eventID = $1 and nricHash = $2",
 		eventID, nricHash)
+
+	if err == nil {
+		gs.DeleteCache(eventID, nric)
+	}
 
 	return err
 }
@@ -429,26 +443,37 @@ func (gs *GuestService) scanRowsIntoStrings(rows *sql.Rows, rowCount int) ([]str
 	return strings, nil
 }
 
-func (gs *GuestService) setCache(eventID, nric, hash string) {
+//SetCache tells the GuestService that a guest with the given eventID and nric has the given nricHash
+func (gs *GuestService) SetCache(eventID, nric, hash string) {
 	gs.cacheLock.Lock()
 	defer gs.cacheLock.Unlock()
-	gs.hashCache[strings.ToLower(eventID+nric)] = hash
+	gs.HashCache[strings.ToLower(eventID+nric)] = hash
 }
 
-func (gs *GuestService) deleteCache(eventID, nric string) {
+//DeleteCache removes any information (if any) the guest service has about the nricHash of the given guest
+func (gs *GuestService) DeleteCache(eventID, nric string) {
 	gs.cacheLock.Lock()
 	defer gs.cacheLock.Unlock()
-	delete(gs.hashCache, strings.ToLower(eventID+nric))
+	delete(gs.HashCache, strings.ToLower(eventID+nric))
 }
 
-func (gs *GuestService) getCache(eventID, nric string) (string, bool) {
+//GetCache returns the nricHash of a guest with that eventID and NRIC, from the cache
+func (gs *GuestService) GetCache(eventID, nric string) (string, bool) {
 	gs.cacheLock.RLock()
 	defer gs.cacheLock.RUnlock()
-	hash, ok := gs.hashCache[strings.ToLower(eventID+nric)]
+	hash, ok := gs.HashCache[strings.ToLower(eventID+nric)]
 	return hash, ok
 }
 
-//Returns a guest and true if one could be found with that nric and eventID
+//FlushCache deletes all stuff in the nrich hash cache
+func (gs *GuestService) FlushCache() {
+	gs.cacheLock.Lock()
+	defer gs.cacheLock.Unlock()
+	gs.HashCache = make(map[string]string)
+}
+
+//Returns a guest and true if one could be found with that nric (given in plaintext) and eventID
+//The guest will have its name and nricHash filled out only
 //Returns an empty guest object (and no error) if the guest could not be found
 //Returns an error if there is an error getting a guest
 func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.Guest, error) {
@@ -456,6 +481,11 @@ func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.G
 		//attempting to search for a guest associated with an event with an invalid UUID will throw an error
 		//since a guest with an invalid UUID will definitely not exist, return an empty guest object
 		return checkin.Guest{}, nil
+	}
+	if hash, ok := gs.GetCache(eventID, nric); ok {
+		var guest checkin.Guest
+		err := gs.DB.QueryRowx("SELECT name, nricHash from guest where nricHash = $1", hash).StructScan(&guest)
+		return guest, err
 	}
 	rows, err := gs.DB.Queryx("SELECT name, nricHash from guest where eventID = $1", eventID)
 	if err != nil {
@@ -472,7 +502,9 @@ func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.G
 		return checkin.Guest{}, errors.New("Error reading guest data from database: " + err.Error())
 	}
 
-	return gs.findGuest(nric, guests), nil
+	guest := gs.findGuest(nric, guests)
+	go gs.SetCache(eventID, nric, guest.NRIC)
+	return guest, nil
 }
 
 func (gs *GuestService) findGuest(nric string, hashedGuests []checkin.Guest) checkin.Guest {
