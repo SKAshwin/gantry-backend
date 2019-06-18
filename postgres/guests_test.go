@@ -253,9 +253,14 @@ func TestCheckInStats(t *testing.T) {
 
 //Tests whether the given eventID and NRIC are stored in the hash of the GuestService
 func testCache(eventID, nric string, gs *postgres.GuestService, hm checkin.HashMethod) bool {
-	hash, err := hm.HashAndSalt(nric)
 	cachedHash, ok := (*gs).GetCache(eventID, nric)
-	return err == nil && ok && cachedHash == hash
+	return ok && hm.CompareHashAndPassword(cachedHash, nric)
+}
+
+//Test that the cached cache for a guest that doesn't exist is an empty string
+func testCacheGuestNotFound(eventID, nric string, gs *postgres.GuestService, hm checkin.HashMethod) bool {
+	cachedHash, ok := (*gs).GetCache(eventID, nric)
+	return ok && cachedHash == ""
 }
 
 func TestRegisterGuest(t *testing.T) {
@@ -343,6 +348,10 @@ func TestRegisterGuests(t *testing.T) {
 	//test normal functionality
 	err := gs.RegisterGuests("3820a980-a207-4738-b82b-45808fe7aba8", guests)
 	test.Ok(t, err)
+	test.Equals(t, true, testCache("3820a980-a207-4738-b82b-45808fe7aba8", "1234A", &gs, &hm))
+	test.Equals(t, true, testCache("3820a980-a207-4738-b82b-45808fe7aba8", "1234B", &gs, &hm))
+	test.Equals(t, true, testCache("3820a980-a207-4738-b82b-45808fe7aba8", "1234C", &gs, &hm))
+	test.Equals(t, true, testCache("3820a980-a207-4738-b82b-45808fe7aba8", "1234D", &gs, &hm))
 	names, err := gs.Guests("3820a980-a207-4738-b82b-45808fe7aba8", nil)
 	sort.Strings(names)
 	test.Equals(t, []string{"Eugene", "Jim Bob", "Mayank", "Ya wei"}, names)
@@ -350,22 +359,27 @@ func TestRegisterGuests(t *testing.T) {
 		err := gs.RemoveGuest("3820a980-a207-4738-b82b-45808fe7aba8", guest.NRIC)
 		test.Ok(t, err)
 	}
+	test.Equals(t, gs.HashCache, map[string]string{}) //cache should be empty
 
 	//check salting fails
 	hm.HashAndSaltFn = hashFnGenerator(errors.New("An error"))
 	err = gs.RegisterGuests("3820a980-a207-4738-b82b-45808fe7aba8", guests)
 	test.Assert(t, err != nil, "Failed hashing does not throw an error")
+	test.Equals(t, gs.HashCache, map[string]string{}) //cache should be empty
 	hm.HashAndSaltFn = hashFnGenerator(nil)
 
 	//check empty or nil slice of guests - should fail
 	err = gs.RegisterGuests("3820a980-a207-4738-b82b-45808fe7aba8", []checkin.Guest{})
 	test.Assert(t, err != nil, "No error thrown when attempting to register empty slice of guests")
+	test.Equals(t, gs.HashCache, map[string]string{}) //cache should be empty
 	err = gs.RegisterGuests("3820a980-a207-4738-b82b-45808fe7aba8", nil)
 	test.Assert(t, err != nil, "No error thrown when attempting to register nil guest slice")
+	test.Equals(t, gs.HashCache, map[string]string{}) //cache should be empty
 
 	//check event does not even exist
 	err = gs.RegisterGuests("a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8", guests)
 	test.Assert(t, err != nil, "Registering guests for non-existent event does not throw an error")
+	test.Equals(t, gs.HashCache, map[string]string{}) //cache should be empty
 
 	//check case insensitivity of NRIC
 	guests = []checkin.Guest{
@@ -376,7 +390,8 @@ func TestRegisterGuests(t *testing.T) {
 	test.Assert(t, err != nil, "Registering two identical guests (with only NRIC case differing) for non-existent event does not throw an error")
 	names, err = gs.Guests("a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8", nil)
 	test.Ok(t, err)
-	test.Equals(t, []string{}, names) //test that an error in registering one guest, for example 1234a, means neither are registered
+	test.Equals(t, []string{}, names)                 //test that an error in registering one guest, for example 1234a, means neither are registered
+	test.Equals(t, gs.HashCache, map[string]string{}) //cache should be empty
 
 	//check that its empty now, before moving on to next test
 	names, err = gs.Guests("3820a980-a207-4738-b82b-45808fe7aba8", []string{})
@@ -400,10 +415,13 @@ func TestTags(t *testing.T) {
 	//guest doesn't exist
 	tags, err = gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "6433G")
 	test.Assert(t, err != nil, "No error when fetching tags of non-existent guests")
+	test.Equals(t, true, testCache("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "2346C", &gs, &hm))
 
 	//event does not exist
 	tags, err = gs.Tags("a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8", "6433G")
 	test.Assert(t, err != nil, "No error when fetching tags of guest of non-existent event")
+	test.Equals(t, true, testCacheGuestNotFound("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "2346C", &gs, &hm))
+	//TODO fix this failing test
 
 	tags, err = gs.Tags("notevenauuid", "6433G")
 	test.Assert(t, err != nil, "No error when fetching tags of guest of non-existent event (invalid UUID)")
@@ -412,6 +430,7 @@ func TestTags(t *testing.T) {
 	tags, err = gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "1234A")
 	test.Ok(t, err)
 	test.Equals(t, []string{}, tags)
+	test.Equals(t, true, testCache("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "1234A", &gs, &hm))
 
 }
 
@@ -427,6 +446,7 @@ func TestSetTags(t *testing.T) {
 	//test normal functionality
 	err = gs.SetTags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "1234A", []string{"HELLO", "WORLD"})
 	test.Ok(t, err)
+	test.Equals(t, true, testCache("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "1234A", &gs, &hm))
 	tags, err := gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "1234A")
 	test.Ok(t, err)
 	test.Equals(t, []string{"HELLO", "WORLD"}, tags)
@@ -434,6 +454,7 @@ func TestSetTags(t *testing.T) {
 	//test if the guest already has some tags (new tags should overwrite old)
 	err = gs.SetTags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "2346C", []string{"HELLO", "WORLD"})
 	test.Ok(t, err)
+	test.Equals(t, true, testCache("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "2346C", &gs, &hm))
 	tags, err = gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "2346C")
 	test.Ok(t, err)
 	test.Equals(t, []string{"HELLO", "WORLD"}, tags)
@@ -442,6 +463,7 @@ func TestSetTags(t *testing.T) {
 	newUnaffectedTags, err := gs.Tags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "5678B")
 	test.Ok(t, err)
 	test.Equals(t, unaffectedTags, newUnaffectedTags)
+	test.Equals(t, true, testCache("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "5678B", &gs, &hm))
 
 	//test nil and empty array tags
 	//nils should set tags to empty array
@@ -460,6 +482,7 @@ func TestSetTags(t *testing.T) {
 	//test guest or event does not exist
 	err = gs.SetTags("aa19239f-f9f5-4935-b1f7-0edfdceabba7", "1111B", []string{})
 	test.Assert(t, err != nil, "No error returned for nonexistent guest")
+	test.Equals(t, gs.HashCache, map[string]string{})
 	err = gs.SetTags("a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8", "2346C", []string{})
 	test.Assert(t, err != nil, "No error returned for nonexistent event")
 
