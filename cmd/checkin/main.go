@@ -39,7 +39,7 @@ func main() {
 	us := &postgres.UserService{DB: db, HM: bcryptHashMethod}
 	as := &postgres.AuthenticationService{DB: db, HM: bcryptHashMethod}
 	es := &postgres.EventService{DB: db}
-	gs := &postgres.GuestService{DB: db, HM: bcryptHashMethod}
+	gs := &postgres.GuestService{DB: db, HM: bcryptHashMethod, HashCache: make(map[string]string)}
 
 	authHandler := http.NewAuthHandler(as, jwtAuthenticator, us)
 	userHandler := http.NewUserHandler(us, jwtAuthenticator)
