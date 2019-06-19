@@ -5,7 +5,6 @@ import (
 	"checkin"
 	"database/sql"
 	"errors"
-	"log"
 
 	"github.com/google/uuid"
 
@@ -507,7 +506,6 @@ func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.G
 	}
 
 	guest := gs.findGuest(nric, guests)
-	log.Println(nric, guest.NRIC)
 	gs.SetCache(eventID, nric, guest.NRIC) //puts an empty string if guest not found
 	return guest, nil
 }
