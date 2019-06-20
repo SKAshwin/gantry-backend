@@ -49,10 +49,4 @@ INSERT into guest(nricHash, eventID, name, tags, checkedIn, checkInTime) VALUES
 	('D8146', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'R', '{"VIP", "ATTENDING"}', TRUE, NOW()),
     ('S1215', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'S', '{"VIP"}', TRUE, NOW()),
 	('Q3333', '2c59b54d-3422-4bdb-824c-4125775b44c8', 'T', '{"ATTENDING"}', TRUE, NOW()),
-	('A1234', '03293b3b-df83-407e-b836-fb7d4a3c4966', 'A', '{}', FALSE, NOW()),
-    ('A1234', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'A', '{"OFFICER"}', FALSE, NULL),
-    ('B2834', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'B', '{"VIP", "ATTENDING"}', TRUE, NOW()),
-    ('C1212', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'C', '{}', TRUE, NOW()),
-    ('B1132', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'D', '{"VIP", "ATTENDING"}', TRUE, NOW()),
-    ('Z4432', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'E', '{"VIP"}', TRUE, NOW()),
-    ('D2482', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'F', '{"OFFICER"}', FALSE, NULL);
+	('A1234', '03293b3b-df83-407e-b836-fb7d4a3c4966', 'A', '{}', FALSE, NOW());

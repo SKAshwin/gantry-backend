@@ -111,7 +111,7 @@ func (gs *GuestService) Guests(eventID string, tags []string) ([]string, error) 
 		return nil, errors.New("Cannot fetch number of guests: " + err.Error())
 	}
 
-	return gs.scanRowsIntoStrings(rows, numGuests)
+	return gs.scanRowsIntoNames(rows, numGuests)
 }
 
 //GuestsCheckedIn return an array of names of the guests who have checked in
@@ -134,7 +134,7 @@ func (gs *GuestService) GuestsCheckedIn(eventID string, tags []string) ([]string
 		return nil, errors.New("Cannot fetch number of guests checked in: " + err.Error())
 	}
 
-	return gs.scanRowsIntoStrings(rows, numGuests)
+	return gs.scanRowsIntoNames(rows, numGuests)
 }
 
 //GuestsNotCheckedIn returns an array of guests who haven't checked into the
@@ -157,7 +157,7 @@ func (gs *GuestService) GuestsNotCheckedIn(eventID string, tags []string) ([]str
 		return nil, errors.New("Cannot fetch number of guests not checked in: " + err.Error())
 	}
 
-	return gs.scanRowsIntoStrings(rows, numGuests)
+	return gs.scanRowsIntoNames(rows, numGuests)
 }
 
 //GuestExists returns true if a Guest with the given NRIC identifier (last 5 digits of NRIC)
@@ -261,7 +261,7 @@ func (gs *GuestService) RegisterGuests(eventID string, guests []checkin.Guest) e
 
 //Tags returns the tags of a given guest
 //Returns an empty array for no tags
-//Returns error if guest does not exist, or there was an error fetching it
+//Returns nil if guest does not exist, or there was an error fetching it
 func (gs *GuestService) Tags(eventID string, nric string) ([]string, error) {
 	guest, err := gs.getGuestWithNRIC(eventID, nric)
 	if err != nil {
@@ -299,34 +299,6 @@ func (gs *GuestService) SetTags(eventID string, nric string, tags []string) erro
 
 	_, err = gs.DB.Exec("UPDATE guest SET tags = $1 where eventID = $2 and nricHash = $3", pq.Array(tags), eventID, guest.NRIC)
 	return err
-}
-
-//AllTags returns all the unique tags for guests in a given event
-//Returns an empty string array if there are no tags, or no guests, in a given event
-//Also returns an empty string array if the event does not exist (or invalid UUID), NOT AN ERROR
-//Returns an error only if there is an error fetching the list of guests from the database
-func (gs *GuestService) AllTags(eventID string) ([]string, error) {
-	if _, err := uuid.Parse(eventID); err != nil {
-		return []string{}, nil
-	}
-
-	rows, err := gs.DB.Query("SELECT distinct unnest(tags) from guest where eventID = $1", eventID)
-	if err != nil {
-		return nil, errors.New("Error fetching tags for event: " + err.Error())
-	}
-	defer rows.Close()
-
-	count, err := gs.getNumberOfUniqueTags(eventID)
-	if err != nil {
-		return nil, errors.New("Error fetching number of unique tags: " + err.Error())
-	}
-
-	uniqueTags, err := gs.scanRowsIntoStrings(rows, count)
-	if err != nil {
-		return nil, errors.New("Error scanning rows into a string array: " + err.Error())
-	}
-
-	return uniqueTags, nil
 }
 
 //RemoveGuest removes a given guest (indicated by nric) from the database
@@ -379,13 +351,6 @@ func (gs *GuestService) CheckInStats(eventID string, tags []string) (checkin.Gue
 	}, nil
 }
 
-func (gs *GuestService) getNumberOfUniqueTags(eventID string) (int, error) {
-	var i int
-	err := gs.DB.QueryRow("SELECT count(distinct tag) from guest, unnest(guest.tags) as tag where eventID = $1", eventID).Scan(&i)
-
-	return i, err
-}
-
 //if tags is nil OR an empty array, looks for all guests, ignoring tags
 //in general, looks for guests who have all the tags specified in tags
 //they could possibly have more
@@ -426,21 +391,21 @@ func (gs *GuestService) getNumberOfGuestsCheckInStatus(eventID string, checkInSt
 	return i, nil
 }
 
-func (gs *GuestService) scanRowsIntoStrings(rows *sql.Rows, rowCount int) ([]string, error) {
-	strings := make([]string, rowCount)
+func (gs *GuestService) scanRowsIntoNames(rows *sql.Rows, rowCount int) ([]string, error) {
+	names := make([]string, rowCount)
 
 	index := 0
 	for ok := rows.Next(); ok; ok = rows.Next() {
-		var str string
-		err := rows.Scan(&str)
+		var name string
+		err := rows.Scan(&name)
 		if err != nil {
 			return nil, errors.New("Could not extract guest name: " + err.Error())
 		}
-		strings[index] = str
+		names[index] = name
 		index++
 	}
 
-	return strings, nil
+	return names, nil
 }
 
 //SetCache tells the GuestService that a guest with the given eventID and nric has the given nricHash

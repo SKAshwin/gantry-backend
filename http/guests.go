@@ -52,12 +52,8 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, gm GuestM
 		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}/guests", Adapt(http.HandlerFunc(h.handleRegisterGuest),
 		tokenCheck, existCheck, credentialsCheck)).Methods("POST")
-	h.Handle("/api/v1-3/events/{eventID}/guests", Adapt(http.HandlerFunc(h.handleRegisterGuests),
-		tokenCheck, existCheck, credentialsCheck)).Methods("POST")
 	h.Handle("/api/v0/events/{eventID}/guests", Adapt(http.HandlerFunc(h.handleRemoveGuest),
 		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
-	h.Handle("/api/v1-3/events/{eventID}/guests/tags", Adapt(http.HandlerFunc(h.handleTags),
-		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}/guests/checkedin", Adapt(http.HandlerFunc(h.handleGuestsCheckedIn),
 		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 	h.Handle("/api/v0/events/{eventID}/guests/checkedin", Adapt(http.HandlerFunc(h.handleCheckInGuest),
@@ -74,17 +70,6 @@ func NewGuestHandler(gs checkin.GuestService, es checkin.EventService, gm GuestM
 		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 
 	return h
-}
-
-func (h *GuestHandler) handleTags(w http.ResponseWriter, r *http.Request) {
-	tags, err := h.GuestService.AllTags(mux.Vars(r)["eventID"])
-	if err != nil {
-		h.Logger.Println("Error in handleTags: " + err.Error())
-		WriteMessage(http.StatusInternalServerError, "Error fetching all tags for event", w)
-		return
-	}
-	reply, _ := json.Marshal(tags)
-	w.Write(reply)
 }
 
 func (h *GuestHandler) handleGuests(w http.ResponseWriter, r *http.Request) {
