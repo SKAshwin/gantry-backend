@@ -326,7 +326,9 @@ func (h *EventHandler) handleCreateEvent(w http.ResponseWriter, r *http.Request)
 		h.Logger.Println("Error in creating event: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error in creating event", w)
 	} else {
-		WriteMessage(http.StatusCreated, "Event created", w)
+		reply, _ := json.Marshal(eventData.ID)
+		w.WriteHeader(http.StatusCreated)
+		w.Write(reply)
 	}
 }
 
