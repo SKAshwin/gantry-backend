@@ -22,11 +22,7 @@ func (us *UserService) User(username string) (checkin.User, error) {
 		"SELECT username, name, passwordHash, createdAt, updatedAt, lastLoggedIn from app_user where username = $1",
 		username).StructScan(&u)
 
-	if err != nil {
-		return checkin.User{}, errors.New("Could not fetch user details: " + err.Error())
-	}
-
-	return u, nil
+	return u, err
 }
 
 //Users Returns the details of all users
@@ -50,7 +46,7 @@ func (us *UserService) CreateUser(u checkin.User) error {
 	if err != nil {
 		return errors.New("createUser: " + err.Error())
 	}
-	_, err = us.DB.Exec("INSERT into app_user (username,passwordHash,name,createdAt,updatedAt,lastLoggedIn) VALUES ($1, $2, $3, NOW(), NOW(), NULL)",
+	_, err = us.DB.Exec("INSERT into app_user (username,passwordHash,name,createdAt,updatedAt,lastLoggedIn) VALUES ($1, $2, $3, (NOW() at time zone 'utc'), (NOW() at time zone 'utc'), NULL)",
 		u.Username, passwordHash, u.Name)
 	return err
 }
@@ -94,7 +90,7 @@ func (us *UserService) UpdateUser(originalUsername string, user checkin.User) er
 		return errors.New("Error while updating database: " + err.Error())
 	}
 
-	_, err = tx.Exec("UPDATE app_user SET updatedAt = NOW() where username = $1", user.Username)
+	_, err = tx.Exec("UPDATE app_user SET updatedAt = (NOW() at time zone 'utc') where username = $1", user.Username)
 	if err != nil {
 		tx.Rollback()
 		return errors.New("Error when updating updated field in app_user: " + err.Error())
@@ -119,8 +115,12 @@ func (us *UserService) CheckIfExists(username string) (bool, error) {
 }
 
 //UpdateLastLoggedIn Sets the lastLoggedIn attribute of this user to the current time
+//Returns an error if the user with that username does not exist, or error updating last logged in
 func (us *UserService) UpdateLastLoggedIn(username string) error {
-	_, err := us.DB.Exec("UPDATE app_user SET lastLoggedIn = NOW() where username = $1", username)
+	res, err := us.DB.Exec("UPDATE app_user SET lastLoggedIn = (NOW() at time zone 'utc') where username = $1", username)
+	if num, _ := res.RowsAffected(); num == 0 {
+		return errors.New("User does not exist")
+	}
 	return err
 }
 

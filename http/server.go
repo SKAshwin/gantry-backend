@@ -35,7 +35,7 @@ func (s *Server) Open() error {
 	s.ln = ln
 
 	// Start HTTP server.
-	go func() { http.Serve(s.ln, s.PreFlightHandler.Handle(s.Handler)) }()
+	go func() { http.Serve(s.ln, s.PreFlightHandler.Handle(redirectToHTTPSRouter(s.Handler))) }()
 
 	return nil
 }

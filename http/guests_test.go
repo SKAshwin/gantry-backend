@@ -8,14 +8,13 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"errors"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/guregu/null"
 )
 
 //Generates a HasConnection mock function (for use in mock.GuestMessenger) that returns the
@@ -44,7 +43,7 @@ func TestHandleGuests(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	var gm mock.GuestMessenger
-	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth, 64, 64)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
@@ -200,7 +199,7 @@ func TestHandleTags(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	var gm mock.GuestMessenger
-	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth, 64, 64)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
@@ -264,7 +263,7 @@ func TestHandleRegisterGuests(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	var gm mock.GuestMessenger
-	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth, 64, 64)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
@@ -318,6 +317,20 @@ func TestHandleRegisterGuests(t *testing.T) {
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
 
+	//test too long name, or tag
+	r = httptest.NewRequest("POST", "/api/v1-3/events/300/guests",
+		strings.NewReader(`[{"name":"qwertyuiopaSDFGHJKLZXCVBNMwqwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnm", "nric":"1234A", "tags":[]},{"name":"B", "nric":"1234B", "tags":null},
+		{"name":"C", "nric":"1234C", "tags":["VIP","CONFIRMED"]}, {"name":"D", "nric":"2234D", "tags":["CONFIRMED"]}]`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	r = httptest.NewRequest("POST", "/api/v1-3/events/300/guests",
+		strings.NewReader(`[{"name":"qwerty", "nric":"1234A", "tags":["asdft","qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjkl;zxcvbnmqwertyuiopasdfghjklzxcvbnm"]},{"name":"B", "nric":"1234B", "tags":null},
+		{"name":"C", "nric":"1234C", "tags":["VIP","CONFIRMED"]}, {"name":"D", "nric":"2234D", "tags":["CONFIRMED"]}]`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
 	//test registering one guest
 	gs.RegisterGuestsFn = registerGuestsGenerator(nil, []checkin.Guest{
 		checkin.Guest{
@@ -341,6 +354,14 @@ func TestHandleRegisterGuests(t *testing.T) {
 
 	r = httptest.NewRequest("POST", "/api/v1-3/events/300/guests",
 		strings.NewReader(`null`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+
+	//test attempting to register guest with too long name or tag
+	r = httptest.NewRequest("POST", "/api/v1-3/events/300/guests",
+		strings.NewReader(`[{"name":"qwertyuiopasdlzxcvbnmqwertyuiopasdfghjklzxcvbnmqwertyuopasdfklqwertyqwertyuiopqwertyuiopasdlzxcvbnmqwertyuiopasdfghjklzxcvbnmqwertyuopasdfklqwertyqwertyuiop", "nric":"1234A", "tags":[]},{"name":"B", "nric":"1234B", "tags":null},
+		{"name":"C", "nric":"1234C", "tags":["VIP","CONFIRMED"]}, {"name":"D", "nric":"2234D", "tags":["CONFIRMED"]}]`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
@@ -466,7 +487,7 @@ func TestHandleRegisterGuest(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	var gm mock.GuestMessenger
-	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth, 64, 64)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
@@ -500,6 +521,18 @@ func TestHandleRegisterGuest(t *testing.T) {
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
+
+	//tes too long name or tag
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
+		strings.NewReader(`{"name":"qwertyuiopaSDFGHJKLZXCVBNMwqwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnm", "nric":"1234A", "tags":[]}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
+	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
+		strings.NewReader(`{"name":"Hello", "nric":"1234A", "tags":["heLlo","lol","qwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjklzxcvbnmqwertyuiopasdfghjkl"]}`))
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 
 	//Test tags supplied with request
 
@@ -608,7 +641,7 @@ func TestHandleRemoveGuest(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	var gm mock.GuestMessenger
-	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth, 64, 64)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
@@ -689,7 +722,7 @@ func TestHandleGuestsCheckedIn(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	var gm mock.GuestMessenger
-	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth, 64, 64)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
@@ -756,7 +789,7 @@ func TestHandleCheckInGuest(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	var gm mock.GuestMessenger
-	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth, 64, 64)
 
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
 	//mock the required calls
@@ -770,12 +803,10 @@ func TestHandleCheckInGuest(t *testing.T) {
 				return checkin.Event{}, err
 			}
 			if !valid {
-				return checkin.Event{Release: null.Time{}}, nil
+				return checkin.Event{}, nil
 			}
 			return checkin.Event{
-				Release: null.Time{Time: time.Now().UTC().Add(offset),
-					Valid: true,
-				},
+				TimeTags: map[string]time.Time{"release": time.Now().UTC().Add(offset)},
 			}, nil
 
 		}
@@ -932,7 +963,7 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	var gm mock.GuestMessenger
-	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth, 64, 64)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
@@ -1063,7 +1094,7 @@ func TestHandleCreateCheckInListener(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	var gm mock.GuestMessenger
-	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth, 64, 64)
 
 	es.CheckIfExistsFn = checkIfExistsGenerator("300", nil)
 	openConnectionGen := func(err error) func(string, http.ResponseWriter, *http.Request) error {
@@ -1102,7 +1133,7 @@ func TestHandleGuestsNotCheckedIn(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	var gm mock.GuestMessenger
-	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth, 64, 64)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
@@ -1170,7 +1201,7 @@ func TestHandleStats(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	var gm mock.GuestMessenger
-	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth, 64, 64)
 
 	//mock the required calls
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
@@ -1245,36 +1276,42 @@ func TestHandleReport(t *testing.T) {
 	var es mock.EventService
 	var auth mock.Authenticator
 	var gm mock.GuestMessenger
-	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth)
+	h := myhttp.NewGuestHandler(&gs, &es, &gm, &auth, 64, 64)
 
 	es.CheckIfExistsFn = checkIfExistsGenerator("100", nil)
 	es.CheckHostFn = checkHostGenerator("testing_username", "100", nil)
 	auth.AuthenticateFn = authenticateGenerator(true, nil)
 	auth.GetAuthInfoFn = getAuthInfoGenerator("testing_username", false, nil)
-	guestsCheckedInGenerator := func(names []string, err error) func(string, []string) ([]string, error) {
+	guestsCheckedInGenerator := func(names []string, filterednames []string, err error) func(string, []string) ([]string, error) {
 		return func(eventID string, tags []string) ([]string, error) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
 			}
-			if tags != nil && len(tags) != 0 {
+			log.Println(tags)
+			if len(tags) == 2 && tags[0] == "CONFIRMED" && tags[1] == "VIP" {
+				return filterednames, err
+			} else if tags != nil && len(tags) != 0 {
 				t.Fatal("Expected nil or empty tags but got ", tags)
 			}
 			return names, err
 		}
 	}
-	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, nil)
-	guestsNotCheckedInFnGenerator := func(names []string, err error) func(string, []string) ([]string, error) {
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, []string{"Alice", "Bob"}, nil)
+	guestsNotCheckedInFnGenerator := func(names []string, filterednames []string, err error) func(string, []string) ([]string, error) {
 		return func(eventID string, tags []string) ([]string, error) {
 			if eventID != "100" {
 				t.Fatalf("unexpected id: %s", eventID)
 			}
-			if tags != nil && len(tags) != 0 {
-				t.Fatal("Expected nil or empty tags but got ", tags)
+			log.Println(tags)
+			if len(tags) == 2 && tags[0] == "CONFIRMED" && tags[1] == "VIP" {
+				return filterednames, err
+			} else if tags != nil && len(tags) != 0 {
+				t.Fatal("Expected nil or empty tags or confirmed/vip but got ", tags)
 			}
 			return names, err
 		}
 	}
-	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Herman", "Ritchie"}, nil)
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Herman", "Ritchie"}, []string{"Herman"}, nil)
 
 	r := httptest.NewRequest("GET", "/api/v0/events/100/guests/report", nil)
 
@@ -1294,8 +1331,27 @@ func TestHandleReport(t *testing.T) {
 		}
 	}
 
+	//test VIP/confirmed tags
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests/report?tags=CONFIRMED&tags=VIP", nil)
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, r)
+	reader = csv.NewReader(w.Result().Body)
+	data, err = reader.ReadAll()
+	test.Ok(t, err)
+	for _, row := range data {
+		if row[0] == "Alice" || row[0] == "Bob" {
+			test.Equals(t, "1", row[1])
+		} else if row[0] == "Herman" {
+			test.Equals(t, "0", row[1])
+		} else {
+			test.Equals(t, row[0], "Name")
+		}
+	}
+
+	r = httptest.NewRequest("GET", "/api/v0/events/100/guests/report", nil)
+
 	//check empty lists
-	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, nil)
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, []string{}, nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	reader = csv.NewReader(w.Result().Body)
@@ -1306,9 +1362,9 @@ func TestHandleReport(t *testing.T) {
 			test.Equals(t, "0", row[1])
 		}
 	}
-	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, nil)
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, []string{}, nil)
 
-	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, nil)
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, []string{}, nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	reader = csv.NewReader(w.Result().Body)
@@ -1320,8 +1376,8 @@ func TestHandleReport(t *testing.T) {
 		}
 	}
 
-	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, nil)
-	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, nil)
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, []string{}, nil)
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, []string{}, nil)
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	reader = csv.NewReader(w.Result().Body)
@@ -1330,21 +1386,21 @@ func TestHandleReport(t *testing.T) {
 	test.Equals(t, 1, len(data))
 	test.Equals(t, "Name", data[0][0])
 	test.Equals(t, "Present", data[0][1])
-	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Herman", "Ritchie"}, nil)
-	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, nil)
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Herman", "Ritchie"}, []string{}, nil)
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, []string{}, nil)
 
 	//check internal server error handling
-	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, errors.New("An error"))
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{}, []string{}, errors.New("An error"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
-	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, nil)
+	gs.GuestsCheckedInFn = guestsCheckedInGenerator([]string{"Alice", "Jim", "Bob"}, []string{}, nil)
 
-	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, errors.New("An error"))
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{}, []string{}, errors.New("An error"))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
-	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Herman", "Ritchie"}, nil)
+	gs.GuestsNotCheckedInFn = guestsNotCheckedInFnGenerator([]string{"Herman", "Ritchie"}, []string{}, nil)
 
 	//access restriction tests
 	//Test access by another user

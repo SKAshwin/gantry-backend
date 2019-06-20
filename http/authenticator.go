@@ -17,12 +17,12 @@ type Authenticator interface {
 }
 
 //CheckAuth an adapter generator which checks if the request has valid authentication
-func checkAuth(au Authenticator) Adapter {
+func checkAuth(au Authenticator, logger *log.Logger) Adapter {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ok, err := au.Authenticate(r)
 			if err != nil {
-				log.Println("Error in authentication: " + err.Error())
+				logger.Println("Error in authentication: " + err.Error())
 				WriteMessage(http.StatusBadRequest, "Authorization token in invalid format", w)
 			} else if !ok {
 				WriteMessage(http.StatusUnauthorized, "Invalid Token", w)
@@ -34,12 +34,12 @@ func checkAuth(au Authenticator) Adapter {
 }
 
 //isAdmin Allows the handler to serve the request only if it is admin authorized
-func isAdmin(au Authenticator) Adapter {
+func isAdmin(au Authenticator, logger *log.Logger) Adapter {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authDetails, err := au.GetAuthInfo(r)
 			if err != nil {
-				log.Println("Error in fetching authorization info: " + err.Error())
+				logger.Println("Error in fetching authorization info: " + err.Error())
 				WriteMessage(http.StatusBadRequest, "Authorization could not be deciphered", w)
 			} else if authDetails.IsAdmin {
 				h.ServeHTTP(w, r)
@@ -54,12 +54,12 @@ func isAdmin(au Authenticator) Adapter {
 //if the username attached to the request is the host of the event
 //Needs an authenticator, an event service, and a string indicating what mux placeholder
 //is used to store the eventID
-func isAdminOrHost(au Authenticator, es checkin.EventService, eventIDKey string) Adapter {
+func isAdminOrHost(au Authenticator, es checkin.EventService, eventIDKey string, logger *log.Logger) Adapter {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authDetails, err := au.GetAuthInfo(r)
 			if err != nil {
-				log.Println("Error in fetching authorization info: " + err.Error())
+				logger.Println("Error in fetching authorization info: " + err.Error())
 				WriteMessage(http.StatusBadRequest, "Authorization could not be deciphered", w)
 			} else if authDetails.IsAdmin {
 				h.ServeHTTP(w, r)
@@ -67,7 +67,7 @@ func isAdminOrHost(au Authenticator, es checkin.EventService, eventIDKey string)
 				eventID := mux.Vars(r)[eventIDKey]
 				ok, err := es.CheckHost(authDetails.Username, eventID)
 				if err != nil {
-					log.Println("Error in checking if user is host: " + err.Error())
+					logger.Println("Error in checking if user is host: " + err.Error())
 					WriteMessage(http.StatusInternalServerError, "Error checking host", w)
 				} else if ok {
 					h.ServeHTTP(w, r)
@@ -80,12 +80,12 @@ func isAdminOrHost(au Authenticator, es checkin.EventService, eventIDKey string)
 	}
 }
 
-func isAdminOrUser(au Authenticator, us checkin.UserService, usernameKey string) Adapter {
+func isAdminOrUser(au Authenticator, us checkin.UserService, usernameKey string, logger *log.Logger) Adapter {
 	return func(h http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			authDetails, err := au.GetAuthInfo(r)
 			if err != nil {
-				log.Println("Error in fetching authorization info: " + err.Error())
+				logger.Println("Error in fetching authorization info: " + err.Error())
 				WriteMessage(http.StatusBadRequest, "Authorization could not be deciphered", w)
 			} else if authDetails.IsAdmin || authDetails.Username == mux.Vars(r)[usernameKey] {
 				h.ServeHTTP(w, r)

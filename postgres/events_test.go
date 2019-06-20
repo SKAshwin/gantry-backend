@@ -4,25 +4,215 @@ import (
 	"checkin"
 	"checkin/postgres"
 	"checkin/test"
+	"log"
 	"math"
+	"sort"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/guregu/null"
 )
+
+func TestEvent(t *testing.T) {
+	es := postgres.EventService{DB: db}
+
+	//test normal functionality
+	event, err := es.Event("2c59b54d-3422-4bdb-824c-4125775b44c8")
+	test.Ok(t, err)
+	event.UpdatedAt = time.Time{}
+	event.CreatedAt = time.Time{}
+	test.Equals(t, checkin.Event{
+		ID:       "2c59b54d-3422-4bdb-824c-4125775b44c8",
+		Name:     "Data Science CoP",
+		URL:      null.StringFrom("cop2018"),
+		TimeTags: map[string]time.Time{"release": time.Date(2019, 4, 12, 9, 0, 0, 0, time.UTC)},
+	}, event)
+
+	//test multiple timetags
+	event, err = es.Event("3820a980-a207-4738-b82b-45808fe7aba8")
+	test.Ok(t, err)
+	event.UpdatedAt = time.Time{}
+	event.CreatedAt = time.Time{}
+	test.Equals(t, checkin.Event{
+		ID:       "3820a980-a207-4738-b82b-45808fe7aba8",
+		Name:     "SDB Cohesion",
+		URL:      null.String{}, //also tests NULL URL
+		TimeTags: map[string]time.Time{"release": time.Date(2019, 10, 8, 12, 0, 0, 0, time.UTC), "formrelease": time.Date(2019, 10, 8, 16, 30, 12, 0, time.UTC)},
+	}, event)
+
+	//test no time tags
+	event, err = es.Event("03293b3b-df83-407e-b836-fb7d4a3c4966")
+	test.Ok(t, err)
+	event.UpdatedAt = time.Time{}
+	event.CreatedAt = time.Time{}
+	test.Equals(t, checkin.Event{
+		ID:       "03293b3b-df83-407e-b836-fb7d4a3c4966",
+		Name:     "CSSCOM Planning Seminar",
+		URL:      null.StringFrom("csscom"),
+		TimeTags: map[string]time.Time{},
+	}, event)
+
+	//test no such event exists
+	_, err = es.Event("810b6bf0-a29b-405b-82ee-e482924f8faa")
+	test.Assert(t, err != nil, "No error thrown when trying to fetch event that does not exist")
+
+	//test invalid UUID
+	_, err = es.Event("")
+	test.Assert(t, err != nil, "No error thrown when trying to fetch event that does not exist (invalid UUID)")
+}
+
+func TestEventByURL(t *testing.T) {
+	es := postgres.EventService{DB: db}
+
+	//test normal functionality
+	event, err := es.EventByURL("cop2018")
+	test.Ok(t, err)
+	event.UpdatedAt = time.Time{}
+	event.CreatedAt = time.Time{}
+	test.Equals(t, checkin.Event{
+		ID:       "2c59b54d-3422-4bdb-824c-4125775b44c8",
+		Name:     "Data Science CoP",
+		URL:      null.StringFrom("cop2018"),
+		TimeTags: map[string]time.Time{"release": time.Date(2019, 4, 12, 9, 0, 0, 0, time.UTC)},
+	}, event)
+
+	//test event does not exist
+	_, err = es.EventByURL("Nonexistent event")
+	test.Assert(t, err != nil, "No error thrown trying to fetch by url event that does not exist")
+}
+
+func TestEventsBy(t *testing.T) {
+	es := postgres.EventService{DB: db}
+
+	//test normal functionality
+	events, err := es.EventsBy("TestUser")
+	test.Ok(t, err)
+	sort.Slice(events, func(i, j int) bool {
+		return events[i].Name < events[j].Name
+	})
+	test.Equals(t, []checkin.Event{
+		checkin.Event{
+			ID:        "aa19239f-f9f5-4935-b1f7-0edfdceabba7",
+			Name:      "Data Science Department Talk",
+			URL:       null.StringFrom("dsdjan2019"),
+			Start:     null.TimeFrom(time.Date(2019, 1, 10, 15, 0, 0, 0, time.UTC)),
+			End:       null.TimeFrom(time.Date(2019, 1, 10, 18, 0, 0, 0, time.UTC)),
+			TimeTags:  map[string]time.Time{},
+			CreatedAt: time.Date(2019, 4, 1, 4, 5, 36, 0, time.UTC),
+			UpdatedAt: time.Date(2019, 4, 10, 3, 2, 11, 0, time.UTC),
+			Lat:       null.FloatFrom(1.335932),
+			Long:      null.FloatFrom(103.744708),
+			Radius:    null.FloatFrom(0.5),
+		},
+		checkin.Event{
+			ID:        "3820a980-a207-4738-b82b-45808fe7aba8",
+			Name:      "SDB Cohesion",
+			TimeTags:  map[string]time.Time{"release": time.Date(2019, 10, 8, 12, 0, 0, 0, time.UTC), "formrelease": time.Date(2019, 10, 8, 16, 30, 12, 0, time.UTC)},
+			CreatedAt: time.Date(2019, 5, 31, 02, 15, 22, 0, time.UTC),
+			UpdatedAt: time.Date(2019, 5, 31, 13, 02, 11, 0, time.UTC),
+		},
+	}, events)
+
+	//test user hosts no events
+	events, err = es.EventsBy("ME6Alice")
+	test.Ok(t, err)
+	test.Equals(t, []checkin.Event{}, events)
+
+	//test user does not exist
+	events, err = es.EventsBy("wdqdwqd")
+	test.Ok(t, err)
+	test.Equals(t, []checkin.Event{}, events)
+}
+
+func TestCreateEvent(t *testing.T) {
+	es := postgres.EventService{DB: db}
+
+	singapore, err := time.LoadLocation("Asia/Singapore")
+	test.Ok(t, err)
+	event := checkin.Event{
+		ID:        uuid.New().String(),
+		Name:      "Test",
+		TimeTags:  make(map[string]time.Time),
+		URL:       null.String{}, //test null URL as well
+		Long:      null.FloatFrom(10.0),
+		Start:     null.TimeFrom(time.Date(2019, 10, 11, 11, 2, 1, 0, singapore)), //test how non-UTC times are handled
+		UpdatedAt: time.Date(2015, 2, 3, 1, 2, 0, 0, time.UTC),                    //these fields should be ignored by the create funtion
+		CreatedAt: time.Date(2014, 2, 3, 1, 2, 0, 0, time.UTC),                    //^
+	}
+	event.TimeTags["releAsE"] = time.Date(2019, 5, 4, 3, 2, 1, 0, time.UTC)
+	event.TimeTags["FORMRELEASE"] = time.Date(2019, 6, 5, 12, 3, 2, 0, singapore) //test non-UTC times in the timetag
+	err = es.CreateEvent(event, "TestUser")
+	test.Ok(t, err)
+
+	fetched, err := es.Event(event.ID)
+	test.Ok(t, err)
+	log.Println(fetched.Start)
+	test.Equals(t, time.Date(2019, 5, 4, 3, 2, 1, 0, time.UTC), fetched.TimeTags["release"])
+	test.Equals(t, time.Date(2019, 6, 5, 4, 3, 2, 0, time.UTC), fetched.TimeTags["formrelease"])
+	test.Assert(t, time.Since(fetched.CreatedAt) < 2*time.Second && time.Since(fetched.CreatedAt) > 0, "Create time not within 2 seconds before now; not properly set")
+	test.Assert(t, fetched.CreatedAt == fetched.UpdatedAt, "UpdatedAt time not set to be equal to the CreatedAt time upon creation")
+	event.UpdatedAt = fetched.UpdatedAt
+	event.CreatedAt = fetched.CreatedAt
+	event.TimeTags = fetched.TimeTags
+	event.Start = null.TimeFrom(time.Date(2019, 10, 11, 3, 2, 1, 0, time.UTC))
+	test.Equals(t, event, fetched)
+
+	err = es.DeleteEvent(event.ID)
+	test.Ok(t, err)
+
+	//test nil timetags
+	event.TimeTags = nil
+	err = es.CreateEvent(event, "TestUser")
+	test.Ok(t, err)
+	fetched, err = es.Event(event.ID)
+	test.Ok(t, err)
+	test.Equals(t, make(map[string]time.Time), fetched.TimeTags)
+
+	err = es.DeleteEvent(event.ID)
+	test.Ok(t, err)
+
+	//test empty map time tags, should be same result as nil
+	event.TimeTags = make(map[string]time.Time)
+	err = es.CreateEvent(event, "TestUser")
+	test.Ok(t, err)
+	fetched, err = es.Event(event.ID)
+	test.Ok(t, err)
+	test.Equals(t, make(map[string]time.Time), fetched.TimeTags)
+
+	err = es.DeleteEvent(event.ID)
+	test.Ok(t, err)
+
+	//test missing ID
+	event.ID = ""
+	err = es.CreateEvent(event, "TestUser")
+	test.Assert(t, err != nil, "No error when creating an event without an ID")
+
+	//test host does not exist
+	err = es.CreateEvent(event, "Notauser")
+	test.Assert(t, err != nil, "No error when creating an event without an ID")
+}
 
 func TestUpdateEvent(t *testing.T) {
 	//NOTE: This method, for the duration of the execution of the test suite, permanently changes the updatedAt value of one of the events
 	//DO NOT RELY ON THAT VALUE IN ANY OTHER TEST
 	es := postgres.EventService{DB: db}
 
+	asmara, err := time.LoadLocation("Africa/Asmara") //off by 3
+	test.Ok(t, err)
+
 	event, err := es.Event("aa19239f-f9f5-4935-b1f7-0edfdceabba7")
 	test.Ok(t, err)
 	test.Assert(t, math.Abs(event.Radius.Float64-5) > 0.0001, "Event radius was already at updated value")
+	test.Assert(t, len(event.TimeTags) == 0 && event.TimeTags != nil, "Time tags already at updated value, should be empty array")
 	originalRadius := event.Radius
 	test.Assert(t, math.Abs(event.UpdatedAt.Sub(time.Now().UTC()).Seconds()) > 2, "Event last updated time already close to current time")
 	originalCreatedAt := event.CreatedAt
 
 	event.Radius.Float64 = 5
-	event.CreatedAt = time.Now() //this should not actually be processed as an updatable field
+	event.CreatedAt = time.Now()                                                  //this should not actually be processed as an updatable field
+	event.TimeTags["ReLeaSe"] = time.Date(2019, 10, 3, 2, 5, 10, 0, time.UTC)     //testing adding a time tag, make sure that its not case sensitive (should be set to all lowercase)
+	event.TimeTags["formrelease"] = time.Date(2019, 10, 3, 12, 15, 30, 0, asmara) //test non-UTC time
 	err = es.UpdateEvent(event)
 	test.Ok(t, err)
 
@@ -31,11 +221,23 @@ func TestUpdateEvent(t *testing.T) {
 	test.Assert(t, math.Abs(5-event.Radius.Float64) < 0.0001, "Radius was not successfully updated")
 	test.Assert(t, math.Abs(event.UpdatedAt.Sub(time.Now().UTC()).Seconds()) < 2, "Event last updated not within 2 seconds of now; i.e. not updated")
 	test.Assert(t, event.CreatedAt == originalCreatedAt, "Event created at time was modified; this should not be allowed")
+	test.Assert(t, event.TimeTags["release"] == time.Date(2019, 10, 3, 2, 5, 10, 0, time.UTC) && len(event.TimeTags) == 2, "Time tags were not properly updated")
+	test.Assert(t, event.TimeTags["formrelease"] == time.Date(2019, 10, 3, 9, 15, 30, 0, time.UTC) && len(event.TimeTags) == 2, "Time tags were not properly updated (non-UTC timezone issue)")
 
 	event.Radius = originalRadius
+	event.TimeTags = nil
 
 	err = es.UpdateEvent(event)
 	test.Ok(t, err)
+
+	event, err = es.Event("aa19239f-f9f5-4935-b1f7-0edfdceabba7")
+	test.Ok(t, err)
+	test.Equals(t, make(map[string]time.Time, 0), event.TimeTags) //should not ever have TimeTags set to nil
+	//nil should be equivalent to an empty map
+	event.TimeTags = make(map[string]time.Time)
+	err = es.UpdateEvent(event)
+	test.Ok(t, err)
+	test.Equals(t, make(map[string]time.Time), event.TimeTags)
 
 	//test no such event with that event ID
 	event = checkin.Event{ID: "a6db3963-5389-4dbe-8fc6-bbd7f7ce66b8"}
@@ -163,5 +365,30 @@ func TestSubmitFeedback(t *testing.T) {
 	ff.Survey = []checkin.FeedbackFormItem{}
 	err = es.SubmitFeedback("03293b3b-df83-407e-b836-fb7d4a3c4966", ff)
 	test.Assert(t, err != nil, "Empty survey does not throw an error")
+
+}
+
+func TestCheckIfExists(t *testing.T) {
+	es := postgres.EventService{DB: db}
+
+	//test event exists
+	exists, err := es.CheckIfExists("c14a592c-950d-44ba-b173-bbb9e4f5c8b4")
+	test.Ok(t, err)
+	test.Equals(t, true, exists)
+
+	//test event does not exist
+	exists, err = es.CheckIfExists("812d513d-8bb1-4216-93f5-17bd3056fff4")
+	test.Ok(t, err)
+	test.Equals(t, false, exists)
+
+	//test invalid UUID
+	exists, err = es.CheckIfExists("helloworld")
+	test.Ok(t, err)
+	test.Equals(t, false, exists)
+
+	//test empty string
+	exists, err = es.CheckIfExists("")
+	test.Ok(t, err)
+	test.Equals(t, false, exists)
 
 }

@@ -24,8 +24,8 @@ create table app_admin(
 create table event(
 	ID UUID PRIMARY KEY NOT NULL DEFAULT uuid_generate_v4(),
 	name text NOT NULL,
-	url text UNIQUE NOT NULL,
-	release TIMESTAMP,
+	url text UNIQUE,
+	timetags json NOT NULL DEFAULT '{}', -- should just be an empty JSON object instead of null
 	"start" TIMESTAMP,
 	"end" TIMESTAMP,
 	lat float8,

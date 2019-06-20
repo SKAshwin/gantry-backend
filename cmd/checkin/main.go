@@ -4,10 +4,10 @@ import (
 	"checkin/bcrypt"
 	"checkin/http"
 	"checkin/http/cors"
+	websocket "checkin/http/gorillawebsocket"
 	"checkin/http/jwt"
 	"checkin/postgres"
 	"checkin/qrcode"
-	websocket "checkin/http/gorillawebsocket"
 	"fmt"
 	"log"
 	"os"
@@ -20,7 +20,9 @@ import (
 )
 
 func main() {
-	loadEnvironmentalVariables() //comment this out for heroku production
+	if os.Getenv("IS_HEROKU") != "TRUE" {
+		loadEnvironmentalVariables()
+	}
 	config := getConfig()
 	db, err := postgres.Open(config["DATABASE_URL"])
 	if err != nil {
@@ -29,30 +31,22 @@ func main() {
 	defer db.Close()
 	log.Println("Successfully Connected!")
 
-	hashCost, err := strconv.Atoi(config["HASH_COST"])
-	if err != nil {
-		log.Fatal("Error parsing HASH_COST env variable" + err.Error())
-	}
-
-	authHours, err := strconv.Atoi(config["AUTH_HOURS"])
-	if err != nil {
-		log.Fatal("Error parsing AUTH_HOURS env variable" + err.Error())
-	}
-
-	jwtAuthenticator := jwt.Authenticator{SigningKey: []byte(config["AUTH_SECRET"]), ExpiryTime: time.Duration(authHours) * time.Hour}
-	bcryptHashMethod := bcrypt.HashMethod{HashCost: hashCost}
+	jwtAuthenticator := jwt.Authenticator{SigningKey: []byte(config["AUTH_SECRET"]), ExpiryTime: time.Duration(toInt(config["AUTH_HOURS"])) * time.Hour}
+	bcryptHashMethod := bcrypt.HashMethod{HashCost: toInt(config["HASH_COST"])}
 	qrGenerator := qrcode.Generator{Level: qrcode.High}
 	guestMessenger := websocket.NewGuestMessenger(2048, 2048)
 
 	us := &postgres.UserService{DB: db, HM: bcryptHashMethod}
 	as := &postgres.AuthenticationService{DB: db, HM: bcryptHashMethod}
 	es := &postgres.EventService{DB: db}
-	gs := &postgres.GuestService{DB: db, HM: bcryptHashMethod}
+	gs := &postgres.GuestService{DB: db, HM: bcryptHashMethod, HashCache: make(map[string]string)}
 
 	authHandler := http.NewAuthHandler(as, jwtAuthenticator, us)
 	userHandler := http.NewUserHandler(us, jwtAuthenticator)
-	guestHandler := http.NewGuestHandler(gs, es, guestMessenger, jwtAuthenticator)
-	eventHandler := http.NewEventHandler(es, jwtAuthenticator, guestHandler)
+	guestHandler := http.NewGuestHandler(gs, es, guestMessenger, jwtAuthenticator, toInt(config["MAX_LENGTH_GUEST_NAME"]),
+		toInt(config["MAX_LENGTH_GUEST_TAG"]))
+	eventHandler := http.NewEventHandler(es, jwtAuthenticator, guestHandler, toInt(config["MAX_LENGTH_EVENT_NAME"]),
+		toInt(config["MAX_LENGTH_EVENT_URL"]), toInt(config["MAX_LENGTH_EVENT_TIMETAG"]))
 	utilityHandler := http.NewUtilityHandler(qrGenerator)
 
 	handler := http.Handler{
@@ -81,52 +75,41 @@ func loadEnvironmentalVariables() {
 	}
 }
 
+//adds a value with the given name as a key from the environmental variables into
+func addConfig(name string, config map[string]string) {
+	val, ok := os.LookupEnv(name)
+	if !ok {
+		log.Fatal(name + " environment variable required but not set")
+	}
+	config[name] = val
+}
+
 func getConfig() map[string]string {
 	//reads from environmental variables
 	conf := make(map[string]string)
-	dbURL, ok := os.LookupEnv("DATABASE_URL")
-	if !ok {
-		log.Fatal("DATABASE_URL environment variable required but not set")
-	}
-	authSecret, ok := os.LookupEnv("AUTH_SECRET")
-	if !ok {
-		log.Fatal("AUTH_SECRET environment variable required but not set")
-	}
-	authHours, ok := os.LookupEnv("AUTH_HOURS")
-	if !ok {
-		log.Fatal("AUTH_HOURS environment variable required but not set")
-	}
-	hashCost, ok := os.LookupEnv("HASH_COST")
-	if !ok {
-		log.Fatal("HASH_COST environment variable required but not set")
-	}
-	port, ok := os.LookupEnv("PORT")
-	if !ok {
-		log.Fatal("PORT environment variable required but not set")
-	}
-	origins, ok := os.LookupEnv("ALLOWED_ORIGINS")
-	if !ok {
-		log.Fatal("ALLOWED_ORIGINS environment variable required but not set")
-	}
-	methods, ok := os.LookupEnv("ALLOWED_METHODS")
-	if !ok {
-		log.Fatal("ALLOWED_METHODS environment variable required but not set")
-	}
-	headers, ok := os.LookupEnv("ALLOWED_HEADERS")
-	if !ok {
-		log.Fatal("ALLOWED_HEADERS environment variable required but not set")
-	}
-
-	conf["DATABASE_URL"] = dbURL
-	conf["AUTH_SECRET"] = authSecret
-	conf["HASH_COST"] = hashCost
-	conf["AUTH_HOURS"] = authHours
-	conf["PORT"] = port
-	conf["ALLOWED_ORIGINS"] = origins
-	conf["ALLOWED_METHODS"] = methods
-	conf["ALLOWED_HEADERS"] = headers
+	addConfig("DATABASE_URL", conf)
+	addConfig("AUTH_SECRET", conf)
+	addConfig("AUTH_HOURS", conf)
+	addConfig("HASH_COST", conf)
+	addConfig("PORT", conf)
+	addConfig("ALLOWED_ORIGINS", conf)
+	addConfig("ALLOWED_METHODS", conf)
+	addConfig("ALLOWED_HEADERS", conf)
+	addConfig("MAX_LENGTH_GUEST_NAME", conf)
+	addConfig("MAX_LENGTH_GUEST_TAG", conf)
+	addConfig("MAX_LENGTH_EVENT_NAME", conf)
+	addConfig("MAX_LENGTH_EVENT_URL", conf)
+	addConfig("MAX_LENGTH_EVENT_TIMETAG", conf)
 
 	return conf
+}
+
+func toInt(str string) int {
+	val, err := strconv.Atoi(str)
+	if err != nil {
+		log.Fatal("Error parsing " + str + " to int: " + err.Error())
+	}
+	return val
 }
 
 func configurePFH(env map[string]string) cors.PreFlightHandler {

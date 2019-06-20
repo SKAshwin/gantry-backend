@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -29,6 +30,7 @@ func NewUtilityHandler(qrg checkin.QRGenerator) *UtilityHandler {
 		QRGenerator: qrg,
 	}
 	h.Handle("/api/v0/utility/qrcode", http.HandlerFunc(h.handleQRGeneration)).Methods("POST")
+	h.Handle("/api/v1-3/utility/time", Adapt(http.HandlerFunc(h.handleCurrentTime), correctTimezonesOutput)).Methods("GET")
 	return h
 }
 
@@ -51,4 +53,16 @@ func (h *UtilityHandler) handleQRGeneration(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", http.DetectContentType(img))
 	w.Header().Set("Content-Length", strconv.Itoa(len(img)))
 	w.Write(img)
+}
+
+func (h *UtilityHandler) handleCurrentTime(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		h.Logger.Println("Error parsing form queries: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "Could not parse query string", w)
+		return
+	}
+
+	val, _ := json.Marshal(time.Now().UTC())
+	w.Write(val)
 }

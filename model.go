@@ -33,17 +33,17 @@ type UserService interface {
 
 //Event represents an event which will have an associated website
 type Event struct {
-	ID        string     `json:"eventId" db:"id"`
-	Name      string     `json:"name" db:"name"`
-	Release   null.Time  `json:"releaseDateTime" db:"release"`
-	Start     null.Time  `json:"startDateTime" db:"start"`
-	End       null.Time  `json:"endDateTime" db:"end"`
-	Lat       null.Float `json:"lat" db:"lat"`
-	Long      null.Float `json:"long" db:"long"`
-	Radius    null.Float `json:"radius" db:"radius"` //in km
-	URL       string     `json:"url" db:"url"`
-	UpdatedAt time.Time  `json:"updatedAt" db:"updatedat"`
-	CreatedAt time.Time  `json:"createdAt" db:"createdat"`
+	ID        string               `json:"eventId" db:"id"`
+	Name      string               `json:"name" db:"name"`
+	TimeTags  map[string]time.Time `json:"triggers" db:"-"`
+	Start     null.Time            `json:"startDateTime" db:"start"`
+	End       null.Time            `json:"endDateTime" db:"end"`
+	Lat       null.Float           `json:"lat" db:"lat"`
+	Long      null.Float           `json:"long" db:"long"`
+	Radius    null.Float           `json:"radius" db:"radius"` //in km
+	URL       null.String          `json:"url" db:"url"`
+	UpdatedAt time.Time            `json:"updatedAt" db:"updatedat"`
+	CreatedAt time.Time            `json:"createdAt" db:"createdat"`
 }
 
 //FeedbackFormItem represents a question/answer pair in a feedback form
@@ -61,21 +61,10 @@ type FeedbackForm struct {
 	SubmitTime time.Time          `json:"submitTime" db:"submittime"`
 }
 
-//Released returns true if the current time in Singapore is beyond
-//the release time in UTC
-func (event *Event) Released() bool {
-	now := time.Now().UTC()
-
-	if !event.Release.Valid {
-		//if no release time set, return true
-		return true
-	}
-	return event.Release.Time.UTC().Before(now)
-}
-
 //EventService An interface for functions that modify/fetch event data in the database
 type EventService interface {
 	Event(ID string) (Event, error)
+	EventByURL(url string) (Event, error)
 	EventsBy(username string) ([]Event, error)
 	Events() ([]Event, error)
 	CreateEvent(e Event, hostUsername string) error

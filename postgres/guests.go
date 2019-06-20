@@ -10,6 +10,8 @@ import (
 
 	"strings"
 
+	"sync"
+
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
@@ -18,8 +20,10 @@ import (
 //Needs a HashMethod as all NRICs are stored internally as hashes for
 //security purposes
 type GuestService struct {
-	DB *sqlx.DB
-	HM checkin.HashMethod
+	DB        *sqlx.DB
+	HM        checkin.HashMethod
+	HashCache map[string]string
+	cacheLock sync.RWMutex
 }
 
 //CheckIn marks a guest (indicated by the last 5 digits of the nric)
@@ -44,7 +48,7 @@ func (gs *GuestService) CheckIn(eventID string, nric string) (string, error) {
 		return "", errors.New("Error starting transaction: " + err.Error())
 	}
 
-	_, err = tx.Exec("UPDATE guest SET checkedIn = TRUE, checkInTime = NOW() WHERE eventID = $1 and nricHash = $2",
+	_, err = tx.Exec("UPDATE guest SET checkedIn = TRUE, checkInTime = (NOW() at time zone 'utc') WHERE eventID = $1 and nricHash = $2",
 		eventID, nricHash)
 	if err != nil {
 		tx.Rollback()
@@ -82,7 +86,7 @@ func (gs *GuestService) MarkAbsent(eventID string, nric string) error {
 	}
 	nricHash := guest.NRIC
 
-	_, err = gs.DB.Exec("UPDATE guest SET checkedIn = False, checkInTime = NOW() WHERE eventID = $1 and nricHash = $2",
+	_, err = gs.DB.Exec("UPDATE guest SET checkedIn = False, checkInTime = (NOW() at time zone 'utc') WHERE eventID = $1 and nricHash = $2",
 		eventID, nricHash)
 	return err
 }
@@ -96,6 +100,7 @@ func (gs *GuestService) Guests(eventID string, tags []string) ([]string, error) 
 	if tags == nil {
 		tags = []string{}
 	}
+	tags = gs.capitalizeTags(tags)
 	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and $2 <@ tags", eventID, pq.Array(tags))
 	if err != nil {
 		return nil, errors.New("Cannot fetch guest names: " + err.Error())
@@ -118,6 +123,7 @@ func (gs *GuestService) GuestsCheckedIn(eventID string, tags []string) ([]string
 	if tags == nil {
 		tags = []string{}
 	}
+	tags = gs.capitalizeTags(tags)
 	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and checkedIn = TRUE and $2 <@ tags", eventID, pq.Array(tags))
 	if err != nil {
 		return nil, errors.New("Cannot fetch checked in guest names: " + err.Error())
@@ -140,6 +146,7 @@ func (gs *GuestService) GuestsNotCheckedIn(eventID string, tags []string) ([]str
 	if tags == nil {
 		tags = []string{}
 	}
+	tags = gs.capitalizeTags(tags)
 	rows, err := gs.DB.Query("SELECT name from guest where eventID = $1 and checkedIn = FALSE and $2 <@ tags", eventID, pq.Array(tags))
 	if err != nil {
 		return nil, errors.New("Cannot fetch not checked in guest names: " + err.Error())
@@ -173,12 +180,17 @@ func (gs *GuestService) RegisterGuest(eventID string, guest checkin.Guest) error
 	if guest.Tags == nil {
 		guest.Tags = []string{} //no nils allowed
 	}
+	guest.Tags = gs.capitalizeTags(guest.Tags)
 	if err != nil {
 		return errors.New("Error hashing NRIC: " + err.Error())
 	}
 
 	_, err = gs.DB.Exec("INSERT into guest(nricHash,eventID,name,tags,checkedIn) VALUES($1,$2,$3,$4,FALSE)",
 		nricHash, eventID, guest.Name, pq.Array(guest.Tags))
+
+	if err == nil {
+		gs.SetCache(eventID, guest.NRIC, nricHash)
+	}
 
 	return err
 }
@@ -203,22 +215,34 @@ func (gs *GuestService) RegisterGuests(eventID string, guests []checkin.Guest) e
 		}
 	}()
 
+	stmt, err := tx.Prepare("INSERT into guest(nrichash, eventid, name, tags, checkedin) VALUES($1, $2, $3, $4, FALSE)")
+	if err != nil {
+		return errors.New("Error preparing statement: " + err.Error())
+	}
+
 	for _, guest := range guests {
 		nricHash, err := gs.HM.HashAndSalt(strings.ToUpper(guest.NRIC))
 		if guest.Tags == nil {
 			guest.Tags = []string{} //no nils allowed
 		}
+		guest.Tags = gs.capitalizeTags(guest.Tags)
 		if err != nil {
 			tx.Rollback()
+			stmt.Close()
 			return errors.New("Error hashing NRIC: " + err.Error())
 		}
 
-		_, err = gs.DB.Exec("INSERT into guest(nricHash,eventID,name,tags,checkedIn) VALUES($1,$2,$3,$4,FALSE)",
-			nricHash, eventID, guest.Name, pq.Array(guest.Tags))
+		_, err = stmt.Exec(nricHash, eventID, guest.Name, pq.Array(guest.Tags))
 		if err != nil {
 			tx.Rollback()
+			stmt.Close()
 			return errors.New("Error inserting one of the guests: " + err.Error())
 		}
+	}
+
+	err = stmt.Close()
+	if err != nil {
+		return errors.New("Error closing statement: " + err.Error())
 	}
 
 	err = tx.Commit()
@@ -226,6 +250,12 @@ func (gs *GuestService) RegisterGuests(eventID string, guests []checkin.Guest) e
 		tx.Rollback()
 		return errors.New("Error committing changes to database: " + err.Error())
 	}
+
+	for _, guest := range guests {
+		nricHash, _ := gs.HM.HashAndSalt(strings.ToUpper(guest.NRIC))
+		gs.SetCache(eventID, guest.NRIC, nricHash)
+	}
+
 	return nil
 }
 
@@ -253,6 +283,7 @@ func (gs *GuestService) Tags(eventID string, nric string) ([]string, error) {
 //SetTags sets the tags of a given guest; it overwrites all previous tags on that guest
 //nil tags treated as empty array tags
 //Error if guest does not exist or error updating/fetching the guest
+//tags automatically capitalized by the function
 func (gs *GuestService) SetTags(eventID string, nric string, tags []string) error {
 	guest, err := gs.getGuestWithNRIC(eventID, nric)
 	if err != nil {
@@ -264,6 +295,7 @@ func (gs *GuestService) SetTags(eventID string, nric string, tags []string) erro
 	if tags == nil { //treat nils as empty arrays
 		tags = []string{}
 	}
+	tags = gs.capitalizeTags(tags)
 
 	_, err = gs.DB.Exec("UPDATE guest SET tags = $1 where eventID = $2 and nricHash = $3", pq.Array(tags), eventID, guest.NRIC)
 	return err
@@ -312,6 +344,10 @@ func (gs *GuestService) RemoveGuest(eventID string, nric string) error {
 	_, err = gs.DB.Exec("DELETE from guest where eventID = $1 and nricHash = $2",
 		eventID, nricHash)
 
+	if err == nil {
+		gs.DeleteCache(eventID, nric)
+	}
+
 	return err
 }
 
@@ -357,6 +393,7 @@ func (gs *GuestService) getNumberOfGuests(eventID string, tags []string) (int, e
 	var i int
 	var err error
 	if tags != nil {
+		tags = gs.capitalizeTags(tags)
 		err = gs.DB.QueryRow("SELECT count(*) from guest where eventID = $1 and $2 <@ tags",
 			eventID, pq.Array(tags)).Scan(&i)
 	} else {
@@ -375,6 +412,7 @@ func (gs *GuestService) getNumberOfGuestsCheckInStatus(eventID string, checkInSt
 	var i int
 	var err error
 	if tags != nil {
+		tags = gs.capitalizeTags(tags)
 		err = gs.DB.QueryRow("SELECT count(*) from guest where eventID = $1 and checkedIn = $2 and $3 <@ tags",
 			eventID, checkInStatus, pq.Array(tags)).Scan(&i)
 	} else {
@@ -405,13 +443,51 @@ func (gs *GuestService) scanRowsIntoStrings(rows *sql.Rows, rowCount int) ([]str
 	return strings, nil
 }
 
-//Returns a guest and true if one could be found with that nric and eventID
+//SetCache tells the GuestService that a guest with the given eventID and nric has the given nricHash
+func (gs *GuestService) SetCache(eventID, nric, hash string) {
+	gs.cacheLock.Lock()
+	defer gs.cacheLock.Unlock()
+	gs.HashCache[strings.ToLower(eventID+nric)] = hash
+}
+
+//DeleteCache removes any information (if any) the guest service has about the nricHash of the given guest
+func (gs *GuestService) DeleteCache(eventID, nric string) {
+	gs.cacheLock.Lock()
+	defer gs.cacheLock.Unlock()
+	delete(gs.HashCache, strings.ToLower(eventID+nric))
+}
+
+//GetCache returns the nricHash of a guest with that eventID and NRIC, from the cache
+//Returns an empty string if that guest is known not to exist
+func (gs *GuestService) GetCache(eventID, nric string) (string, bool) {
+	gs.cacheLock.RLock()
+	defer gs.cacheLock.RUnlock()
+	hash, ok := gs.HashCache[strings.ToLower(eventID+nric)]
+	return hash, ok
+}
+
+//FlushCache deletes all stuff in the nrich hash cache
+func (gs *GuestService) FlushCache() {
+	gs.cacheLock.Lock()
+	defer gs.cacheLock.Unlock()
+	gs.HashCache = make(map[string]string)
+}
+
+//Returns a guest and true if one could be found with that nric (given in plaintext) and eventID
+//The guest will have its name and nricHash filled out only
 //Returns an empty guest object (and no error) if the guest could not be found
 //Returns an error if there is an error getting a guest
 func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.Guest, error) {
 	if _, err := uuid.Parse(eventID); err != nil {
 		//attempting to search for a guest associated with an event with an invalid UUID will throw an error
 		//since a guest with an invalid UUID will definitely not exist, return an empty guest object
+		return checkin.Guest{}, nil
+	}
+	if hash, ok := gs.GetCache(eventID, nric); ok && hash != "" {
+		var guest checkin.Guest
+		err := gs.DB.QueryRowx("SELECT name, nricHash from guest where nricHash = $1", hash).StructScan(&guest)
+		return guest, err
+	} else if hash == "" && ok {
 		return checkin.Guest{}, nil
 	}
 	rows, err := gs.DB.Queryx("SELECT name, nricHash from guest where eventID = $1", eventID)
@@ -429,13 +505,55 @@ func (gs *GuestService) getGuestWithNRIC(eventID string, nric string) (checkin.G
 		return checkin.Guest{}, errors.New("Error reading guest data from database: " + err.Error())
 	}
 
-	for _, guest := range guests {
-		if gs.HM.CompareHashAndPassword(guest.NRIC, strings.ToUpper(nric)) {
-			return guest, nil
-		}
-	}
+	guest := gs.findGuest(nric, guests)
+	gs.SetCache(eventID, nric, guest.NRIC) //puts an empty string if guest not found
+	return guest, nil
+}
 
-	return checkin.Guest{}, nil
+func (gs *GuestService) findGuest(nric string, hashedGuests []checkin.Guest) checkin.Guest {
+	result := make(chan checkin.Guest) //channel to send a found guest
+	quit := make(chan bool)            //channel to signal that all goroutines have finished execution
+	found := make(chan bool)           //channel to signal that a guest has been found
+	upperNRIC := strings.ToUpper(nric)
+	wg := sync.WaitGroup{}
+	for i := 0; i < len(hashedGuests); i += 20 {
+		wg.Add(1)
+		go func(guests []checkin.Guest) {
+			defer wg.Done()
+			for _, guest := range guests {
+				select {
+				case <-found:
+					//guest found by another goroutine, end execution
+					return
+				default:
+					if gs.HM.CompareHashAndPassword(guest.NRIC, upperNRIC) {
+						result <- guest
+						close(found)
+						return
+					}
+				}
+
+			}
+		}(hashedGuests[i:min(len(hashedGuests), i+20)])
+	}
+	go func() {
+		wg.Wait()
+		close(quit)
+	}()
+	select {
+	case guest := <-result: //one of the goroutines found a guest
+		return guest
+	case <-quit: //Wait finished executing, which means all threads closed, and as the other
+		//case did not run, nothing was sent over the result channel
+		return checkin.Guest{}
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func (gs *GuestService) scanRowsIntoGuests(rows *sqlx.Rows, rowCount int) ([]checkin.Guest, error) {
@@ -453,4 +571,15 @@ func (gs *GuestService) scanRowsIntoGuests(rows *sqlx.Rows, rowCount int) ([]che
 	}
 
 	return guests, nil
+}
+
+func (gs *GuestService) capitalizeTags(tags []string) []string {
+	if tags == nil {
+		return nil
+	}
+	capital := make([]string, len(tags))
+	for i, tag := range tags {
+		capital[i] = strings.ToUpper(tag)
+	}
+	return capital
 }
