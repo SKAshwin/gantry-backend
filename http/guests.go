@@ -149,7 +149,7 @@ func (h *GuestHandler) handleRegisterGuests(w http.ResponseWriter, r *http.Reque
 
 		if !h.validGuest(guest) {
 			h.Logger.Println("Invalid guest to register")
-			WriteMessage(http.StatusBadRequest, "A guest cannot have a name or tag more than 128 bytes long", w)
+			WriteMessage(http.StatusBadRequest, "The name or one of the tags of the guest is too long", w)
 			return
 		}
 	}
