@@ -8,6 +8,7 @@ package checkin
 import (
 	"encoding/json"
 	"reflect"
+	"strconv"
 )
 
 //GuestSite represents the content and styling of the guest website
@@ -143,8 +144,7 @@ const (
 
 //UnmarshalJSON validates that the pop up type is either text or image, or returns an error
 func (pt *PopUpComponentType) UnmarshalJSON(bytes []byte) error {
-	input := PopUpComponentType(bytes)
-
+	input := PopUpComponentType(bytes[1 : len(bytes)-1])
 	switch input {
 	case Text:
 		*pt = Text
@@ -154,12 +154,8 @@ func (pt *PopUpComponentType) UnmarshalJSON(bytes []byte) error {
 		break
 	default:
 		//leave current PopUpComponentType unchanged
-		if *pt != Text && *pt != Image { //but if the pop-up component type is currently a invalid value, throw an error
-			return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
-				Str: string(input) + " is not a valid button type"}
-		}
-
-		return nil
+		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
+			Str: string(input) + " is not a valid  pop up component type"}
 	}
 
 	return nil
@@ -259,7 +255,7 @@ func (h *Hour) UnmarshalJSON(bytes []byte) error {
 	}
 	if number > 23 || number < 0 {
 		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
-			Str: string(number) + " is not a valid hour (must be between 0 and 23)"}
+			Str: strconv.Itoa((int)(number)) + " is not a valid hour (must be between 0 and 23)"}
 	}
 	*h = Hour(number)
 	return nil
@@ -274,7 +270,7 @@ func (m *Minute) UnmarshalJSON(bytes []byte) error {
 	}
 	if number > 59 || number < 0 {
 		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
-			Str: string(number) + " is not a valid minute (must be between 0 and 59)"}
+			Str: strconv.Itoa((int)(number)) + " is not a valid minute (must be between 0 and 59)"}
 	}
 	*m = Minute(number)
 	return nil
@@ -289,7 +285,7 @@ func (s *TextSize) UnmarshalJSON(bytes []byte) error {
 	}
 	if number > 7 || number < 1 {
 		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
-			Str: string(number) + " is not a valid text size (must be between 1 and 7)"}
+			Str: strconv.Itoa((int)(number)) + " is not a valid text size (must be between 1 and 7)"}
 	}
 	*s = TextSize(number)
 	return nil
@@ -304,7 +300,7 @@ func (s *ButtonSize) UnmarshalJSON(bytes []byte) error {
 	}
 	if number > 4 || number < 1 {
 		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
-			Str: string(number) + " is not a valid button size (must be between 1 and 4)"}
+			Str: strconv.Itoa((int)(number)) + " is not a valid button size (must be between 1 and 4)"}
 	}
 	*s = ButtonSize(number)
 	return nil
