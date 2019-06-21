@@ -274,7 +274,7 @@ func (m *Minute) UnmarshalJSON(bytes []byte) error {
 	}
 	if number > 59 || number < 0 {
 		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
-			Str: string(number) + " is not a valid hour (must be between 0 and 59)"}
+			Str: string(number) + " is not a valid minute (must be between 0 and 59)"}
 	}
 	*m = Minute(number)
 	return nil
@@ -289,7 +289,7 @@ func (s *TextSize) UnmarshalJSON(bytes []byte) error {
 	}
 	if number > 7 || number < 1 {
 		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
-			Str: string(number) + " is not a valid hour (must be between 1 and 7)"}
+			Str: string(number) + " is not a valid text size (must be between 1 and 7)"}
 	}
 	*s = TextSize(number)
 	return nil
@@ -304,7 +304,7 @@ func (s *ButtonSize) UnmarshalJSON(bytes []byte) error {
 	}
 	if number > 4 || number < 1 {
 		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
-			Str: string(number) + " is not a valid hour (must be between 1 and 4)"}
+			Str: string(number) + " is not a valid button size (must be between 1 and 4)"}
 	}
 	*s = ButtonSize(number)
 	return nil
