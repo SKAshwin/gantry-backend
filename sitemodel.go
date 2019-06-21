@@ -10,32 +10,26 @@ import (
 	"reflect"
 )
 
-//Size represents an elements sizing instruction
-//and it should be between 0 and 7
-//TODO write special marshaller to enforce this constraint
-type Size uint8
-
 //GuestSite represents the content and styling of the guest website
 type GuestSite struct {
 	Details DetailsSection `json:"details"`
-	Main    MainSection    `json:"main"`
+	Main    ButtonSection  `json:"main"`
 	Survey  SurveySection  `json:"survey"`
 }
 
 //DetailsSection is the section of the page with all the event details
 type DetailsSection struct {
-	Logo    ImageElement `json:"logo"`
+	Logo    string       `json:"logo"`
 	Title   TextElement  `json:"title"`
 	Tagline TextElement  `json:"tagline"`
 	Items   []DetailItem `json:"items"`
 }
 
-//MainSection represents the main part of the page
-//TODO ask what this means
-type MainSection struct {
+//ButtonSection represents the bottom part of the page, with the buttons
+type ButtonSection struct {
 	Icon      bool            `json:"icon"`
 	Schedule  ScheduleSection `json:"schedule"`
-	Size      Size            `json:"sz"` //TODO confirm this is limited between 0 and 7
+	Size      ButtonSize      `json:"sz"`
 	ButtonRow ButtonMatrix    `json:"rows"`
 }
 
@@ -44,24 +38,25 @@ type SurveySection []QuestionElement
 
 //QuestionElement represents a single question and its input type
 type QuestionElement struct {
-	Type     string `json:"type"` //TODO assign special type when you work out the possibilities
-	Question string `json:"question"`
+	Type     QuestionType `json:"type"`
+	Question string       `json:"question"`
 }
 
 //ScheduleSection represents the portion of the website with the event schedule information
 type ScheduleSection struct {
-	Check bool          `json:"check"` //TODO ask what this means
-	Menus []MenuSection `json:"menus"`
+	Display bool           `json:"check"`
+	Pages   []SchedulePage `json:"menus"`
 }
 
-//MenuSection represents a menu from which the schedule can be selected
-//TODO ask what this means
-type MenuSection struct {
-	Subject string     `json:"subject"`
-	Items   []MenuItem `json:"items"`
+//SchedulePage refers to a page of the schedule
+type SchedulePage struct {
+	Subject string         `json:"subject"`
+	Items   []ScheduleItem `json:"items"`
 }
 
-type MenuItem struct {
+//ScheduleItem is a particular part of the schedule, which has a start and end time, and some topic, and possibly further information like
+//abstract and speaker information
+type ScheduleItem struct {
 	Topic    string              `json:"topic"`
 	Start    TimeElement         `json:"start"`
 	End      TimeElement         `json:"end"`
@@ -77,13 +72,13 @@ type TimeElement struct {
 
 //OptionalContent refers to text component that may or may not exist
 type OptionalContent struct {
-	Check   bool   `json:"check"`
+	Display bool   `json:"check"`
 	Content string `json:"cont"`
 }
 
 //OptionalProfileItem represents a ProfileItem that may or may not exist
 type OptionalProfileItem struct {
-	Check   bool        `json:"check"`
+	Display bool        `json:"check"`
 	Content ProfileItem `json:"cont"`
 }
 
@@ -97,14 +92,8 @@ type ProfileItem struct {
 
 //TextElement some words which have a size and some content
 type TextElement struct {
-	Content string `json:"cont"`
-	Size    Size   `json:"sz"`
-}
-
-//ImageElement refers to an image
-type ImageElement struct {
-	Type    string `json:"type"` //TODO ask Henry what the heck type means
-	Content string `json:"cont"` //the Base64 encoding of the ImageElement
+	Content string   `json:"cont"`
+	Size    TextSize `json:"sz"`
 }
 
 //DetailItem refers to structure providing info about some event attribute
@@ -128,7 +117,7 @@ type ButtonElement struct {
 	Title string     `json:"title"`
 	Type  ButtonType `json:"type"`
 	Link  string     `json:"link"` //consider using markdown
-	PopUp PopUp      `json:"popup`
+	PopUp PopUp      `json:"popup"`
 }
 
 //PopUp a pop up consists of many components
@@ -180,10 +169,12 @@ func (pt *PopUpComponentType) UnmarshalJSON(bytes []byte) error {
 type ButtonType string
 
 const (
+	//EmptyButtonType is the invalid zero value
+	EmptyButtonType ButtonType = ""
 	//Link means that the button embeds a URL to another
 	Link ButtonType = "link"
 	//Modal means that the button triggers a pop up with some text
-	Modal ButtonType = "modal"
+	Modal ButtonType = "popup"
 )
 
 //UnmarshalJSON validates that the button type is either link or modal, or returns and error
@@ -198,22 +189,66 @@ func (bt *ButtonType) UnmarshalJSON(bytes []byte) error {
 		*bt = Modal
 		break
 	default:
-		//leave current ButtonType unchanged
-		if *bt != Link && *bt != Modal { //but if the button type is currently the invalid value, throw an error
-			return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
-				Str: string(input) + " is not a valid button type"}
-		}
-
-		return nil
+		*bt = EmptyButtonType
+		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
+			Str: string(input) + " is not a valid button type"}
 	}
 
 	return nil
 }
 
+//QuestionType tells the input of the question
+type QuestionType string
+
+const (
+	//Scaled refers to a qualitative scaled input (ie Strongly Disagree to Agree etc)
+	Scaled QuestionType = "scaled"
+	//Rating refers to a quantitative slider input (i.e. 1 to 5)
+	Rating QuestionType = "rating"
+	//RadioButton refers to a radio button input
+	RadioButton QuestionType = "radio"
+	//OpenEnded refers to open ended input (like a text box)
+	OpenEnded QuestionType = "open"
+)
+
+//UnmarshalJSON unmarshals JSON input into a QuestionType, making sure its one of Scaled, Rating, RadioButton or OpenEnded
+func (qt *QuestionType) UnmarshalJSON(bytes []byte) error {
+	input := QuestionType(bytes)
+
+	switch input {
+	case Scaled:
+		*qt = Scaled
+		break
+	case Rating:
+		*qt = Rating
+		break
+	case RadioButton:
+		*qt = RadioButton
+		break
+	case OpenEnded:
+		*qt = OpenEnded
+		break
+	default:
+		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
+			Str: string(input) + " is not a valid button type"}
+	}
+
+	return nil
+}
+
+//TextSize represents an text elements sizing instruction
+//and it should be between 1 and 7
+type TextSize uint8
+
+//ButtonSize represents a button's sizing instruction
+//Should be between 1 and 4
+type ButtonSize uint8
+
 //Hour represents a 24 hour time
-type Hour uint8 //TODO custom marshaller
+type Hour uint8
+
 //Minute represents the minute component of time (between 0 and 59)
-type Minute uint8 //TODO custom marshaller
+type Minute uint8
 
 //UnmarshalJSON validates the bytes, making sure its first a valid number, and then between 0 and 23
 func (h *Hour) UnmarshalJSON(bytes []byte) error {
@@ -226,11 +261,12 @@ func (h *Hour) UnmarshalJSON(bytes []byte) error {
 		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
 			Str: string(number) + " is not a valid hour (must be between 0 and 23)"}
 	}
+	*h = Hour(number)
 	return nil
 }
 
 //UnmarshalJSON validates the bytes, making sure its first a valid number, and then between 0 and 59
-func (h *Minute) UnmarshalJSON(bytes []byte) error {
+func (m *Minute) UnmarshalJSON(bytes []byte) error {
 	var number uint8
 	err := json.Unmarshal(bytes, &number)
 	if err != nil {
@@ -240,5 +276,36 @@ func (h *Minute) UnmarshalJSON(bytes []byte) error {
 		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
 			Str: string(number) + " is not a valid hour (must be between 0 and 59)"}
 	}
+	*m = Minute(number)
+	return nil
+}
+
+//UnmarshalJSON validates the bytes, making sure its first a valid number, and then between 1 and 7
+func (s *TextSize) UnmarshalJSON(bytes []byte) error {
+	var number uint8
+	err := json.Unmarshal(bytes, &number)
+	if err != nil {
+		return err
+	}
+	if number > 7 || number < 1 {
+		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
+			Str: string(number) + " is not a valid hour (must be between 1 and 7)"}
+	}
+	*s = TextSize(number)
+	return nil
+}
+
+//UnmarshalJSON validates the bytes, making sure its first a valid number, and then between 1 and 4
+func (s *ButtonSize) UnmarshalJSON(bytes []byte) error {
+	var number uint8
+	err := json.Unmarshal(bytes, &number)
+	if err != nil {
+		return err
+	}
+	if number > 4 || number < 1 {
+		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
+			Str: string(number) + " is not a valid hour (must be between 1 and 4)"}
+	}
+	*s = ButtonSize(number)
 	return nil
 }
