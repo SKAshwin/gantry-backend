@@ -517,7 +517,7 @@ func TestHandleRegisterGuest(t *testing.T) {
 
 	//Test normal behavior
 	r := httptest.NewRequest("POST", "/api/v0/events/300/guests",
-		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
+		strings.NewReader(`{"name":"Jim", "nric":"5678F"}`))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
@@ -570,7 +570,7 @@ func TestHandleRegisterGuest(t *testing.T) {
 
 	//Test guest already exists with that nric
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
-		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"1234F\"}"))
+		strings.NewReader(`{"name":"Jim", "nric":"1234F"}`))
 	gs.RegisterGuestInvoked = false
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
@@ -579,7 +579,7 @@ func TestHandleRegisterGuest(t *testing.T) {
 
 	//Test error checking if guest exists
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
-		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
+		strings.NewReader(`{"name":"Jim", "nric":"5678F"}`))
 	gs.RegisterGuestInvoked = false
 	gs.GuestExistsFn = guestExistsGenerator(errors.New("An error"))
 	w = httptest.NewRecorder()
@@ -591,7 +591,7 @@ func TestHandleRegisterGuest(t *testing.T) {
 	//Test error registering guest
 	gs.RegisterGuestFn = registerGuestGenerator(errors.New("An error"), nil)
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
-		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
+		strings.NewReader(`{"name":"Jim", "nric":"5678F"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
@@ -599,14 +599,14 @@ func TestHandleRegisterGuest(t *testing.T) {
 
 	//Test invalid JSON
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
-		strings.NewReader("{\"name\":\"Jim\", nric\":\"5678F\""))
+		strings.NewReader(`{"name":"Jim", nric":"5678F"`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 
 	//Test extra field
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
-		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\", \"nricHash\":\"5678F\"}"))
+		strings.NewReader(`{"name":"Jim", "nric":"5678F", "nricHash":"5678F"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
@@ -614,24 +614,24 @@ func TestHandleRegisterGuest(t *testing.T) {
 	//access restriction tests
 	//Test access by another user
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
-		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
+		strings.NewReader(`{"name":"Jim", "nric":"5678F"}`))
 	nonHostAccessTest(t, r, h, &auth, &es, "unauthorized_person")
 
 	//Test access by admin
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
-		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
+		strings.NewReader(`{"name":"Jim", "nric":"5678F"}`))
 	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
 		test.Equals(t, http.StatusCreated, r.StatusCode)
 	})
 
 	//Test invalid token
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests",
-		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
+		strings.NewReader(`{"name":"Jim", "nric":"5678F"}`))
 	noValidTokenTest(t, r, h, &auth)
 
 	//Test invalid eventID
 	r = httptest.NewRequest("POST", "/api/v0/events/100/guests",
-		strings.NewReader("{\"name\":\"Jim\", \"nric\":\"5678F\"}"))
+		strings.NewReader(`{"name":"Jim", "nric":"5678F"}`))
 	eventDoesNotExistTest(t, r, h, &es)
 }
 
@@ -659,26 +659,26 @@ func TestHandleRemoveGuest(t *testing.T) {
 
 	//Test normal behavior
 	r := httptest.NewRequest("DELETE", "/api/v0/events/300/guests",
-		strings.NewReader("{\"nric\":\"5678F\"}"))
+		strings.NewReader(`{"nric":"5678F"}`))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusOK, w.Result().StatusCode)
 
 	//Test badly formatted JSON
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests",
-		strings.NewReader(""))
+		strings.NewReader(``))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 
 	//Test extra field (name supplied in particular)
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests",
-		strings.NewReader("{\"nric\":\"5678F\", \"field\":\"amazing\"}"))
+		strings.NewReader(`{"nric":"5678F", "field":"amazing"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests",
-		strings.NewReader("{\"nric\":\"5678F\", \"name\":\"amazing\"}"))
+		strings.NewReader(`{"nric":"5678F", "name":"amazing"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
@@ -686,7 +686,7 @@ func TestHandleRemoveGuest(t *testing.T) {
 	//Test error removing guest
 	gs.RemoveGuestFn = removeGuestGenerator(errors.New("An error"))
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests",
-		strings.NewReader("{\"nric\":\"5678F\"}"))
+		strings.NewReader(`{"nric":"5678F"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
@@ -695,24 +695,24 @@ func TestHandleRemoveGuest(t *testing.T) {
 	//access restriction tests
 	//Test access by another user
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests",
-		strings.NewReader("{\"nric\":\"5678F\"}"))
+		strings.NewReader(`{"nric":"5678F"}`))
 	nonHostAccessTest(t, r, h, &auth, &es, "unauthorized_person")
 
 	//Test access by admin
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests",
-		strings.NewReader("{\"nric\":\"5678F\"}"))
+		strings.NewReader(`{"nric":"5678F"}`))
 	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
 		test.Equals(t, http.StatusOK, r.StatusCode)
 	})
 
 	//Test invalid token
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests",
-		strings.NewReader("{\"nric\":\"5678F\"}"))
+		strings.NewReader(`{"nric":"5678F"}`))
 	noValidTokenTest(t, r, h, &auth)
 
 	//Test invalid eventID
 	r = httptest.NewRequest("DELETE", "/api/v0/events/200/guests",
-		strings.NewReader("{\"nric\":\"5678F\"}"))
+		strings.NewReader(`{"nric":"5678F"}`))
 	eventDoesNotExistTest(t, r, h, &es)
 }
 
@@ -837,7 +837,7 @@ func TestHandleCheckInGuest(t *testing.T) {
 
 	//Test normal behavior
 	r := httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	var name string
@@ -854,7 +854,7 @@ func TestHandleCheckInGuest(t *testing.T) {
 		},
 	})
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	json.NewDecoder(w.Result().Body).Decode(&name)
@@ -869,7 +869,7 @@ func TestHandleCheckInGuest(t *testing.T) {
 		},
 	})
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	json.NewDecoder(w.Result().Body).Decode(&name)
@@ -880,7 +880,7 @@ func TestHandleCheckInGuest(t *testing.T) {
 	//Test guest does not exist with that nric
 	gs.CheckInInvoked = false
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"5678F\"}"))
+		strings.NewReader(`{"nric":"5678F"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
@@ -888,19 +888,19 @@ func TestHandleCheckInGuest(t *testing.T) {
 
 	//Test empty body
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader(""))
+		strings.NewReader(``))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 
 	//Test extra field (name supplied in particular)
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"5678F\", \"field\":\"amazing\"}"))
+		strings.NewReader(`{"nric":"5678F", "field":"amazing"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"5678F\", \"name\":\"amazing\"}"))
+		strings.NewReader(`{"nric":"5678F", "name":"amazing"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
@@ -909,7 +909,7 @@ func TestHandleCheckInGuest(t *testing.T) {
 	gs.GuestExistsFn = guestExistsFnGenerator(errors.New("An error"))
 	gs.CheckInInvoked = false
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
@@ -919,7 +919,7 @@ func TestHandleCheckInGuest(t *testing.T) {
 	//Test error checking in guest
 	gs.CheckInFn = checkInFnGenerator(errors.New("An error"))
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
@@ -927,13 +927,13 @@ func TestHandleCheckInGuest(t *testing.T) {
 
 	//Test invalid eventID
 	r = httptest.NewRequest("POST", "/api/v0/events/200/guests/checkedin",
-		strings.NewReader("{\"nric\":\"5678F\"}"))
+		strings.NewReader(`{"nric":"5678F"}`))
 	eventDoesNotExistTest(t, r, h, &es)
 
 	//Test not yet released
 	es.EventFn = eventFnGenerator(time.Hour, true, nil)
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusForbidden, w.Result().StatusCode)
@@ -941,7 +941,7 @@ func TestHandleCheckInGuest(t *testing.T) {
 	//Test no release date set
 	es.EventFn = eventFnGenerator(0, false, nil)
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	json.NewDecoder(w.Result().Body).Decode(&name)
@@ -950,7 +950,7 @@ func TestHandleCheckInGuest(t *testing.T) {
 	//Test error getting release date
 	es.EventFn = eventFnGenerator(time.Hour, false, errors.New("An error"))
 	r = httptest.NewRequest("POST", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
@@ -992,7 +992,7 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 
 	//Test normal behavior
 	r := httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusOK, w.Result().StatusCode)
@@ -1003,7 +1003,7 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 		Title: "checkedin/0",
 	})
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusOK, w.Result().StatusCode)
@@ -1013,7 +1013,7 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 		Title: "checkedin/0",
 	})
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusOK, w.Result().StatusCode)
@@ -1022,26 +1022,26 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 
 	//Test guest does not exist with that nric
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"5678F\"}"))
+		strings.NewReader(`{"nric":"5678F"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusNotFound, w.Result().StatusCode)
 
 	//Test badly formatted JSON
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\""))
+		strings.NewReader(`{"nric":"1234F"`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 
 	//Test extra field (name supplied in particular)
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"5678F\", \"field\":\"amazing\"}"))
+		strings.NewReader(`{"nric":"5678F", "field":"amazing"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"5678F\", \"name\":\"amazing\"}"))
+		strings.NewReader(`{"nric":"5678F", "name":"amazing"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusBadRequest, w.Result().StatusCode)
@@ -1049,7 +1049,7 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 	//Test error when marking as absent
 	gs.MarkAbsentFn = markAbsentFnGenerator(errors.New("An error"))
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
@@ -1058,7 +1058,7 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 	//Test error when checking if guest exists
 	gs.GuestExistsFn = guestExistsFnGenerator(errors.New("An error"))
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
@@ -1067,24 +1067,24 @@ func TestHandleMarkGuestAbsent(t *testing.T) {
 	//access restriction tests
 	//Test access by another user
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	nonHostAccessTest(t, r, h, &auth, &es, "unauthorized_person")
 
 	//Test access by admin
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
 		test.Equals(t, http.StatusOK, r.StatusCode)
 	})
 
 	//Test invalid token
 	r = httptest.NewRequest("DELETE", "/api/v0/events/300/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	noValidTokenTest(t, r, h, &auth)
 
 	//Test invalid eventID
 	r = httptest.NewRequest("DELETE", "/api/v0/events/200/guests/checkedin",
-		strings.NewReader("{\"nric\":\"1234F\"}"))
+		strings.NewReader(`{"nric":"1234F"}`))
 	eventDoesNotExistTest(t, r, h, &es)
 }
 

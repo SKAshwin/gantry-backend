@@ -34,11 +34,11 @@ func databaseDefinition() string {
 }
 
 func initDB() *sqlx.DB {
-	db, err := postgres.Open("postgres://regapp_test:henry@localhost/registrationapp_test")
-	tearDownDB(db) //tear down any remnants of the DB in case last test was not cleaned up properly
+	db, err := postgres.Open("postgres://regapp_test:henry@localhost/registrationapp_test?sslmode=disable")
 	if err != nil {
 		log.Fatal("Error opening database: " + err.Error())
 	}
+	tearDownDB(db) //tear down any remnants of the DB in case last test was not cleaned up properly
 
 	_, err = db.Exec(databaseDefinition())
 

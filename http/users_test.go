@@ -272,53 +272,53 @@ func TestHandleCreateUser(t *testing.T) {
 
 	//Test normal functionality
 	r := httptest.NewRequest("POST", "/api/v0/users",
-		strings.NewReader("{\"username\":\"bob\",\"password\":\"1234\",\"name\":\"Bob\"}"))
+		strings.NewReader(`{"username":"bob","password":"1234","name":"Bob"}`))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusCreated, w.Result().StatusCode)
 
 	//test username already used
 	r = httptest.NewRequest("POST", "/api/v0/users",
-		strings.NewReader("{\"username\":\"takenName\",\"password\":\"1234\",\"name\":\"Bob\"}"))
+		strings.NewReader(`{"username":"takenName","password":"1234","name":"Bob"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusConflict, w.Result().StatusCode)
 
 	//Test extra meaningless fields added
 	r = httptest.NewRequest("POST", "/api/v0/users",
-		strings.NewReader("{\"username\":\"bob\",\"password\":\"1234\",\"name\":\"Bob\", \"passwordhash\":\"hmm\"}"))
+		strings.NewReader(`{"username":"bob","password":"1234","name":"Bob", "passwordhash":"hmm"}`))
 	badRequestTest(t, r, h)
 
 	//Test no username, password or name.
 	r = httptest.NewRequest("POST", "/api/v0/users",
-		strings.NewReader("{\"password\":\"1234\",\"name\":\"Bob\"}"))
+		strings.NewReader(`{"password":"1234","name":"Bob"}`))
 	badRequestTest(t, r, h)
 	r = httptest.NewRequest("POST", "/api/v0/users",
-		strings.NewReader("{\"username\":\"bob\",\"name\":\"Bob\"}"))
+		strings.NewReader(`{"username":"bob","name":"Bob"}`))
 	badRequestTest(t, r, h)
 	r = httptest.NewRequest("POST", "/api/v0/users",
-		strings.NewReader("{\"username\":\"bob\",\"password\":\"1234\"}"))
+		strings.NewReader(`{"username":"bob","password":"1234"}`))
 	badRequestTest(t, r, h)
 
 	//Test attempt to set createdAt, updatedAt or lastLoggedIn
 	r = httptest.NewRequest("POST", "/api/v0/users",
-		strings.NewReader("{\"username\":\"bob\",\"password\":\"1234\",\"name\":\"Bob\","+
-			"\"createdAt\":\"2019-03-15T08:20:00Z\"}"))
+		strings.NewReader(`{"username":"bob","password":"1234","name":"Bob",
+			createdAt":"2019-03-15T08:20:00Z"}`))
 	badRequestTest(t, r, h)
 	r = httptest.NewRequest("POST", "/api/v0/users",
-		strings.NewReader("{\"username\":\"bob\",\"password\":\"1234\",\"name\":\"Bob\","+
-			"\"updatedAt\":\"2019-03-15T08:20:00Z\"}"))
+		strings.NewReader(`{"username":"bob","password":"1234","name":"Bob",
+			updatedAt":"2019-03-15T08:20:00Z"}`))
 	badRequestTest(t, r, h)
 	r = httptest.NewRequest("POST", "/api/v0/users",
-		strings.NewReader("{\"username\":\"bob\",\"password\":\"1234\",\"name\":\"Bob\","+
-			"\"lastLoggedIn\":\"2019-03-15T08:20:00Z\"}"))
+		strings.NewReader(`{"username":"bob","password":"1234","name":"Bob",
+			lastLoggedIn":"2019-03-15T08:20:00Z"}`))
 	badRequestTest(t, r, h)
 
 	//Test checking if exists fails
 	us.CheckIfExistsFn = checkIfExistsGenerator("takenName", errors.New("An error"))
 	us.CreateUserInvoked = false
 	r = httptest.NewRequest("POST", "/api/v0/users",
-		strings.NewReader("{\"username\":\"bob\",\"password\":\"1234\",\"name\":\"Bob\"}"))
+		strings.NewReader(`{"username":"bob","password":"1234","name":"Bob"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
@@ -328,7 +328,7 @@ func TestHandleCreateUser(t *testing.T) {
 	//Test create user fails
 	us.CreateUserFn = createUserFnGenerator(expUser, errors.New("An error"))
 	r = httptest.NewRequest("POST", "/api/v0/users",
-		strings.NewReader("{\"username\":\"bob\",\"password\":\"1234\",\"name\":\"Bob\"}"))
+		strings.NewReader(`{"username":"bob","password":"1234","name":"Bob"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
@@ -338,15 +338,15 @@ func TestHandleCreateUser(t *testing.T) {
 	//Admin should succeed
 	//No valid token should fail to access
 	r = httptest.NewRequest("POST", "/api/v0/users",
-		strings.NewReader("{\"username\":\"bob\",\"password\":\"1234\",\"name\":\"Bob\"}"))
+		strings.NewReader(`{"username":"bob","password":"1234","name":"Bob"}`))
 	userAccessTest(t, r, h, &auth, "some_guy")
 	r = httptest.NewRequest("POST", "/api/v0/users",
-		strings.NewReader("{\"username\":\"bob\",\"password\":\"1234\",\"name\":\"Bob\"}"))
+		strings.NewReader(`{"username":"bob","password":"1234","name":"Bob"}`))
 	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
 		test.Equals(t, http.StatusCreated, r.StatusCode)
 	})
 	r = httptest.NewRequest("POST", "/api/v0/users",
-		strings.NewReader("{\"username\":\"bob\",\"password\":\"1234\",\"name\":\"Bob\"}"))
+		strings.NewReader(`{"username":"bob","password":"1234","name":"Bob"}`))
 	noValidTokenTest(t, r, h, &auth)
 }
 
@@ -416,7 +416,7 @@ func TestHandleUpdateUser(t *testing.T) {
 
 	//Test normal functionality
 	r := httptest.NewRequest("PATCH", "/api/v0/users/bob",
-		strings.NewReader("{\"username\":\"max\",\"password\":\"5678\",\"name\":\"Max\"}"))
+		strings.NewReader(`{"username":"max","password":"5678","name":"Max"}`))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusOK, w.Result().StatusCode)
@@ -425,7 +425,7 @@ func TestHandleUpdateUser(t *testing.T) {
 	expUser.PasswordPlaintext = nil
 	us.UpdateUserFn = updateUserFnGenerator("bob", expUser, nil)
 	r = httptest.NewRequest("PATCH", "/api/v0/users/bob",
-		strings.NewReader("{\"username\":\"max\",\"name\":\"Max\"}"))
+		strings.NewReader(`{"username":"max","name":"Max"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusOK, w.Result().StatusCode)
@@ -434,38 +434,38 @@ func TestHandleUpdateUser(t *testing.T) {
 
 	//Test extra meaningless fields added
 	r = httptest.NewRequest("PATCH", "/api/v0/users/bob",
-		strings.NewReader("{\"username\":\"bob\",\"password\":\"1234\",\"name\":\"Bob\", \"passwordhash\":\"hmm\"}"))
+		strings.NewReader(`{"username":"bob","password":"1234","name":"Bob", "passwordhash":"hmm"}`))
 	badRequestTest(t, r, h)
 
 	//Test attempt to set createdAt, updatedAt or lastLoggedIn
 	r = httptest.NewRequest("PATCH", "/api/v0/users/bob",
-		strings.NewReader("{\"username\":\"bob\",\"password\":\"1234\",\"name\":\"Bob\","+
-			"\"createdAt\":\"2019-03-15T08:20:00Z\"}"))
+		strings.NewReader(`{"username":"bob","password":"1234","name":"Bob",
+			createdAt":"2019-03-15T08:20:00Z"}`))
 	badRequestTest(t, r, h)
 	r = httptest.NewRequest("PATCH", "/api/v0/users/bob",
-		strings.NewReader("{\"username\":\"bob\",\"password\":\"1234\",\"name\":\"Bob\","+
-			"\"updatedAt\":\"2019-03-15T08:20:00Z\"}"))
+		strings.NewReader(`{"username":"bob","password":"1234","name":"Bob",
+			updatedAt":"2019-03-15T08:20:00Z"}`))
 	badRequestTest(t, r, h)
 	r = httptest.NewRequest("PATCH", "/api/v0/users/bob",
-		strings.NewReader("{\"username\":\"bob\",\"password\":\"1234\",\"name\":\"Bob\","+
-			"\"lastLoggedIn\":\"2019-03-15T08:20:00Z\"}"))
+		strings.NewReader(`{"username":"bob","password":"1234","name":"Bob",
+			lastLoggedIn":"2019-03-15T08:20:00Z"}`))
 	badRequestTest(t, r, h)
 
 	//Set blank username, password or name
 	r = httptest.NewRequest("PATCH", "/api/v0/users/bob",
-		strings.NewReader("{\"username\":\"\",\"password\":\"5678\",\"name\":\"Max\"}"))
+		strings.NewReader(`{"username":"","password":"5678","name":"Max"}`))
 	badRequestTest(t, r, h)
 	r = httptest.NewRequest("PATCH", "/api/v0/users/bob",
-		strings.NewReader("{\"username\":\"max\",\"\":\"5678\",\"name\":\"Max\"}"))
+		strings.NewReader(`{"username":"max","":"5678","name":"Max"}`))
 	badRequestTest(t, r, h)
 	r = httptest.NewRequest("PATCH", "/api/v0/users/bob",
-		strings.NewReader("{\"username\":\"max\",\"password\":\"5678\",\"name\":\"\"}"))
+		strings.NewReader(`{"username":"max","password":"5678","name":""}`))
 	badRequestTest(t, r, h)
 
 	//Test change username to already used username
 	us.CheckIfExistsFn = checkIfExistsGenerator("bob", nil, true) //set to always says exists
 	r = httptest.NewRequest("PATCH", "/api/v0/users/bob",
-		strings.NewReader("{\"username\":\"jim\",\"password\":\"5678\",\"name\":\"Max\"}"))
+		strings.NewReader(`{"username":"jim","password":"5678","name":"Max"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusConflict, w.Result().StatusCode)
@@ -475,7 +475,7 @@ func TestHandleUpdateUser(t *testing.T) {
 	us.CheckIfExistsFn = checkIfExistsGenerator("jim", errors.New("An error"), true) //set to always says exists
 	//will fail only if ID = jim, so first call succeeds (to check if "bob" exists), second call fails
 	r = httptest.NewRequest("PATCH", "/api/v0/users/bob",
-		strings.NewReader("{\"username\":\"jim\",\"password\":\"5678\",\"name\":\"Max\"}"))
+		strings.NewReader(`{"username":"jim","password":"5678","name":"Max"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
@@ -484,7 +484,7 @@ func TestHandleUpdateUser(t *testing.T) {
 	//check error on getting user
 	us.UserFn = userFnGenerator(original, errors.New("An error"))
 	r = httptest.NewRequest("PATCH", "/api/v0/users/bob",
-		strings.NewReader("{\"username\":\"max\",\"password\":\"5678\",\"name\":\"Max\"}"))
+		strings.NewReader(`{"username":"max","password":"5678","name":"Max"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
@@ -493,7 +493,7 @@ func TestHandleUpdateUser(t *testing.T) {
 	//check error updating user
 	us.UpdateUserFn = updateUserFnGenerator("bob", expUser, errors.New("An error"))
 	r = httptest.NewRequest("PATCH", "/api/v0/users/bob",
-		strings.NewReader("{\"username\":\"max\",\"password\":\"5678\",\"name\":\"Max\"}"))
+		strings.NewReader(`{"username":"max","password":"5678","name":"Max"}`))
 	w = httptest.NewRecorder()
 	h.ServeHTTP(w, r)
 	test.Equals(t, http.StatusInternalServerError, w.Result().StatusCode)
@@ -503,19 +503,19 @@ func TestHandleUpdateUser(t *testing.T) {
 	//Admin should succeed
 	//No valid token should fail to access
 	r = httptest.NewRequest("PATCH", "/api/v0/users/bob",
-		strings.NewReader("{\"username\":\"max\",\"password\":\"5678\",\"name\":\"Max\"}"))
+		strings.NewReader(`{"username":"max","password":"5678","name":"Max"}`))
 	userAccessTest(t, r, h, &auth, "someguy")
 	r = httptest.NewRequest("PATCH", "/api/v0/users/bob",
-		strings.NewReader("{\"username\":\"max\",\"password\":\"5678\",\"name\":\"Max\"}"))
+		strings.NewReader(`{"username":"max","password":"5678","name":"Max"}`))
 	adminAccessTest(t, r, h, &auth, func(r *http.Response) {
 		test.Equals(t, http.StatusOK, r.StatusCode)
 	})
 	r = httptest.NewRequest("PATCH", "/api/v0/users/bob",
-		strings.NewReader("{\"username\":\"max\",\"password\":\"5678\",\"name\":\"Max\"}"))
+		strings.NewReader(`{"username":"max","password":"5678","name":"Max"}`))
 	noValidTokenTest(t, r, h, &auth)
 
 	r = httptest.NewRequest("PATCH", "/api/v0/users/somefellow",
-		strings.NewReader("{\"username\":\"max\",\"password\":\"5678\",\"name\":\"Max\"}"))
+		strings.NewReader(`{"username":"max","password":"5678","name":"Max"}`))
 	userDoesNotExistTest(t, r, h, &us)
 }
 
