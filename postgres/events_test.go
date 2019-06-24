@@ -4,8 +4,10 @@ import (
 	"checkin"
 	"checkin/postgres"
 	"checkin/test"
+	"fmt"
 	"log"
 	"math"
+	"reflect"
 	"sort"
 	"testing"
 	"time"
@@ -60,6 +62,66 @@ func TestEvent(t *testing.T) {
 	//test invalid UUID
 	_, err = es.Event("")
 	test.Assert(t, err != nil, "No error thrown when trying to fetch event that does not exist (invalid UUID)")
+}
+
+func TestEvents(t *testing.T) {
+	es := postgres.EventService{DB: db}
+	//Test normal functionality
+	events, err := es.Events()
+	test.Ok(t, err)
+	events_check := []checkin.Event{
+		checkin.Event{
+			ID:        "2c59b54d-3422-4bdb-824c-4125775b44c8",
+			Name:      "Data Science CoP",
+			URL:       null.StringFrom("cop2018"),
+			TimeTags:  map[string]time.Time{"release": time.Date(2019, 4, 12, 9, 0, 0, 0, time.UTC)},
+			CreatedAt: time.Date(2019, 4, 1, 4, 5, 36, 0, time.UTC),
+			UpdatedAt: time.Date(2019, 4, 10, 3, 2, 11, 0, time.UTC),
+		},
+		checkin.Event{
+			ID:        "3820a980-a207-4738-b82b-45808fe7aba8",
+			Name:      "SDB Cohesion",
+			URL:       null.String{},
+			TimeTags:  map[string]time.Time{"release": time.Date(2019, 10, 8, 12, 0, 0, 0, time.UTC), "formrelease": time.Date(2019, 10, 8, 16, 30, 12, 0, time.UTC)},
+			CreatedAt: time.Date(2019, 5, 31, 2, 15, 22, 0, time.UTC),
+			UpdatedAt: time.Date(2019, 5, 31, 13, 2, 11, 0, time.UTC),
+		},
+		checkin.Event{
+			ID:        "03293b3b-df83-407e-b836-fb7d4a3c4966",
+			Name:      "CSSCOM Planning Seminar",
+			URL:       null.StringFrom("csscom"),
+			TimeTags:  map[string]time.Time{},
+			CreatedAt: time.Date(2019, 4, 1, 4, 5, 36, 0, time.UTC),
+			UpdatedAt: time.Date(2019, 4, 10, 3, 2, 11, 0, time.UTC),
+		},
+		checkin.Event{
+			ID:        "c14a592c-950d-44ba-b173-bbb9e4f5c8b4",
+			Name:      "Supply Rally",
+			URL:       null.String{},
+			TimeTags:  map[string]time.Time{"testlabel": time.Date(2019, 6, 8, 20, 30, 0, 0, time.UTC)},
+			CreatedAt: time.Date(2019, 4, 1, 4, 5, 36, 0, time.UTC),
+			UpdatedAt: time.Date(2019, 4, 10, 3, 2, 11, 0, time.UTC),
+		},
+		checkin.Event{
+			ID:        "aa19239f-f9f5-4935-b1f7-0edfdceabba7",
+			Name:      "Data Science Department Talk",
+			URL:       null.StringFrom("dsdjan2019"),
+			CreatedAt: time.Date(2019, 4, 1, 4, 5, 36, 0, time.UTC),
+			UpdatedAt: time.Date(2019, 4, 10, 3, 2, 11, 0, time.UTC),
+			Start:     null.TimeFrom(time.Date(2019, 1, 10, 15, 0, 0, 0, time.UTC)),
+			End:       null.TimeFrom(time.Date(2019, 1, 10, 18, 0, 0, 0, time.UTC)),
+			Lat:       null.FloatFrom(1.335932),
+			Long:      null.FloatFrom(103.744708),
+			Radius:    null.FloatFrom(0.5),
+		},
+	}
+	sort.Slice(events, func(i, j int) bool { return events[i].ID < events[j].ID })
+	sort.Slice(events_check, func(i, j int) bool { return events_check[i].ID < events_check[j].ID })
+	fmt.Printf("%v\n\n", events)
+	fmt.Printf("%v\n", events_check)
+	if reflect.DeepEqual(events, events_check) == false {
+		test.Assert(t, err != nil, "Slices were not equal")
+	}
 }
 
 func TestEventByURL(t *testing.T) {
