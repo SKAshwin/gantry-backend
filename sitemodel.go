@@ -108,7 +108,9 @@ type DetailItem struct {
 type ButtonMatrix []ButtonColumn
 
 //ButtonColumn represents a row of buttons
-type ButtonColumn []ButtonElement
+type ButtonColumn struct {
+	Buttons []ButtonElement `json:"cols"`
+}
 
 //ButtonElement represents a button, whih has a size, some text, a type (can link to either an external webpage
 //or to a pop up modal), and a content, which is either the URL of the external page or the text in the modal,
@@ -144,7 +146,11 @@ const (
 
 //UnmarshalJSON validates that the pop up type is either text or image, or returns an error
 func (pt *PopUpComponentType) UnmarshalJSON(bytes []byte) error {
-	input := PopUpComponentType(bytes[1 : len(bytes)-1])
+	if len(bytes) < 2 {
+		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
+			Str: string(bytes) + " is not a valid  pop up component type"}
+	}
+	input := PopUpComponentType(bytes[1 : len(bytes)-1]) //to remove the quotes
 	switch input {
 	case Text:
 		*pt = Text
@@ -153,9 +159,8 @@ func (pt *PopUpComponentType) UnmarshalJSON(bytes []byte) error {
 		*pt = Image
 		break
 	default:
-		//leave current PopUpComponentType unchanged
 		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
-			Str: string(input) + " is not a valid  pop up component type"}
+			Str: string(bytes) + " is not a valid  pop up component type"}
 	}
 
 	return nil
@@ -165,8 +170,6 @@ func (pt *PopUpComponentType) UnmarshalJSON(bytes []byte) error {
 type ButtonType string
 
 const (
-	//EmptyButtonType is the invalid zero value
-	EmptyButtonType ButtonType = ""
 	//Link means that the button embeds a URL to another
 	Link ButtonType = "link"
 	//Modal means that the button triggers a pop up with some text
@@ -175,7 +178,11 @@ const (
 
 //UnmarshalJSON validates that the button type is either link or modal, or returns and error
 func (bt *ButtonType) UnmarshalJSON(bytes []byte) error {
-	input := ButtonType(bytes)
+	if len(bytes) < 2 {
+		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
+			Str: string(bytes) + " is not a valid button type"}
+	}
+	input := ButtonType(bytes[1 : len(bytes)-1]) //to remove the quotes
 
 	switch input {
 	case Link:
@@ -185,9 +192,8 @@ func (bt *ButtonType) UnmarshalJSON(bytes []byte) error {
 		*bt = Modal
 		break
 	default:
-		*bt = EmptyButtonType
 		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
-			Str: string(input) + " is not a valid button type"}
+			Str: string(bytes) + " is not a valid button type"}
 	}
 
 	return nil
@@ -209,7 +215,11 @@ const (
 
 //UnmarshalJSON unmarshals JSON input into a QuestionType, making sure its one of Scaled, Rating, RadioButton or OpenEnded
 func (qt *QuestionType) UnmarshalJSON(bytes []byte) error {
-	input := QuestionType(bytes)
+	if len(bytes) < 2 {
+		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
+			Str: string(bytes) + " is not a valid question type"}
+	}
+	input := QuestionType(bytes[1 : len(bytes)-1]) //to remove the quotes
 
 	switch input {
 	case Scaled:
@@ -226,7 +236,7 @@ func (qt *QuestionType) UnmarshalJSON(bytes []byte) error {
 		break
 	default:
 		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
-			Str: string(input) + " is not a valid button type"}
+			Str: string(bytes) + " is not a valid question type"}
 	}
 
 	return nil
