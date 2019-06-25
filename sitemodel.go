@@ -28,10 +28,10 @@ type DetailsSection struct {
 
 //ButtonSection represents the bottom part of the page, with the buttons
 type ButtonSection struct {
-	Icon      bool            `json:"icon"`
-	Schedule  ScheduleSection `json:"schedule"`
-	Size      ButtonSize      `json:"sz"`
-	ButtonRow ButtonMatrix    `json:"rows"`
+	Icon       bool            `json:"icon"`
+	Schedule   ScheduleSection `json:"schedule"`
+	Size       ButtonSize      `json:"sz"`
+	ButtonRows ButtonMatrix    `json:"rows"`
 }
 
 //SurveySection represents a collection of questions that make up the event survey
@@ -101,7 +101,7 @@ type TextElement struct {
 //For example, Venue: KC3, will be a DetailItem with title Venue and Content KC3
 type DetailItem struct {
 	Title   string `json:"title"`
-	Content string `json:"content"`
+	Content string `json:"cont"`
 }
 
 //ButtonMatrix represents a row of button columns

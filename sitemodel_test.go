@@ -4,7 +4,6 @@ import (
 	"checkin"
 	"checkin/test"
 	"encoding/json"
-	"log"
 	"testing"
 )
 
@@ -41,6 +40,8 @@ func TestMinuteUnmarshalJSON(t *testing.T) {
 	//try not even a number
 	err = json.Unmarshal([]byte("aword"), &min)
 	test.Assert(t, err != nil, "No error when trying to unmarshal aword into minute")
+	err = json.Unmarshal([]byte(``), &min)
+	test.Assert(t, err != nil, "No error when trying to unmarshal empty string into minute")
 }
 
 func TestHourUnmarshalJSON(t *testing.T) {
@@ -75,6 +76,8 @@ func TestHourUnmarshalJSON(t *testing.T) {
 	//try not even a number
 	err = json.Unmarshal([]byte("aword"), &hour)
 	test.Assert(t, err != nil, "No error when trying to unmarshal aword into Hour")
+	err = json.Unmarshal([]byte(``), &hour)
+	test.Assert(t, err != nil, "No error when trying to unmarshal empty string into Hour")
 }
 
 func TestTextSizeUnmarshalJSON(t *testing.T) {
@@ -110,6 +113,8 @@ func TestTextSizeUnmarshalJSON(t *testing.T) {
 	//try not even a number
 	err = json.Unmarshal([]byte(" "), &sz)
 	test.Assert(t, err != nil, "No error when trying to unmarshal empty space into TextSize")
+	err = json.Unmarshal([]byte(``), &sz)
+	test.Assert(t, err != nil, "No error when trying to unmarshal empty string into TextSize")
 }
 
 func TestButtonSizeUnmarshalJSON(t *testing.T) {
@@ -145,6 +150,8 @@ func TestButtonSizeUnmarshalJSON(t *testing.T) {
 	//try not even a number
 	err = json.Unmarshal([]byte(`"ayywtf"`), &sz)
 	test.Assert(t, err != nil, "No error when trying to unmarshal ayywtf into ButtonSize")
+	err = json.Unmarshal([]byte(``), &sz)
+	test.Assert(t, err != nil, "No error when trying to unmarshal empty string into ButtonSize")
 }
 
 func TestPopUpComponentTypeUnmarshalJSON(t *testing.T) {
@@ -236,6 +243,164 @@ func TestQuestionTypeUnmarshalJSON(t *testing.T) {
 func TestGuestSiteUnmarshalJSON(t *testing.T) {
 	var site checkin.GuestSite
 
+	expectedSite := checkin.GuestSite{
+		Details: checkin.DetailsSection{
+			Logo: "",
+			Title: checkin.TextElement{
+				Content: "title",
+				Size:    checkin.TextSize(2),
+			},
+			Tagline: checkin.TextElement{
+				Content: "tagline",
+				Size:    checkin.TextSize(5),
+			},
+			Items: []checkin.DetailItem{
+				checkin.DetailItem{
+					Title:   "Date",
+					Content: "1 Jan 2020",
+				},
+				checkin.DetailItem{
+					Title:   "Time",
+					Content: "1300 - 1700",
+				},
+				checkin.DetailItem{
+					Title:   "Venue",
+					Content: "Kranji Camp 3 Blk 822, 90 Choa Chu Kang Way, Singapore 688264",
+				},
+				checkin.DetailItem{
+					Title:   "Attire",
+					Content: "Office Wear",
+				},
+			},
+		},
+		Main: checkin.ButtonSection{
+			Icon: true,
+			Schedule: checkin.ScheduleSection{
+				Display: true,
+				Pages: []checkin.SchedulePage{
+					checkin.SchedulePage{
+						Subject: "Menu A",
+						Items: []checkin.ScheduleItem{
+							checkin.ScheduleItem{
+								Topic: "Item A",
+								Start: checkin.TimeElement{},
+								End:   checkin.TimeElement{},
+								Abstract: checkin.OptionalContent{
+									Display: true,
+									Content: "hello",
+								},
+								Speaker: checkin.OptionalProfileItem{},
+							},
+							checkin.ScheduleItem{
+								Topic: "Item B",
+								Start: checkin.TimeElement{Hour: 12, Minute: 0},
+								End:   checkin.TimeElement{Hour: 14, Minute: 0},
+								Abstract: checkin.OptionalContent{
+									Display: true,
+									Content: "hello",
+								},
+								Speaker: checkin.OptionalProfileItem{
+									Display: true,
+									Content: checkin.ProfileItem{
+										Image: "",
+										Name:  "name",
+										Title: "title",
+										About: "about",
+									},
+								},
+							},
+						},
+					},
+					checkin.SchedulePage{
+						Subject: "Menu B",
+						Items: []checkin.ScheduleItem{
+							checkin.ScheduleItem{
+								Topic: "Item A",
+								Start: checkin.TimeElement{},
+								End:   checkin.TimeElement{},
+								Abstract: checkin.OptionalContent{
+									Display: false,
+									Content: "hello",
+								},
+								Speaker: checkin.OptionalProfileItem{
+									Display: true,
+								},
+							},
+							checkin.ScheduleItem{
+								Topic: "Item B",
+								Start: checkin.TimeElement{Hour: 12, Minute: 0},
+								End:   checkin.TimeElement{Hour: 14, Minute: 0},
+								Abstract: checkin.OptionalContent{
+									Display: false,
+									Content: "hello",
+								},
+								Speaker: checkin.OptionalProfileItem{
+									Display: false,
+									Content: checkin.ProfileItem{
+										Image: "",
+										Name:  "name",
+										Title: "title",
+										About: "about",
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			Size: checkin.ButtonSize(4),
+			ButtonRows: checkin.ButtonMatrix([]checkin.ButtonColumn{
+				checkin.ButtonColumn{
+					Buttons: []checkin.ButtonElement{
+						checkin.ButtonElement{
+							Title: "Link",
+							Type:  checkin.ButtonType("link"),
+							Icon:  "a1a.svg",
+							Link:  "https://www.google.com",
+							PopUp: checkin.PopUp([]checkin.PopUpComponent{
+								checkin.PopUpComponent{
+									Type:  checkin.PopUpComponentType("text"),
+									Text:  "",
+									Image: "",
+								},
+							}),
+						},
+						checkin.ButtonElement{
+							Title: "Popup",
+							Type:  checkin.ButtonType("popup"),
+							Icon:  "a1b.svg",
+							Link:  "",
+							PopUp: checkin.PopUp([]checkin.PopUpComponent{
+								checkin.PopUpComponent{
+									Type:  checkin.PopUpComponentType("text"),
+									Text:  "Hello",
+									Image: "",
+								},
+							}),
+						},
+					},
+				},
+			}),
+		},
+		Survey: checkin.SurveySection([]checkin.QuestionElement{
+			checkin.QuestionElement{
+				Type:     checkin.QuestionType("scaled"),
+				Question: "The length of the event was just nice.",
+			},
+			checkin.QuestionElement{
+				Type:     checkin.QuestionType("rating"),
+				Question: "How would you rate this event?",
+			},
+			checkin.QuestionElement{
+				Type:     checkin.QuestionType("radio"),
+				Question: "Is this your first time attending this event?",
+			},
+			checkin.QuestionElement{
+				Type:     checkin.QuestionType("open"),
+				Question: "Any other comments.",
+			},
+		}),
+	}
 	err := json.Unmarshal([]byte(`{
 		"details": {
 			"logo": "",
@@ -339,5 +504,6 @@ func TestGuestSiteUnmarshalJSON(t *testing.T) {
 		}]
 	}`), &site)
 	test.Ok(t, err)
-	log.Println(site)
+	test.Equals(t, expectedSite, site)
+
 }
