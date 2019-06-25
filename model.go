@@ -78,6 +78,15 @@ type EventService interface {
 	SubmitFeedback(ID string, ff FeedbackForm) error
 }
 
+//GuestSiteService An interface for functions which modify/fetch website data in the database
+type GuestSiteService interface {
+	GuestSite(eventID string) (GuestSite, error)
+	CreateGuestSite(eventID string, site GuestSite) error
+	UpdateGuestSite(eventID string, site GuestSite) error
+	DeleteGuestSite(eventID string) error
+	GuestSiteExists(eventID string) (bool, error)
+}
+
 //HashMethod An interface allowing you to hash a string, and confirm if a string matches a given hash
 type HashMethod interface {
 	HashAndSalt(pwd string) (string, error)
