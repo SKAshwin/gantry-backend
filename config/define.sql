@@ -59,6 +59,10 @@ create table hosts(
 	PRIMARY KEY(username, eventID)
 );
 
+create table website(
+	eventID UUID NOT NULL PRIMARY KEY REFERENCES event(ID) ON UPDATE CASCADE ON DELETE CASCADE,
+	data json NOT NULL
+);
 --test
 
 create USER server_access with password 'LongNightShortDay';

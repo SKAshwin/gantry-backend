@@ -56,3 +56,186 @@ INSERT into guest(nricHash, eventID, name, tags, checkedIn, checkInTime) VALUES
     ('B1132', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'D', '{"VIP", "ATTENDING"}', TRUE, NOW()),
     ('Z4432', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'E', '{"VIP"}', TRUE, NOW()),
     ('D2482', 'c14a592c-950d-44ba-b173-bbb9e4f5c8b4', 'F', '{"OFFICER"}', FALSE, NULL);
+
+INSERT INTO website(eventID, data) VALUES
+    ('2c59b54d-3422-4bdb-824c-4125775b44c8', '{
+		"details": {
+			"logo": "",
+			"title": {
+				"cont": "title",
+				"sz": 2
+			},
+			"tagline": {
+				"cont": "tagline",
+				"sz": 5
+			},
+			"items": [
+				{
+					"title": "Date",
+					"cont": "1 Jan 2020"
+				},{
+					"title": "Time",
+					"cont": "1300 - 1700"
+				},{
+					"title": "Venue",
+					"cont": "Kranji Camp 3 Blk 822, 90 Choa Chu Kang Way, Singapore 688264"
+				},{
+					"title": "Attire",
+					"cont": "Office Wear"
+				}
+			]
+		},
+		"main":{
+			"icon": true,
+			"schedule": {
+				"check": true,
+				"menus": [
+					{
+						"subject": "Menu A",
+						"items": [
+							{
+								"topic": "Item A",
+								"start": {"hour": 0, "mins": 0},
+								"end": {"hour": 0, "mins": 0},
+								"abstract": {"check": true, "cont": "hello"},
+								"speaker": {"check": false, "cont": {"img": "", "name": "", "title": "", "about": ""}}
+							},{
+								"topic": "Item B",
+								"start": {"hour": 12, "mins": 0},
+								"end": {"hour": 14, "mins": 0},
+								"abstract": {"check": true, "cont": "hello"},
+								"speaker": {"check": true, "cont": {"img": "", "name": "name", "title": "title", "about": "about"}}
+							}
+						]
+					},{
+						"subject": "Menu B",
+						"items": [
+							{
+								"topic": "Item A",
+								"start": {"hour": 0, "mins": 0},
+								"end": {"hour": 0, "mins": 0},
+								"abstract": {"check": false, "cont": "hello"},
+								"speaker": {"check": true, "cont": {"img": "", "name": "", "title": "", "about": ""}}
+							},{
+								"topic": "Item B",
+								"start": {"hour": 12, "mins": 0},
+								"end": {"hour": 14, "mins": 0},
+								"abstract": {"check": false, "cont": "hello"},
+								"speaker": {"check": false, "cont": {"img": "", "name": "name", "title": "title", "about": "about"}}
+							}
+						]
+					}
+				]
+			},
+			"sz": 4,
+			"rows": [
+				{
+					"cols": [{
+						"title": "Link",
+						"type": "link",
+						"icon": "a1a.svg",
+						"link": "https://www.google.com",
+						"popup": [{"type":"text", "text":"", "img":""}]
+						},{
+						"title": "Popup",
+						"type": "popup",
+						"icon": "a1b.svg",
+						"link": "",
+						"popup": [{"type":"text", "text":"Hello", "img":""}]
+					}]
+				}
+			]
+		},
+		"survey": [{
+			"type": "scaled",
+			"question": "The length of the event was just nice."
+		},{
+			"type": "rating",
+			"question": "How would you rate this event?"
+		},{
+			"type": "radio",
+			"question": "Is this your first time attending this event?"
+		},{
+			"type": "open",
+			"question": "Any other comments."
+		}]
+	}'),
+	('3820a980-a207-4738-b82b-45808fe7aba8', '{
+		"details": {
+			"logo": "",
+			"title": {
+				"cont": "anything",
+				"sz": 5
+			},
+			"tagline": {
+				"cont": "",
+				"sz": 1
+			},
+			"items": [
+				{
+					"title": "Date",
+					"cont": "1 Jan 2020"
+				},{
+					"title": "Time",
+					"cont": "1300 - 1700"
+				},{
+					"title": "Venue",
+					"cont": "Kranji Camp 3 Blk 822, 90 Choa Chu Kang Way, Singapore 688264"
+				}
+			]
+		},
+		"main":{
+			"icon": true,
+			"schedule": {
+				"check": true,
+				"menus": [
+					{
+						"subject": "Menu A",
+						"items": [
+							{
+								"topic": "Item A",
+								"start": {"hour": 0, "mins": 0},
+								"end": {"hour": 0, "mins": 0},
+								"abstract": {"check": true, "cont": "hello"},
+								"speaker": {"check": false, "cont": {"img": "hello", "name": "", "title": "", "about": ""}}
+							},{
+								"topic": "Item B",
+								"start": {"hour": 12, "mins": 0},
+								"end": {"hour": 14, "mins": 0},
+								"abstract": {"check": true, "cont": "hello"},
+								"speaker": {"check": true, "cont": {"img": "", "name": "name", "title": "title", "about": "about"}}
+							}
+						]
+					}
+				]
+			},
+			"sz": 3,
+			"rows": [
+				{
+					"cols": [{
+						"title": "Link",
+						"type": "link",
+						"icon": "a1a.svg",
+						"link": "https://www.google.com",
+						"popup": [{"type":"text", "text":"", "img":""}]
+						},{
+						"title": "Popup",
+						"type": "popup",
+						"icon": "a1b.svg",
+						"link": "",
+						"popup": [{"type":"text", "text":"Hello", "img":""}]
+					}]
+				}
+			]
+		},
+		"survey": [{
+			"type": "scaled",
+			"question": "The length of the event was just nice."
+		},{
+			"type": "rating",
+			"question": "How would you rate this event?"
+		},{
+			"type": "open",
+			"question": "Any other comments."
+		}]
+	}');
