@@ -207,6 +207,9 @@ func TestCreateGuestSite(t *testing.T) {
 				Size:    checkin.TextSize(5),
 			},
 		},
+		Main: checkin.ButtonSection{
+			Size: checkin.ButtonSize(2),
+		},
 	}
 	err := gss.CreateGuestSite("03293b3b-df83-407e-b836-fb7d4a3c4966", site)
 	test.Ok(t, err)
