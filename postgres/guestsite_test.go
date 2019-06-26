@@ -289,6 +289,10 @@ func TestDeleteGuestSite(t *testing.T) {
 	//try deleting guest site of non-existent event, should not throw an error
 	err = gss.DeleteGuestSite("7d9ccc97-ae6c-472d-9696-c7bb61eff8bd")
 	test.Ok(t, err)
+
+	//try deleting guest site of non-existent event, should not throw an error
+	err = gss.DeleteGuestSite("notauuid")
+	test.Ok(t, err)
 }
 
 func TestGuestSiteExists(t *testing.T) {
