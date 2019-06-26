@@ -506,4 +506,9 @@ func TestGuestSiteUnmarshalJSON(t *testing.T) {
 	test.Ok(t, err)
 	test.Equals(t, expectedSite, site)
 
+	site = checkin.GuestSite{}
+	err = json.Unmarshal([]byte(`{}`), &site)
+	test.Ok(t, err)
+	test.Equals(t, checkin.GuestSite{}, site)
+
 }
