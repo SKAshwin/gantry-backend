@@ -197,19 +197,66 @@ func TestCreateGuestSite(t *testing.T) {
 	//test normal functionality
 	site := checkin.GuestSite{
 		Details: checkin.DetailsSection{
-			Logo: "something.jpg",
+			Logo: "",
 			Title: checkin.TextElement{
-				Content: "CSSCOM iWPS",
-				Size:    checkin.TextSize(7),
+				Content: "title",
+				Size:    checkin.TextSize(2),
 			},
 			Tagline: checkin.TextElement{
-				Content: "2019",
+				Content: "tagline",
 				Size:    checkin.TextSize(5),
+			},
+			Items: []checkin.DetailItem{
+				checkin.DetailItem{
+					Title:   "Date",
+					Content: "1 Jan 2020",
+				},
+				checkin.DetailItem{
+					Title:   "Time",
+					Content: "1300 - 1700",
+				},
 			},
 		},
 		Main: checkin.ButtonSection{
-			Size: checkin.ButtonSize(2),
+			Size: checkin.ButtonSize(4),
+			ButtonRows: checkin.ButtonMatrix([]checkin.ButtonColumn{
+				checkin.ButtonColumn{
+					Buttons: []checkin.ButtonElement{
+						checkin.ButtonElement{
+							Title: "Link",
+							Type:  checkin.ButtonType("link"),
+							PopUp: checkin.PopUp([]checkin.PopUpComponent{
+								checkin.PopUpComponent{
+									Type: checkin.PopUpComponentType("text"),
+								},
+							}),
+						},
+						checkin.ButtonElement{
+							Type: checkin.ButtonType("popup"),
+							PopUp: checkin.PopUp([]checkin.PopUpComponent{
+								checkin.PopUpComponent{
+									Type: checkin.PopUpComponentType("text"),
+								},
+							}),
+						},
+					},
+				},
+			}),
 		},
+		Survey: checkin.SurveySection([]checkin.QuestionElement{
+			checkin.QuestionElement{
+				Type: checkin.QuestionType("scaled"),
+			},
+			checkin.QuestionElement{
+				Type: checkin.QuestionType("rating"),
+			},
+			checkin.QuestionElement{
+				Type: checkin.QuestionType("radio"),
+			},
+			checkin.QuestionElement{
+				Type: checkin.QuestionType("open"),
+			},
+		}),
 	}
 	err := gss.CreateGuestSite("03293b3b-df83-407e-b836-fb7d4a3c4966", site)
 	test.Ok(t, err)
@@ -219,15 +266,8 @@ func TestCreateGuestSite(t *testing.T) {
 	err = gss.DeleteGuestSite("03293b3b-df83-407e-b836-fb7d4a3c4966") //clear out website
 	test.Ok(t, err)
 
-	//test that empty sites work fine
-	err = gss.CreateGuestSite("03293b3b-df83-407e-b836-fb7d4a3c4966", checkin.GuestSite{})
-	test.Ok(t, err)
-	fetched, err = gss.GuestSite("03293b3b-df83-407e-b836-fb7d4a3c4966")
-	test.Ok(t, err)
-	test.Equals(t, checkin.GuestSite{}, fetched)
-
 	//testing attempting to give one event multiple guest sites
-	err = gss.CreateGuestSite("2c59b54d-3422-4bdb-824c-4125775b44c8", checkin.GuestSite{})
+	err = gss.CreateGuestSite("2c59b54d-3422-4bdb-824c-4125775b44c8", site)
 	test.Assert(t, err != nil, "No error thrown when trying to create multiple sites for an event")
 
 	//test event does not exist
