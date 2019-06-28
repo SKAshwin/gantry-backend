@@ -377,6 +377,10 @@ func TestGuestSiteUnmarshalJSON(t *testing.T) {
 									Type:  checkin.PopUpComponentType("text"),
 									Text:  "Hello",
 									Image: "",
+									Table: checkin.Table{
+										TitleRow: []string{"title"},
+										Values:   [][]string{[]string{"a"}, []string{"b"}},
+									},
 								},
 							}),
 						},
@@ -488,7 +492,7 @@ func TestGuestSiteUnmarshalJSON(t *testing.T) {
 						"type": "popup",
 						"icon": "a1b.svg",
 						"link": "",
-						"popup": [{"type":"text", "text":"Hello", "img":""}]
+						"popup": [{"type":"text", "text":"Hello", "img":"", "table": {"title":["title"], "cont":[["a"], ["b"]]}}]
 					}]
 				}
 			]

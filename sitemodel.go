@@ -133,6 +133,13 @@ type PopUpComponent struct {
 	Type  PopUpComponentType `json:"type"`
 	Text  string             `json:"text"`
 	Image string             `json:"img"`
+	Table Table              `json:"table"`
+}
+
+//Table literally represents a table
+type Table struct {
+	TitleRow []string   `json:"title"`
+	Values   [][]string `json:"cont"`
 }
 
 //PopUpComponentType represents the type of a pop up component
