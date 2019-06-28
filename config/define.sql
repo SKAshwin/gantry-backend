@@ -67,9 +67,4 @@ create table website(
 
 create USER server_access with password 'LongNightShortDay';
 grant CONNECT on DATABASE registrationapp to server_access;
-grant SELECT, INSERT, UPDATE, DELETE on app_user to server_access;
-grant SELECT, INSERT, UPDATE on app_admin to server_access;
-grant SELECT, INSERT, UPDATE, DELETE on event to server_access;
-grant SELECT, INSERT, UPDATE, DELETE on hosts to server_access;
-grant SELECT, INSERT, UPDATE, DELETE on guest to server_access;
-grant SELECT, INSERT, UPDATE, DELETE on form to server_access;
+GRANT ALL PRIVILEGES on schema public to server_access;
