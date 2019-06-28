@@ -2,6 +2,7 @@ package http
 
 import (
 	"checkin"
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -53,8 +54,87 @@ func NewGuestSiteHandler(gss checkin.GuestSiteService, es checkin.EventService, 
 	return h
 }
 
+//Returns the website associated with this event
 func (h *GuestSiteHandler) handleWebsite(w http.ResponseWriter, r *http.Request) {
+	website, err := h.GuestSiteService.GuestSite(mux.Vars(r)["eventID"])
+	if err != nil {
+		h.Logger.Println("Error fetching website: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error fetching website", w)
+	} else {
+		reply, _ := json.Marshal(website)
+		w.Write(reply)
+	}
+}
 
+func (h *GuestSiteHandler) handleCreateWebsite(w http.ResponseWriter, r *http.Request) {
+	var website checkin.GuestSite
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&website)
+	if err != nil {
+		h.Logger.Println("Error decoding website JSON: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "Badly formatted JSON for website (Possibly invalid question/component types or sizes)", w)
+		return
+	}
+
+	eventID := mux.Vars(r)["eventID"]
+	if exists, err := h.GuestSiteService.GuestSiteExists(eventID); err != nil {
+		//check if the URL provided is available
+		h.Logger.Println("Error checking if website already exists for event: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error checking if website already exists for event", w)
+		return
+	} else if exists {
+		WriteMessage(http.StatusConflict, "Event already has a website - cannot create a new one. Use PATCH to update the existing one instead.", w)
+		return
+	}
+
+	err = h.GuestSiteService.CreateGuestSite(eventID, website)
+	if err != nil {
+		h.Logger.Println("Error in creating website: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error in creating website", w)
+	} else {
+		WriteMessage(http.StatusCreated, "Website created successfully", w)
+	}
+}
+
+func (h *GuestSiteHandler) handleUpdateWebsite(w http.ResponseWriter, r *http.Request) {
+	//Load original website, marshal JSON into it
+	//This updates only the fields that were supplied
+	eventID := mux.Vars(r)["eventID"]
+	website, err := h.GuestSiteService.GuestSite(eventID)
+	if err != nil {
+		h.Logger.Println("Error fetching original website: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Could not fetch original website", w)
+		return
+	}
+
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err = dec.Decode(&website)
+	if err != nil {
+		h.Logger.Println("Error when decoding update fields for website: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "JSON could not be decoded into website", w)
+		return
+	}
+
+	err = h.GuestSiteService.UpdateGuestSite(eventID, website)
+	if err != nil {
+		h.Logger.Println("Error updating user: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error updating event", w)
+	} else {
+		WriteOKMessage("Event updated", w)
+	}
+}
+
+func (h *GuestSiteHandler) handleDeleteWebsite(w http.ResponseWriter, r *http.Request) {
+	eventID := mux.Vars(r)["eventID"]
+	err := h.GuestSiteService.DeleteGuestSite(eventID)
+	if err != nil {
+		h.Logger.Println("Error deleting website: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error deleting website", w)
+	} else {
+		WriteOKMessage("Successfully deleted website", w)
+	}
 }
 
 func websiteExists(gss checkin.GuestSiteService, eventIDKey string, logger *log.Logger) Adapter {
