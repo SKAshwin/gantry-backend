@@ -33,17 +33,19 @@ type UserService interface {
 
 //Event represents an event which will have an associated website
 type Event struct {
-	ID        string               `json:"eventId" db:"id"`
-	Name      string               `json:"name" db:"name"`
-	TimeTags  map[string]time.Time `json:"triggers" db:"-"`
-	Start     null.Time            `json:"startDateTime" db:"start"`
-	End       null.Time            `json:"endDateTime" db:"end"`
-	Lat       null.Float           `json:"lat" db:"lat"`
-	Long      null.Float           `json:"long" db:"long"`
-	Radius    null.Float           `json:"radius" db:"radius"` //in km
-	URL       null.String          `json:"url" db:"url"`
-	UpdatedAt time.Time            `json:"updatedAt" db:"updatedat"`
-	CreatedAt time.Time            `json:"createdAt" db:"createdat"`
+	ID         string               `json:"eventId" db:"id"`
+	Name       string               `json:"name" db:"name"`
+	TimeTags   map[string]time.Time `json:"triggers" db:"-"`
+	Start      null.Time            `json:"startDateTime" db:"start"`
+	End        null.Time            `json:"endDateTime" db:"end"`
+	Lat        null.Float           `json:"lat" db:"lat"`
+	Long       null.Float           `json:"long" db:"long"`
+	Radius     null.Float           `json:"radius" db:"radius"` //in km
+	URL        null.String          `json:"url" db:"url"`
+	UpdatedAt  time.Time            `json:"updatedAt" db:"updatedat"`
+	CreatedAt  time.Time            `json:"createdAt" db:"createdat"`
+	Identifier string               `json:"identifier"` //NRIC/phone number/etc
+	HasWebsite bool                 `json:"main" db:"website"`
 }
 
 //FeedbackFormItem represents a question/answer pair in a feedback form

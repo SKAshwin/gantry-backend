@@ -93,7 +93,7 @@ func (es *EventService) Events() ([]checkin.Event, error) {
 //into structs
 func (es *EventService) EventsBy(username string) ([]checkin.Event, error) {
 	//need to list out columns instead of * as hosts is used in the query
-	rows, err := es.DB.Queryx("SELECT id, name, \"start\", \"end\", lat, long, radius, url, updatedat, createdat, timetags from event, hosts where hosts.username = $1 and hosts.eventID = event.ID",
+	rows, err := es.DB.Queryx("SELECT id, name, \"start\", \"end\", lat, long, radius, url, updatedat, createdat, timetags, website from event, hosts where hosts.username = $1 and hosts.eventID = event.ID",
 		username)
 	if err != nil {
 		return nil, errors.New("Error fetching all events for user: " + err.Error())
@@ -135,7 +135,7 @@ func (es *EventService) CreateEvent(e checkin.Event, hostUsername string) error 
 
 	rawEvent := es.marshalEvent(e)
 
-	_, err = tx.NamedExec("INSERT INTO event(id, name, url, start, \"end\", timetags, lat, long, radius) VALUES (:id, :name, :url, :start, :end, :timetags,:lat, :long, :radius)", rawEvent)
+	_, err = tx.NamedExec("INSERT INTO event(id, name, url, start, \"end\", timetags, lat, long, radius, website) VALUES (:id, :name, :url, :start, :end, :timetags,:lat, :long, :radius, :website)", rawEvent)
 	if err != nil {
 		tx.Rollback()
 		return errors.New("Error inserting event data: " + err.Error())
@@ -166,7 +166,7 @@ func (es *EventService) CreateEvent(e checkin.Event, hostUsername string) error 
 func (es *EventService) UpdateEvent(event checkin.Event) error {
 	rawEvent := es.marshalEvent(event)
 	res, err := es.DB.NamedExec("UPDATE event SET name = :name, timetags = :timetags, \"start\" = :start, "+
-		"\"end\" = :end, lat = :lat, long= :long, radius = :radius, url = :url, updatedAt = (NOW() at time zone 'utc') where id = :id",
+		"\"end\" = :end, lat = :lat, long= :long, radius = :radius, url = :url, website = :website, updatedAt = (NOW() at time zone 'utc') where id = :id",
 		&rawEvent)
 	if err != nil {
 		return errors.New("Error when updating event: " + err.Error())

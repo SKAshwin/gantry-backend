@@ -31,6 +31,7 @@ create table event(
 	lat float8,
 	long float8,
 	radius float8, --in km
+	website BOOLEAN NOT NULL DEFAULT false, -- has website
 	createdAt TIMESTAMP NOT NULL DEFAULT (NOW() at time zone 'utc'),
 	updatedAt TIMESTAMP NOT NULL DEFAULT (NOW() at time zone 'utc')
 );
