@@ -42,13 +42,13 @@ func NewGuestSiteHandler(gss checkin.GuestSiteService, es checkin.EventService, 
 	eventExistCheck := eventExists(es, "eventID", h.Logger)
 	urlConversion := eventURLToID(es, "eventID", h.Logger)
 	siteExistCheck := websiteExists(gss, "eventID", h.Logger)
-	h.Handle("/api/v1-4/events/{eventID}/website", Adapt(http.NotFoundHandler(),
+	h.Handle("/api/v1-4/events/{eventID}/website", Adapt(http.HandlerFunc(h.handleWebsite),
 		urlConversion, eventExistCheck, siteExistCheck)).Methods("GET") //GET the website JSON
-	h.Handle("/api/v1-4/events/{eventID}/website", Adapt(http.NotFoundHandler(),
+	h.Handle("/api/v1-4/events/{eventID}/website", Adapt(http.HandlerFunc(h.handleCreateWebsite),
 		urlConversion, eventExistCheck, tokenCheck, credentialsCheck)).Methods("POST") //create a new website for that event
-	h.Handle("/api/v1-4/events/{eventID}/website", Adapt(http.NotFoundHandler(),
+	h.Handle("/api/v1-4/events/{eventID}/website", Adapt(http.HandlerFunc(h.handleUpdateWebsite),
 		urlConversion, eventExistCheck, siteExistCheck, tokenCheck, credentialsCheck)).Methods("PATCH") //update the website's JSON
-	h.Handle("/api/v1-4/events/{eventID}/website", Adapt(http.NotFoundHandler(),
+	h.Handle("/api/v1-4/events/{eventID}/website", Adapt(http.HandlerFunc(h.handleDeleteWebsite),
 		urlConversion, eventExistCheck, siteExistCheck, tokenCheck, credentialsCheck)).Methods("DELETE") //remove the website's JSON
 
 	return h

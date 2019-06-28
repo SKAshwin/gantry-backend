@@ -40,12 +40,14 @@ func main() {
 	as := &postgres.AuthenticationService{DB: db, HM: bcryptHashMethod}
 	es := &postgres.EventService{DB: db}
 	gs := &postgres.GuestService{DB: db, HM: bcryptHashMethod, HashCache: make(map[string]string)}
+	gss := &postgres.GuestSiteService{DB: db}
 
 	authHandler := http.NewAuthHandler(as, jwtAuthenticator, us)
 	userHandler := http.NewUserHandler(us, jwtAuthenticator)
 	guestHandler := http.NewGuestHandler(gs, es, guestMessenger, jwtAuthenticator, toInt(config["MAX_LENGTH_GUEST_NAME"]),
 		toInt(config["MAX_LENGTH_GUEST_TAG"]))
-	eventHandler := http.NewEventHandler(es, jwtAuthenticator, guestHandler, toInt(config["MAX_LENGTH_EVENT_NAME"]),
+	guestSiteHandler := http.NewGuestSiteHandler(gss, es, jwtAuthenticator)
+	eventHandler := http.NewEventHandler(es, jwtAuthenticator, guestHandler, guestSiteHandler, toInt(config["MAX_LENGTH_EVENT_NAME"]),
 		toInt(config["MAX_LENGTH_EVENT_URL"]), toInt(config["MAX_LENGTH_EVENT_TIMETAG"]))
 	utilityHandler := http.NewUtilityHandler(qrGenerator)
 

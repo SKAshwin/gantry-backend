@@ -25,6 +25,7 @@ import (
 type EventHandler struct {
 	*mux.Router
 	GuestHandler     *GuestHandler
+	GuestSiteHandler *GuestSiteHandler
 	EventService     checkin.EventService
 	Logger           *log.Logger
 	Authenticator    Authenticator
@@ -38,7 +39,7 @@ type EventHandler struct {
 //GuestHandler, EventService, Authenticator needs to be set by the calling function
 //API endpoint changes happen here, as well as changes to the routing library and logger to be used
 //and type of authenticator
-func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandler, maxLengthName, maxLengthURL, maxLengthTimeTag int) *EventHandler {
+func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandler, gsh *GuestSiteHandler, maxLengthName, maxLengthURL, maxLengthTimeTag int) *EventHandler {
 	h := &EventHandler{
 		Router:           mux.NewRouter(),
 		Logger:           log.New(os.Stderr, "", log.LstdFlags),
@@ -79,6 +80,7 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 		tokenCheck, existCheck, credentialsCheck)).Methods("GET")
 	//route all guest-related requests to the guest handler
 	h.PathPrefix("/api/{versionNumber}/events/{eventID}/guests").Handler(gh)
+	h.PathPrefix("/api/{versionNumber}/events/{eventID}/website").Handler(gsh)
 
 	return h
 }
