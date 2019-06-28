@@ -461,6 +461,38 @@ func eventReleased(es checkin.EventService, eventIDKey string, logger *log.Logge
 	}
 }
 
+//eventURLToID a middleware where, if a form value ?identifier=url is supplied, then
+//interprets the urlOrIDKey as a URL, and finds an event with the corresponding URL
+//and subs out the urlOrIDKey for the eventID
+//so the actual handler can just assume eventID is supplied
+//this allows for url to be supplied instead of eventID for an endpoint that takes eventID
+func eventURLToID(es checkin.EventService, urlOrIDKey string, logger *log.Logger) Adapter {
+	return func(h http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.FormValue("identifier") == "url" {
+				url := mux.Vars(r)[urlOrIDKey]
+				ok, err := es.URLExists(url)
+				if err != nil {
+					logger.Println("Error checking if event exists with that URL: " + err.Error())
+					WriteMessage(http.StatusInternalServerError, "Error fetching event with that URL", w)
+					return
+				} else if !ok {
+					WriteMessage(http.StatusNotFound, "No event found with that URL", w)
+					return
+				}
+				event, err := es.EventByURL(url)
+				if err != nil {
+					logger.Println("Error fetching event: " + err.Error())
+					WriteMessage(http.StatusInternalServerError, "Error fetching event with that URL", w)
+					return
+				}
+				mux.Vars(r)[urlOrIDKey] = event.ID
+			}
+			h.ServeHTTP(w, r)
+		})
+	}
+}
+
 //CURRENTLY UNUSED/UNTESTED (SHOULD BE FINE THOUGH)
 //handleEvents is a handler which returns all information pertaining to all events
 //func (h *EventHandler) handleEvents(w http.ResponseWriter, r *http.Request) {

@@ -39,15 +39,19 @@ func NewGuestSiteHandler(gss checkin.GuestSiteService, es checkin.EventService, 
 	tokenCheck := checkAuth(auth, h.Logger)
 	credentialsCheck := isAdminOrHost(auth, es, "eventID", h.Logger)
 	existCheck := eventExists(es, "eventID", h.Logger)
-
+	urlConversion := eventURLToID(es, "eventID", h.Logger)
 	h.Handle("/api/v1-4/events/{eventID}/website", Adapt(http.NotFoundHandler(),
-		existCheck)).Methods("GET") //GET the website JSON
+		urlConversion, existCheck)).Methods("GET") //GET the website JSON
 	h.Handle("/api/v1-4/events/{eventID}/website", Adapt(http.NotFoundHandler(),
-		existCheck, tokenCheck, credentialsCheck)).Methods("POST") //create a new website for that event
+		urlConversion, existCheck, tokenCheck, credentialsCheck)).Methods("POST") //create a new website for that event
 	h.Handle("/api/v1-4/events/{eventID}/website", Adapt(http.NotFoundHandler(),
-		existCheck, tokenCheck, credentialsCheck)).Methods("PATCH") //update the website's JSON
+		urlConversion, existCheck, tokenCheck, credentialsCheck)).Methods("PATCH") //update the website's JSON
 	h.Handle("/api/v1-4/events/{eventID}/website", Adapt(http.NotFoundHandler(),
-		existCheck, tokenCheck, credentialsCheck)).Methods("DELETE") //remove the website's JSON
+		urlConversion, existCheck, tokenCheck, credentialsCheck)).Methods("DELETE") //remove the website's JSON
 
 	return h
+}
+
+func (h *GuestSiteHandler) handleWebsite(w http.ResponseWriter, r *http.Request) {
+
 }
