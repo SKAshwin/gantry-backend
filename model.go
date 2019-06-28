@@ -44,7 +44,7 @@ type Event struct {
 	URL        null.String          `json:"url" db:"url"`
 	UpdatedAt  time.Time            `json:"updatedAt" db:"updatedat"`
 	CreatedAt  time.Time            `json:"createdAt" db:"createdat"`
-	Identifier string               `json:"identifier"` //NRIC/phone number/etc
+	Identifier string               `json:"identifier" db:"identifier"` //NRIC/phone number/etc
 	HasWebsite bool                 `json:"main" db:"website"`
 }
 
