@@ -29,6 +29,7 @@ type DetailsSection struct {
 //ButtonSection represents the bottom part of the page, with the buttons
 type ButtonSection struct {
 	Icon       bool            `json:"icon"`
+	Survey     bool            `json:"survey"`
 	Schedule   ScheduleSection `json:"schedule"`
 	Size       ButtonSize      `json:"sz"`
 	ButtonRows ButtonMatrix    `json:"rows"`
@@ -109,6 +110,7 @@ type ButtonMatrix []ButtonColumn
 
 //ButtonColumn represents a row of buttons
 type ButtonColumn struct {
+	Title   OptionalContent `json:"title"`
 	Buttons []ButtonElement `json:"cols"`
 }
 

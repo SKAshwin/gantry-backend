@@ -274,7 +274,8 @@ func TestGuestSiteUnmarshalJSON(t *testing.T) {
 			},
 		},
 		Main: checkin.ButtonSection{
-			Icon: true,
+			Icon:   true,
+			Survey: false,
 			Schedule: checkin.ScheduleSection{
 				Display: true,
 				Pages: []checkin.SchedulePage{
@@ -351,6 +352,7 @@ func TestGuestSiteUnmarshalJSON(t *testing.T) {
 			Size: checkin.ButtonSize(4),
 			ButtonRows: checkin.ButtonMatrix([]checkin.ButtonColumn{
 				checkin.ButtonColumn{
+					Title: checkin.OptionalContent{Display: false, Content: ""},
 					Buttons: []checkin.ButtonElement{
 						checkin.ButtonElement{
 							Title: "Link",
@@ -430,6 +432,7 @@ func TestGuestSiteUnmarshalJSON(t *testing.T) {
 		},
 		"main":{
 			"icon": true,
+			"survey": false,
 			"schedule": {
 				"check": true,
 				"menus": [
@@ -473,6 +476,7 @@ func TestGuestSiteUnmarshalJSON(t *testing.T) {
 			"sz": 4,
 			"rows": [
 				{
+					"title": {"check": false, "cont":""},
 					"cols": [{
 						"title": "Link",
 						"type": "link",

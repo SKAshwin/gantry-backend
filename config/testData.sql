@@ -87,6 +87,7 @@ INSERT INTO website(eventID, data) VALUES
 		},
 		"main":{
 			"icon": true,
+			"survey": false,
 			"schedule": {
 				"check": true,
 				"menus": [
@@ -130,6 +131,7 @@ INSERT INTO website(eventID, data) VALUES
 			"sz": 4,
 			"rows": [
 				{
+					"title": {"check": false, "cont":""},
 					"cols": [{
 						"title": "Link",
 						"type": "link",
