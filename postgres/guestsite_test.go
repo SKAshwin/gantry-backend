@@ -117,8 +117,8 @@ func TestGuestSite(t *testing.T) {
 				},
 			},
 			Size: checkin.ButtonSize(4),
-			ButtonRows: checkin.ButtonMatrix([]checkin.ButtonColumn{
-				checkin.ButtonColumn{
+			ButtonRows: []checkin.ButtonRow{
+				checkin.ButtonRow{
 					Buttons: []checkin.ButtonElement{
 						checkin.ButtonElement{
 							Title: "Link",
@@ -148,7 +148,7 @@ func TestGuestSite(t *testing.T) {
 						},
 					},
 				},
-			}),
+			},
 		},
 		Survey: checkin.SurveySection([]checkin.QuestionElement{
 			checkin.QuestionElement{
@@ -219,8 +219,8 @@ func TestCreateGuestSite(t *testing.T) {
 		},
 		Main: checkin.ButtonSection{
 			Size: checkin.ButtonSize(4),
-			ButtonRows: checkin.ButtonMatrix([]checkin.ButtonColumn{
-				checkin.ButtonColumn{
+			ButtonRows: []checkin.ButtonRow{
+				checkin.ButtonRow{
 					Buttons: []checkin.ButtonElement{
 						checkin.ButtonElement{
 							Title: "Link",
@@ -241,7 +241,7 @@ func TestCreateGuestSite(t *testing.T) {
 						},
 					},
 				},
-			}),
+			},
 		},
 		Survey: checkin.SurveySection([]checkin.QuestionElement{
 			checkin.QuestionElement{

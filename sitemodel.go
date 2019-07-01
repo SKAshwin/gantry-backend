@@ -32,7 +32,7 @@ type ButtonSection struct {
 	Survey     bool            `json:"survey"`
 	Schedule   ScheduleSection `json:"schedule"`
 	Size       ButtonSize      `json:"sz"`
-	ButtonRows ButtonMatrix    `json:"rows"`
+	ButtonRows []ButtonRow     `json:"rows"`
 }
 
 //SurveySection represents a collection of questions that make up the event survey
@@ -46,8 +46,9 @@ type QuestionElement struct {
 
 //ScheduleSection represents the portion of the website with the event schedule information
 type ScheduleSection struct {
-	Display bool           `json:"check"`
-	Pages   []SchedulePage `json:"menus"`
+	Display    bool           `json:"check"`
+	Individual bool           `json:"individual"`
+	Pages      []SchedulePage `json:"menus"`
 }
 
 //SchedulePage refers to a page of the schedule
@@ -105,11 +106,8 @@ type DetailItem struct {
 	Content string `json:"cont"`
 }
 
-//ButtonMatrix represents a row of button columns
-type ButtonMatrix []ButtonColumn
-
-//ButtonColumn represents a row of buttons
-type ButtonColumn struct {
+//ButtonRow represents a row of buttons
+type ButtonRow struct {
 	Title   OptionalContent `json:"title"`
 	Buttons []ButtonElement `json:"cols"`
 }
@@ -118,11 +116,12 @@ type ButtonColumn struct {
 //or to a pop up modal), and a content, which is either the URL of the external page or the text in the modal,
 //depending on ButtonType
 type ButtonElement struct {
-	Icon  string     `json:"icon"`
-	Title string     `json:"title"`
-	Type  ButtonType `json:"type"`
-	Link  string     `json:"link"` //consider using markdown
-	PopUp PopUp      `json:"popup"`
+	Icon          string     `json:"icon"`
+	Title         string     `json:"title"`
+	Type          ButtonType `json:"type"`
+	Link          string     `json:"link"` //consider using markdown
+	PopUp         PopUp      `json:"popup"`
+	EventSchedule int        `json:"eventSchedule"`
 }
 
 //PopUp a pop up consists of many components
@@ -181,8 +180,18 @@ type ButtonType string
 const (
 	//Link means that the button embeds a URL to another
 	Link ButtonType = "link"
+
 	//Modal means that the button triggers a pop up with some text
 	Modal ButtonType = "popup"
+
+	//Survey is a button that brings up the feedback survey
+	Survey ButtonType = "survey"
+
+	//MySchedule is a button that brings up a personalized schedule
+	MySchedule ButtonType = "mySchedule"
+
+	//EventSchedule is a button that brings up the event schedule
+	EventSchedule ButtonType = "eventSchedule"
 )
 
 //UnmarshalJSON validates that the button type is either link or modal, or returns and error
@@ -199,6 +208,15 @@ func (bt *ButtonType) UnmarshalJSON(bytes []byte) error {
 		break
 	case Modal:
 		*bt = Modal
+		break
+	case Survey:
+		*bt = Survey
+		break
+	case MySchedule:
+		*bt = MySchedule
+		break
+	case EventSchedule:
+		*bt = EventSchedule
 		break
 	default:
 		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),

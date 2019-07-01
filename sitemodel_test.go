@@ -350,8 +350,8 @@ func TestGuestSiteUnmarshalJSON(t *testing.T) {
 				},
 			},
 			Size: checkin.ButtonSize(4),
-			ButtonRows: checkin.ButtonMatrix([]checkin.ButtonColumn{
-				checkin.ButtonColumn{
+			ButtonRows: []checkin.ButtonRow{
+				checkin.ButtonRow{
 					Title: checkin.OptionalContent{Display: false, Content: ""},
 					Buttons: []checkin.ButtonElement{
 						checkin.ButtonElement{
@@ -386,7 +386,7 @@ func TestGuestSiteUnmarshalJSON(t *testing.T) {
 						},
 					},
 				},
-			}),
+			},
 		},
 		Survey: checkin.SurveySection([]checkin.QuestionElement{
 			checkin.QuestionElement{
