@@ -63,7 +63,7 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 		tokenCheck)).Methods("GET")
 	h.Handle("/api/v1-3/events/id/{eventURL}", http.HandlerFunc(h.handleIDByURL)).Methods("GET")
 	h.Handle("/api/v1-3/events/{eventID}", Adapt(http.HandlerFunc(h.handleEvent),
-		tokenCheck, existCheck, credentialsCheck, correctTimezonesOutput, jsonSelector)).Methods("GET")
+		existCheck, correctTimezonesOutput, jsonSelector)).Methods("GET")
 	h.Handle("/api/v1-3/events/{eventID}", Adapt(http.HandlerFunc(h.handleUpdateEvent),
 		tokenCheck, existCheck, credentialsCheck, correctTimezonesInput)).Methods("PATCH")
 	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleDeleteEvent),
