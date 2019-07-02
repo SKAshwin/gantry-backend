@@ -150,6 +150,9 @@ const (
 
 	//Image means it is to be interpreted as a Base64 encoding of an Image
 	Image PopUpComponentType = "img"
+
+	//TablePopUp means it gives a table
+	TablePopUp PopUpComponentType = "table"
 )
 
 //UnmarshalJSON validates that the pop up type is either text or image, or returns an error
@@ -165,6 +168,9 @@ func (pt *PopUpComponentType) UnmarshalJSON(bytes []byte) error {
 		break
 	case Image:
 		*pt = Image
+		break
+	case TablePopUp:
+		*pt = TablePopUp
 		break
 	default:
 		return &json.UnsupportedValueError{Value: reflect.ValueOf(bytes),
