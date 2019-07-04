@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 
+	"compress/gzip"
+
 	"github.com/gorilla/mux"
 )
 
@@ -61,8 +63,12 @@ func (h *GuestSiteHandler) handleWebsite(w http.ResponseWriter, r *http.Request)
 		h.Logger.Println("Error fetching website: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Error fetching website", w)
 	} else {
-		reply, _ := json.Marshal(website)
-		w.Write(reply)
+		w.Header().Add("Accept-Charset", "utf-8")
+		w.Header().Add("Content-Type", "application/json")
+		w.Header().Add("Content-Encoding", "gzip")
+		gz := gzip.NewWriter(w)
+		json.NewEncoder(gz).Encode(website)
+		gz.Close()
 	}
 }
 
