@@ -66,6 +66,8 @@ func NewEventHandler(es checkin.EventService, auth Authenticator, gh *GuestHandl
 		existCheck, correctTimezonesOutput, jsonSelector)).Methods("GET")
 	h.Handle("/api/v1-3/events/{eventID}", Adapt(http.HandlerFunc(h.handleUpdateEvent),
 		tokenCheck, existCheck, credentialsCheck, correctTimezonesInput)).Methods("PATCH")
+	h.Handle("/api/v1-4/events/{eventID}", Adapt(http.HandlerFunc(h.handleUpdateEventFully),
+		tokenCheck, existCheck, credentialsCheck, correctTimezonesInput)).Methods("PUT")
 	h.Handle("/api/v0/events/{eventID}", Adapt(http.HandlerFunc(h.handleDeleteEvent),
 		tokenCheck, existCheck, credentialsCheck)).Methods("DELETE")
 	h.Handle("/api/v0/events/{eventID}/released", Adapt(http.HandlerFunc(h.handleReleased),
@@ -392,6 +394,60 @@ func (h *EventHandler) handleUpdateEvent(w http.ResponseWriter, r *http.Request)
 	}
 
 	if event.URL != originalURL { //if the caller is attempting to update the url
+		if ok, err := h.EventService.URLExists(event.URL.String); err != nil {
+			h.Logger.Println("Error checking if URL taken: " + err.Error())
+			WriteMessage(http.StatusInternalServerError, "Error checking if URL already taken", w)
+			return
+		} else if ok {
+			WriteMessage(http.StatusConflict, "URL already exists", w)
+			return
+		}
+	}
+
+	err = h.EventService.UpdateEvent(event)
+	if err != nil {
+		h.Logger.Println("Error updating user: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Error updating event", w)
+	} else {
+		WriteOKMessage("Event updated", w)
+	}
+}
+
+//handleUpdateEventFully updates the event given by the eventID provided in the endpoint
+//using the full event struct supplied in the body of the request (overriding all previous values)
+//Note the values for eventID, createdAt and updatedAt still cannot be changed
+//all fields must be resupplied, except ID, which will be ignored if supplied (eventID in the endpoint is used instead)
+func (h *EventHandler) handleUpdateEventFully(w http.ResponseWriter, r *http.Request) {
+	var event checkin.Event
+	dec := json.NewDecoder(r.Body)
+	dec.DisallowUnknownFields()
+	err := dec.Decode(&event)
+	if err != nil {
+		h.Logger.Println("Error when decoding update fields: " + err.Error())
+		WriteMessage(http.StatusBadRequest, "JSON could not be decoded (Possibly invalid time format or unknown fields)", w)
+		return
+	}
+	event.ID = mux.Vars(r)["eventID"]
+
+	//load original event
+	original, err := h.EventService.Event(mux.Vars(r)["eventID"])
+	if err != nil {
+		h.Logger.Println("Error fetching original event: " + err.Error())
+		WriteMessage(http.StatusInternalServerError, "Could not fetch original event", w)
+		return
+	}
+
+	//validate inputs
+	if event.UpdatedAt != original.UpdatedAt || event.CreatedAt != original.CreatedAt {
+		//if caller trying to update these non-updatable fields
+		WriteMessage(http.StatusBadRequest, "Cannot update ID or update and create times", w)
+		return
+	} else if !h.validUpdateEventInputs(event) { //otherwise check that the object you have is valid
+		WriteMessage(http.StatusBadRequest, "Cannot set name or URL or timetag label to empty string, or longer than 64 bytes", w)
+		return
+	}
+
+	if event.URL != original.URL { //if the caller is attempting to update the url
 		if ok, err := h.EventService.URLExists(event.URL.String); err != nil {
 			h.Logger.Println("Error checking if URL taken: " + err.Error())
 			WriteMessage(http.StatusInternalServerError, "Error checking if URL already taken", w)
