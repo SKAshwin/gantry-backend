@@ -429,21 +429,17 @@ func (h *EventHandler) handleUpdateEventFully(w http.ResponseWriter, r *http.Req
 	}
 	event.ID = mux.Vars(r)["eventID"]
 
+	//validate inputs
+	if !h.validUpdateEventInputs(event) { //otherwise check that the object you have is valid
+		WriteMessage(http.StatusBadRequest, "Cannot set name or URL or timetag label to empty string, or longer than 64 bytes", w)
+		return
+	}
+
 	//load original event
 	original, err := h.EventService.Event(mux.Vars(r)["eventID"])
 	if err != nil {
 		h.Logger.Println("Error fetching original event: " + err.Error())
 		WriteMessage(http.StatusInternalServerError, "Could not fetch original event", w)
-		return
-	}
-
-	//validate inputs
-	if event.UpdatedAt != original.UpdatedAt || event.CreatedAt != original.CreatedAt {
-		//if caller trying to update these non-updatable fields
-		WriteMessage(http.StatusBadRequest, "Cannot update ID or update and create times", w)
-		return
-	} else if !h.validUpdateEventInputs(event) { //otherwise check that the object you have is valid
-		WriteMessage(http.StatusBadRequest, "Cannot set name or URL or timetag label to empty string, or longer than 64 bytes", w)
 		return
 	}
 
