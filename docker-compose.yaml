@@ -1,0 +1,32 @@
+version: '3.1'
+services:
+  db:
+    image: postgres:11
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - ./config/define.sql:/docker-entrypoint-initdb.d/1-schema.sql
+      - ./config/testData.sql:/docker-entrypoint-initdb.d/2-data.sql
+  app:
+    build: .
+    environment:
+      - ALLOWED_HEADERS=${ALLOWED_HEADERS}
+      - ALLOWED_METHODS=${ALLOWED_METHODS}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS}
+      - AUTH_HOURS=${AUTH_HOURS}
+      - AUTH_SECRET=${AUTH_SECRET}
+      - DATABASE_URL=${DATABASE_URL}
+      - PORT=${PORT}
+      - HASH_COST=${HASH_COST}
+      - MAX_LENGTH_GUEST_NAME=${MAX_LENGTH_GUEST_NAME}
+      - MAX_LENGTH_GUEST_TAG=${MAX_LENGTH_GUEST_TAG}
+      - MAX_LENGTH_EVENT_NAME=${MAX_LENGTH_EVENT_NAME}
+      - MAX_LENGTH_EVENT_URL=${MAX_LENGTH_EVENT_URL}
+      - MAX_LENGTH_EVENT_TIMETAG=${MAX_LENGTH_EVENT_TIMETAG}
+    command: bash -c 'while !</dev/tcp/db/5432; do sleep 1; done; go run cmd/checkin/main.go'
+    depends_on:
+      - db
+    ports:
+      - "${PORT}:5000"

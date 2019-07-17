@@ -20,9 +20,9 @@ import (
 )
 
 func main() {
-	if os.Getenv("IS_HEROKU") != "TRUE" {
+	/*if os.Getenv("IS_HEROKU") != "TRUE" {
 		loadEnvironmentalVariables()
-	}
+	}*/
 	config := getConfig()
 	db, err := postgres.Open(config["DATABASE_URL"])
 	if err != nil {

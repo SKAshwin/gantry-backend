@@ -1,5 +1,5 @@
-create DATABASE registrationapp;
-\connect registrationapp
+--create DATABASE registrationapp;
+--\connect registrationapp
 
 -- don't modify the test commands - used by the database access layer test suite
 
@@ -67,6 +67,6 @@ create table website(
 );
 --test
 
-create USER server_access with password 'LongNightShortDay';
-grant CONNECT on DATABASE registrationapp to server_access;
-GRANT ALL PRIVILEGES on schema public to server_access;
+--create USER server_access with password 'LongNightShortDay';
+--grant CONNECT on DATABASE registrationapp to server_access;
+--GRANT ALL PRIVILEGES on schema public to server_access;
